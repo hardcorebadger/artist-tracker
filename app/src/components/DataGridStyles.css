@@ -1,0 +1,6 @@
+.InovuaReactDataGrid__row--odd {
+  background-color: #f3f6f9 !important;
+}
+.inovua-react-virtual-list__view-container {
+  cursor: pointer;
+}

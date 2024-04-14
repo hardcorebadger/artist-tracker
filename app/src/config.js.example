@@ -1,0 +1,25 @@
+
+// Used by firebase.js to connect the app to firebase
+export const firebaseConfig = {
+  apiKey: "************************************",
+  authDomain: "***********.firebaseapp.com",
+  projectId: "***********",
+  storageBucket: "***********.appspot.com",
+  messagingSenderId: "***********",
+  appId: "1:***********:web:***********"
+};
+
+// links lemonsqueezy products to access levels
+// using AccessGates and AccessGuards
+export const products = {
+  11111: {
+    display: "Elite",
+    checkout: "https://[store].lemonsqueezy.com/checkout/buy/......",
+    access: ['elite', 'starter']
+  },
+  22222: {
+    display: "Starter",
+    checkout: "https://[store].lemonsqueezy.com/checkout/buy/......",
+    access: ['starter']
+  }
+}
