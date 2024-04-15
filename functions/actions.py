@@ -1,12 +1,6 @@
 
 from controllers import AirtableV1Controller, TaskController
 
-def get_user(uid, db):
-    ref = db.collection("users").document(uid)
-    doc = ref.get()
-    data = doc.to_dict()
-    return data
-
 def airtable_v1_cron(task_controller : TaskController, airtable_v1_controller: AirtableV1Controller):
     jobs_added = 0
 

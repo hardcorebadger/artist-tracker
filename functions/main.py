@@ -1,13 +1,12 @@
 from firebase_admin import initialize_app, firestore
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, params, logger, options
-from actions import airtable_v1_cron, get_user
+from actions import airtable_v1_cron
 from tmp_keys import *
-from lib import SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse
+from lib import SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController
 import flask
 from datetime import datetime, timedelta
 import traceback
-
 
 #################################
 # App Initialization

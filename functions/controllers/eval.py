@@ -50,7 +50,7 @@ class EvalController():
         raise ErrorResponse('Artist not found', 404, 'Tracking')
     # check the artist is ingested
     data = doc.to_dict()
-    if data['songstat_state'] != 'ingested':
+    if data['ob_status'] != 'onboarded' and data['ob_status'] != 'needs_eval':
         raise ErrorResponse('Artist not ingested', 405, 'Tracking')
 
     # get top tracks
@@ -111,17 +111,14 @@ class EvalController():
 
     if len(sp_evals) == 0 and len(yt_evals) == 0:
         ref.update({
-            "copyright_eval" : {
-              "signed_status": "unknown",
-              "distro_type": "unknown",
-              "distro": None,
-              "label": None,
-              "back_catalog": "unknown",
-              "evals": {},
-              "p_lines": [],
-              "as_of": datetime.now().strftime("%Y-%m-%d"),
-              "eval_status": "no_evals_found"
-        }})
+            "eval_status": "unknown",
+            "eval_distro_type": "unknown",
+            "eval_distro": "",
+            "eval_label": "",
+            "eval_prios": "unknown",
+            "eval_as_of": datetime.now().strftime("%Y-%m-%d"),
+            "ob_status": "onboarded"
+        })
         return 'No evals found', 201
         
     # NEW
@@ -177,21 +174,24 @@ class EvalController():
     parse_evals(yt_evals)
 
     ref.update({
-        "copyright_eval" : {
-          "signed_status": status,
-          "distro_type": main_eval['distribution_type'],
-          "distro": main_eval['distributor'],
-          "label": main_eval['label'],
-          "back_catalog": priors,
-          "evals": {
-              "main": main_eval,
-              "youtube": yt_evals,
-              "spotify": sp_evals
-          },
-          "p_lines": sp_plines,
-          "as_of": datetime.now().strftime("%Y-%m-%d"),
-          "eval_status": "success"
-    }})
+        "eval_status": status,
+        "eval_distro_type": main_eval['distribution_type'],
+        "eval_distro": main_eval['distributor'] if main_eval['distributor'] != None else "",
+        "eval_label": main_eval['label'] if main_eval['label'] != None else "",
+        "eval_prios": priors,
+        "eval_as_of": datetime.now().strftime("%Y-%m-%d"),
+        "ob_status": "onboarded"
+        # "copyright_eval" : {
+        #   "evals": {
+        #       "main": main_eval,
+        #       "youtube": yt_evals,
+        #       "spotify": sp_evals
+        #   },
+        #   "p_lines": sp_plines,
+        #   "as_of": datetime.now().strftime("%Y-%m-%d"),
+        #   "eval_status": "success"
+    })
+    # TODO save the full eval state to a subcollection
     return 'success', 200
   
   def _eval_spotify_rights(self, p_line, artist_name):
