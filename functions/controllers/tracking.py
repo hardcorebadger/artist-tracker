@@ -1,8 +1,9 @@
-from lib import SongstatsClient, ErrorResponse
+from lib import SongstatsClient, ErrorResponse, SpotifyClient
 from datetime import datetime, timedelta
 
 class TrackingController():
-  def __init__(self, songstats : SongstatsClient, db):
+  def __init__(self, spotify: SpotifyClient, songstats : SongstatsClient, db):
+    self.spotify = spotify
     self.songstats = songstats
     self.db = db
   
@@ -35,6 +36,9 @@ class TrackingController():
           "found_by": new_users,
       })
       return 'Artist exists, added to tracking', 200
+    
+    # check if the ID is valid (this will raise a 400 if the artist is invalid)
+    self.spotify.get_artist(spotify_id)
     
     # create an artist
     ref.set({

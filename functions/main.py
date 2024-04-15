@@ -27,7 +27,7 @@ youtube = YoutubeClient(YOUTUBE_TOKEN)
 songstats = SongstatsClient(SONGSTATS_API_KEY)
 v1_controller = AirtableV1Controller(airtable, spotify, youtube)
 task_controller = TaskController(PROJECT_ID, LOCATION, API_ROOT, DEFAULT_QUEUE)
-tracking_controller = TrackingController(songstats, db)
+tracking_controller = TrackingController(spotify, songstats, db)
 eval_controller = EvalController(spotify, youtube, db)
 
 # ##############################
