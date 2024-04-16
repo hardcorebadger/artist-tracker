@@ -4,20 +4,21 @@ from lib import ErrorResponse
 import traceback
 
 class TaskController():
-  def __init__(self, project_id, location, api_root, queue):
+  def __init__(self, project_id, location, v1_api_root, v2_api_root):
     self.project_id = project_id
     self.location = location
-    self.api_root = api_root
-    self.queue = queue
+    self.v1_api_root = v1_api_root
+    self.v2_api_root = v2_api_root
     
   
-  def enqueue_task(self, path, data={}):
+  def enqueue_task(self, queue_name, version, path, data={}):
+    api_root = self.v1_api_root if version == 1 else self.v2_api_root
     try:
         tasks_client = tasks_v2.CloudTasksClient()
-        queue = f"projects/{self.project_id}/locations/{self.location}/queues/{self.queue}"
+        queue = f"projects/{self.project_id}/locations/{self.location}/queues/{queue_name}"
         task = tasks_v2.Task(http_request={
             "http_method": tasks_v2.HttpMethod.POST,
-            "url": f"{self.api_root}{path}",
+            "url": f"{api_root}{path}",
             "headers": {
                 "Content-type": "application/json"
             },

@@ -1,6 +1,6 @@
 from firebase_admin import initialize_app, firestore
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, params, logger, options
-from actions import airtable_v1_cron
+from cron_jobs import airtable_v1_cron
 from tmp_keys import *
 from lib import SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController
@@ -25,7 +25,7 @@ airtable = AirtableClient(AIRTABLE_TOKEN, AIRTABLE_BASE, AIRTABLE_TABLES)
 youtube = YoutubeClient(YOUTUBE_TOKEN)
 songstats = SongstatsClient(SONGSTATS_API_KEY)
 v1_controller = AirtableV1Controller(airtable, spotify, youtube)
-task_controller = TaskController(PROJECT_ID, LOCATION, API_ROOT, DEFAULT_QUEUE)
+task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT)
 tracking_controller = TrackingController(spotify, songstats, db)
 eval_controller = EvalController(spotify, youtube, db)
 
@@ -46,7 +46,8 @@ def invalid_api_usage(e : Exception):
 
 @v2_api.post("/debug")
 def debug():
-    return 'debug', 200
+    ids = tracking_controller.find_needs_eval_refresh(100)
+    return {'artists': [ids]}, 200
 
 @v2_api.post("/eval-artist")
 def eval_artist():
@@ -161,13 +162,14 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 # Cron Job Definitions
 #################################
 
-@scheduler_fn.on_schedule(schedule="*/1 * * * *")
-def fn_v1_cron_job(event: scheduler_fn.ScheduledEvent) -> None:
-    airtable_v1_cron(task_controller, v1_controller)
+# @scheduler_fn.on_schedule(schedule="*/1 * * * *")
+# def fn_v1_cron_job(event: scheduler_fn.ScheduledEvent) -> None:
+#     airtable_v1_cron(task_controller, v1_controller)
 
 #################################
 # App Function Definitions
 #################################
+
 
 @https_fn.on_call()
 def add_artist(req: https_fn.CallableRequest):

@@ -1,5 +1,6 @@
 from lib import SongstatsClient, ErrorResponse, SpotifyClient, get_user
 from datetime import datetime, timedelta
+from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilter, StructuredQuery
 
 HOT_TRACKING_FIELDS = {
   "spotify__streams_current": "rel",
@@ -64,7 +65,9 @@ class TrackingController():
         "ob_status": "needs_ingest",
         "ob_wait_till": None,
         "avatar": None,
-        "stat_as_of": [],
+        "stats_as_of": datetime(2000, 1, 1, 1, 1, 1, 1),
+        "stat_dates": [],
+        "eval_as_of": datetime(2000, 1, 1, 1, 1, 1, 1),
         "eval_status": "no_eval",
         "eval_distro_type": "unknown",
         "eval_distro": "",
@@ -143,10 +146,33 @@ class TrackingController():
     stats = self.songstats.get_stat_weeks(spotify_id, 9)
     
     #  update the hot tracking stats on the artist
-    update = {"stat_as_of": stats['as_of']}
+    update = {"stat_dates": stats['as_of'], "stats_as_of": datetime.now()}
     for s in HOT_TRACKING_FIELDS:
       update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = stats['stats'][s][HOT_TRACKING_FIELDS[s]] if s in stats['stats'] else []
     ref.update(update)
     # TODO Add the deep stats subcollection
     return 'success', 200
-    
+  
+  # ######################
+  # Cron Support
+  # ######################
+
+  def find_needs_eval_refresh(self, limit: int):
+    docs = self.db.collection("artists_v2").where(
+        filter=BaseCompositeFilter(operator=StructuredQuery.CompositeFilter.Operator.AND, filters=[
+          FieldFilter('ob_status', "==", "onboarded"),
+          FieldFilter('eval_as_of', "<", (datetime.now()-timedelta(days=7)))
+        ])
+    ).limit(limit).get()
+    ids = [d.id for d in docs]
+    return ids
+  
+  def find_needs_stats_refresh(self, limit: int):
+    docs = self.db.collection("artists_v2").where(
+        filter=BaseCompositeFilter(operator=StructuredQuery.CompositeFilter.Operator.AND, filters=[
+          FieldFilter('ob_status', "==", "onboarded"),
+          FieldFilter('stats_as_of', "<", (datetime.now()-timedelta(days=1)))
+        ])
+    ).limit(limit).get()
+    ids = [d.id for d in docs]
+    return ids

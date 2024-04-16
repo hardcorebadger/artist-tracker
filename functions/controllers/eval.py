@@ -116,7 +116,7 @@ class EvalController():
             "eval_distro": "",
             "eval_label": "",
             "eval_prios": "unknown",
-            "eval_as_of": datetime.now().strftime("%Y-%m-%d"),
+            "eval_as_of": datetime.now(),
             "ob_status": "onboarded"
         })
         return 'No evals found', 201
@@ -179,7 +179,7 @@ class EvalController():
         "eval_distro": main_eval['distributor'] if main_eval['distributor'] != None else "",
         "eval_label": main_eval['label'] if main_eval['label'] != None else "",
         "eval_prios": priors,
-        "eval_as_of": datetime.now().strftime("%Y-%m-%d"),
+        "eval_as_of": datetime.now(),
         "ob_status": "onboarded"
         # "copyright_eval" : {
         #   "evals": {
