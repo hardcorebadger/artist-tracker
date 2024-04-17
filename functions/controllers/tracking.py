@@ -34,20 +34,23 @@ class TrackingController():
     if doc.exists:
       data = doc.to_dict()
       user = get_user(user_id, self.db)
-      new_orgs = list(set(data['organizations'] + [{
+      # TODO fix this - to filter by org the IDs need to be the key in a dict or something
+      # also this will add the same org twice
+      # gotta go back the to set-list thing from befoe and find somewhere else for the attached data
+      data['organizations'].append({
         "org_id": org_id,
         "favorite": False
-      }]))
-      new_users = list(set(data['found_by'] + [{
+      })
+      data['found_by'].append({
         "organization": org_id,
         "user_id": user_id,
         "user_first": user['first_name'],
         "user_last": user['last_name'],
         "found_on": datetime.now().strftime("%Y-%m-%d")
-      }]))
+      })
       ref.update({
-          "organizations": new_orgs,
-          "found_by": new_users,
+          "organizations": data['organizations'],
+          "found_by": data['found_by'],
       })
       return 'Artist exists, added to tracking', 200
     
@@ -97,6 +100,7 @@ class TrackingController():
   def ingest_artist(self, spotify_id : str):
     ref = self.db.collection("artists_v2").document(spotify_id)
     doc = ref.get()
+    print("[INGEST] has doc")
     # check the artist exists
     if not doc.exists:
       raise ErrorResponse('Artist not found', 404, 'Tracking')
@@ -115,6 +119,7 @@ class TrackingController():
           })
           return 'Waiting for data', 201
       raise e
+    print("[INGEST] has info")
     
     # get the stats now that we know the artist is in SS
     self.update_artist(spotify_id, is_ob=True)
@@ -123,8 +128,10 @@ class TrackingController():
     ref.update({
       "avatar": info['artist_info']['avatar'],
       "links": info['artist_info']['links'],
-      "ob_status": "needs_eval" if data['ob_status'] != "onboarded" else "onboarded"
+      "ob_status": "onboarded"
     })
+    print("[INGEST] info updated")
+
     return 'success', 200
   
   # #####################
@@ -134,28 +141,60 @@ class TrackingController():
   def update_artist(self, spotify_id : str, is_ob=False):
     ref = self.db.collection("artists_v2").document(spotify_id)
     doc = ref.get()
+    print("[INGEST] has update doc")
+
     # check the artist exists
     if not doc.exists:
       raise ErrorResponse('Artist not found', 404, 'Tracking')
-    # check the artist is ingested
-    data = doc.to_dict()
-    if data['ob_status'] != 'ingested' and not is_ob:
-      raise ErrorResponse('Artist not ingested', 401, 'Tracking')
+    # check the artist is ingested - not needed
+    # data = doc.to_dict()
+    # if data['ob_status'] != 'ingested' and not is_ob:
+    #   raise ErrorResponse('Artist not ingested', 401, 'Tracking')
 
     # hit SS for the historic stats going back 8 weeks rel (9 abs) from as_of
     stats = self.songstats.get_stat_weeks(spotify_id, 9)
+
+    print("[INGEST] has stats")
+
     
     #  update the hot tracking stats on the artist
     update = {"stat_dates": stats['as_of'], "stats_as_of": datetime.now()}
     for s in HOT_TRACKING_FIELDS:
       update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = stats['stats'][s][HOT_TRACKING_FIELDS[s]] if s in stats['stats'] else []
     ref.update(update)
+    print("[INGEST] stats updated")
+
     # TODO Add the deep stats subcollection
     return 'success', 200
   
   # ######################
   # Cron Support
   # ######################
+
+  # def find_needs_ob_eval(self, limit: int):
+  #   docs = self.db.collection("artists_v2").where(
+  #       filter=FieldFilter('ob_status', "==", "needs_eval")
+  #   ).limit(limit).get()
+  #   ids = [d.id for d in docs]
+  #   return ids
+
+  def find_needs_ob_ingest(self, limit: int):
+    needs_ingest = self.db.collection("artists_v2").where(
+        filter=FieldFilter('ob_status', "==", "needs_ingest")
+    ).limit(limit).get()
+    ids = [d.id for d in needs_ingest]
+    # if we can still do more, find some that are done waiting
+    if len(ids) < limit:
+      waiting_ingest_complete = self.db.collection("artists_v2").where(
+          filter=BaseCompositeFilter(operator=StructuredQuery.CompositeFilter.Operator.AND, filters=[
+            FieldFilter('ob_status', "==", "waiting_ingest"),
+            FieldFilter('ob_wait_till', "<", datetime.now())
+          ])
+      ).limit(limit - len(ids)).get()
+      for d in waiting_ingest_complete:
+        ids.append(d.id)
+    
+    return ids
 
   def find_needs_eval_refresh(self, limit: int):
     docs = self.db.collection("artists_v2").where(

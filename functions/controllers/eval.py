@@ -50,8 +50,10 @@ class EvalController():
         raise ErrorResponse('Artist not found', 404, 'Tracking')
     # check the artist is ingested
     data = doc.to_dict()
-    if data['ob_status'] != 'onboarded' and data['ob_status'] != 'needs_eval':
-        raise ErrorResponse('Artist not ingested', 405, 'Tracking')
+    
+    # This flow works without any of the ingest data
+    # if data['ob_status'] == 'needs_ingest':
+    #     raise ErrorResponse('Artist not ingested', 405, 'Tracking')
 
     # get top tracks
     top_tracks = self.spotify.get_artist_top_tracks(spotify_id)['tracks']
@@ -116,8 +118,7 @@ class EvalController():
             "eval_distro": "",
             "eval_label": "",
             "eval_prios": "unknown",
-            "eval_as_of": datetime.now(),
-            "ob_status": "onboarded"
+            "eval_as_of": datetime.now()
         })
         return 'No evals found', 201
         
@@ -179,8 +180,7 @@ class EvalController():
         "eval_distro": main_eval['distributor'] if main_eval['distributor'] != None else "",
         "eval_label": main_eval['label'] if main_eval['label'] != None else "",
         "eval_prios": priors,
-        "eval_as_of": datetime.now(),
-        "ob_status": "onboarded"
+        "eval_as_of": datetime.now()
         # "copyright_eval" : {
         #   "evals": {
         #       "main": main_eval,

@@ -1,6 +1,22 @@
 
 from controllers import AirtableV1Controller, TaskController, TrackingController
 
+# def ob_eval_cron(task_controller : TaskController, tracking_controller: TrackingController, batch_size : int):
+#    artist_ids = tracking_controller.find_needs_ob_eval(batch_size)
+#    for aritst_id in artist_ids:
+#         body = {"spotify_id": aritst_id}
+#         task_controller.enqueue_task('EvalQueue', 2, '/eval-artist', body)
+
+def onboarding_cron(task_controller : TaskController, tracking_controller: TrackingController, ingest_batch : int, eval_batch : int):
+   artist_ids = tracking_controller.find_needs_ob_ingest(ingest_batch)
+   i = 0
+   for aritst_id in artist_ids:
+        body = {"spotify_id": aritst_id}
+        task_controller.enqueue_task('StatsQueue', 2, '/ingest-artist', body)
+        if i < eval_batch:
+           task_controller.enqueue_task('EvalQueue', 2, '/eval-artist', body)
+        i = i + 1
+
 def eval_cron(task_controller : TaskController, tracking_controller: TrackingController, batch_size : int):
     artist_ids = tracking_controller.find_needs_eval_refresh(batch_size)
     for aritst_id in artist_ids:

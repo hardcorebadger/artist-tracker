@@ -1,6 +1,6 @@
 from firebase_admin import initialize_app, firestore
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, params, logger, options
-from cron_jobs import airtable_v1_cron
+from cron_jobs import airtable_v1_cron, eval_cron, stats_cron, onboarding_cron
 from tmp_keys import *
 from lib import SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController
@@ -8,12 +8,13 @@ import flask
 from datetime import datetime, timedelta
 import traceback
 
+# from local_scripts import wipe_collection
+
 #################################
 # App Initialization
 #################################
 
 app = initialize_app()
-db = firestore.client(app)
 
 #################################
 # Globals
@@ -24,139 +25,130 @@ spotify.authorize()
 airtable = AirtableClient(AIRTABLE_TOKEN, AIRTABLE_BASE, AIRTABLE_TABLES)
 youtube = YoutubeClient(YOUTUBE_TOKEN)
 songstats = SongstatsClient(SONGSTATS_API_KEY)
-v1_controller = AirtableV1Controller(airtable, spotify, youtube)
-task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT)
-tracking_controller = TrackingController(spotify, songstats, db)
-eval_controller = EvalController(spotify, youtube, db)
 
 # ##############################
-# V2 API Routes
+# V2 API
 # ##############################
 
-v2_api = flask.Flask(__name__)
+@https_fn.on_request()
+def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
-@v2_api.errorhandler(Exception)
-def invalid_api_usage(e : Exception):
-    print(e)
-    if isinstance(e, ErrorResponse):
-        print(e.to_json())
-        return e.respond()
-    traceback.print_exc()
-    return flask.jsonify({'error': "An unknown error occurred (500, responding 299 to cancel retry)"}), 299
+    db = firestore.client(app)
+    tracking_controller = TrackingController(spotify, songstats, db)
+    eval_controller = EvalController(spotify, youtube, db)
+    v2_api = flask.Flask(__name__)
 
-@v2_api.post("/debug")
-def debug():
-    ids = tracking_controller.find_needs_eval_refresh(100)
-    return {'artists': [ids]}, 200
+    @v2_api.errorhandler(Exception)
+    def invalid_api_usage(e : Exception):
+        print(e)
+        if isinstance(e, ErrorResponse):
+            print(e.to_json())
+            return e.respond()
+        traceback.print_exc()
+        return flask.jsonify({'error': "An unknown error occurred (500, responding 299 to cancel retry)"}), 299
 
-@v2_api.post("/eval-artist")
-def eval_artist():
-    data = flask.request.get_json()
-    if 'spotify_id' not in data:
-        raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
+    @v2_api.post("/debug")
+    def debug():
+        # wipe_collection(db, 'artists_v2')
+        # aids = spotify.get_playlist_artists('37i9dQZF1E4BtY7pDviRhq')
+        # for a in aids:
+        #     tracking_controller.add_artist(a, 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
+        return 'success', 200
 
-    return eval_controller.evaluate_copyrights(data['spotify_id'])
+    @v2_api.post("/eval-artist")
+    def eval_artist():
+        data = flask.request.get_json()
+        if 'spotify_id' not in data:
+            raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
 
-@v2_api.post("/add-ingest-update-artist")
-def add_ingest_update_artist():
-    data = flask.request.get_json()
-    if 'spotify_id' not in data:
-        raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
+        return eval_controller.evaluate_copyrights(data['spotify_id'])
 
-    return tracking_controller.add_ingest_update_artist(data['spotify_id'], 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
+    @v2_api.post("/add-ingest-update-artist")
+    def add_ingest_update_artist():
+        data = flask.request.get_json()
+        if 'spotify_id' not in data:
+            raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
 
-@v2_api.post("/ingest-update-artist")
-def ingest_update_artist():
-    data = flask.request.get_json()
-    if 'spotify_id' not in data:
-        raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
+        return tracking_controller.add_ingest_update_artist(data['spotify_id'], 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
 
-    return tracking_controller.ingest_update_artist(data['spotify_id'])
+    @v2_api.post("/add-artist")
+    def add_artist():
+        data = flask.request.get_json()
+        if 'spotify_id' not in data:
+            raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
 
+        return tracking_controller.add_artist(data['spotify_id'], 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
 
-@v2_api.post("/add-artist")
-def add_artist():
-    data = flask.request.get_json()
-    if 'spotify_id' not in data:
-        raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
+    @v2_api.post("/ingest-artist")
+    def ingest_artist():
+        data = flask.request.get_json()
+        if 'spotify_id' not in data:
+            raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
+        
+        return tracking_controller.ingest_artist(data['spotify_id'])
 
-    return tracking_controller.add_artist(data['spotify_id'], 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
+    @v2_api.post("/update-artist")
+    def update_artist():
+        data = flask.request.get_json()
+        if 'spotify_id' not in data:
+            raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
+        
+        return tracking_controller.update_artist(data['spotify_id'], datetime.now() - timedelta(days=1))
 
-
-@v2_api.post("/ingest-artist")
-def ingest_artist():
-    data = flask.request.get_json()
-    if 'spotify_id' not in data:
-        raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
-    
-    return tracking_controller.ingest_artist(data['spotify_id'])
-
-@v2_api.post("/update-artist")
-def update_artist():
-    data = flask.request.get_json()
-    if 'spotify_id' not in data:
-        raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
-    
-    return tracking_controller.update_artist(data['spotify_id'], datetime.now() - timedelta(days=1))
+    with v2_api.request_context(req.environ):
+        return v2_api.full_dispatch_request()
 
 ##############################
-# V1 API Routes
+# V1 API 
 # ###########################
-
-v1_api = flask.Flask(__name__)
-
-@v1_api.errorhandler(Exception)
-def invalid_api_usage(e : Exception):
-    print(e)
-    if isinstance(e, ErrorResponse):
-        print(e.to_json())
-        return e.respond()
-    traceback.print_exc()
-    return flask.jsonify({'error': "An unknown error occurred (500, responding 299 to cancel retry)"}), 299
-
-@v1_api.get("/debug")
-def get_debug():
-    record = v1_controller.find_new_evals()[0]
-    v1_controller.copyright_eval(record['id'])
-    return 'success', 200
-
-@v1_api.post("/link-spotify")
-def post_link_spotify():
-    data = flask.request.get_json()
-
-    if 'record_id' not in data:
-        raise ErrorResponse("Invalid payload. Must include 'record_id'", 500)
-    
-    record_id = data['record_id']
-    v1_controller.artist_link_spotify(record_id)
-    
-    return 'Success', 200
-
-@v1_api.post("/copyright-eval")
-def post_copyright_eval():
-    data = flask.request.get_json()
-
-    if 'record_id' not in data:
-        raise ErrorResponse("Invalid payload. Must include 'record_id'", 500)
-    
-    record_id = data['record_id']
-    v1_controller.copyright_eval(record_id)
-    
-    return 'Success', 200
-
-#################################
-# API Function Definitions
-#################################
 
 @https_fn.on_request()
 def fn_v1_api(req: https_fn.Request) -> https_fn.Response:
+
+    v1_controller = AirtableV1Controller(airtable, spotify, youtube)
+    v1_api = flask.Flask(__name__)
+
+    @v1_api.errorhandler(Exception)
+    def invalid_api_usage(e : Exception):
+        print(e)
+        if isinstance(e, ErrorResponse):
+            print(e.to_json())
+            return e.respond()
+        traceback.print_exc()
+        return flask.jsonify({'error': "An unknown error occurred (500, responding 299 to cancel retry)"}), 299
+
+    @v1_api.get("/debug")
+    def get_debug():
+        record = v1_controller.find_new_evals()[0]
+        v1_controller.copyright_eval(record['id'])
+        return 'success', 200
+
+    @v1_api.post("/link-spotify")
+    def post_link_spotify():
+        data = flask.request.get_json()
+
+        if 'record_id' not in data:
+            raise ErrorResponse("Invalid payload. Must include 'record_id'", 500)
+        
+        record_id = data['record_id']
+        v1_controller.artist_link_spotify(record_id)
+        
+        return 'Success', 200
+
+    @v1_api.post("/copyright-eval")
+    def post_copyright_eval():
+        data = flask.request.get_json()
+
+        if 'record_id' not in data:
+            raise ErrorResponse("Invalid payload. Must include 'record_id'", 500)
+        
+        record_id = data['record_id']
+        v1_controller.copyright_eval(record_id)
+        
+        return 'Success', 200
+
     with v1_api.request_context(req.environ):
         return v1_api.full_dispatch_request()
-    
-@https_fn.on_request()
-def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
-    with v2_api.request_context(req.environ):
-        return v2_api.full_dispatch_request()
     
 #################################
 # Cron Job Definitions
@@ -164,15 +156,41 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
 # @scheduler_fn.on_schedule(schedule="*/1 * * * *")
 # def fn_v1_cron_job(event: scheduler_fn.ScheduledEvent) -> None:
-#     airtable_v1_cron(task_controller, v1_controller)
+#   task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT)
+#   airtable_v1_cron(task_controller, v1_controller)
+
+# Figures out how many artists to do per batch given an update interval and minimum SLA
+interval_minutes = 5
+supported_volume = 10000
+daily_run_count = 60*24 / interval_minutes
+weekly_run_count = daily_run_count * 7
+weekly_batch_size = int(supported_volume / weekly_run_count) + 1
+daily_batch_size = int(supported_volume / daily_run_count) + 1
+
+@scheduler_fn.on_schedule(schedule=f"*/{interval_minutes} * * * *")
+def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
+    db = firestore.client(app)
+    tracking_controller = TrackingController(spotify, songstats, db)
+    task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT)
+
+    eval_cron(task_controller, tracking_controller, weekly_batch_size)
+    stats_cron(task_controller, tracking_controller, daily_batch_size)
+    # do up to an additional 100 stat pulls and 10 evals for onboarding as well
+    onboarding_cron(task_controller, tracking_controller, ingest_batch=50, eval_batch=50)
+
+    # For sanity's sake this is how many that actually is
+    # Evals: 5 + 50 burst
+    # Stats: 35 + 50 burst
+
 
 #################################
 # App Function Definitions
 #################################
 
-
 @https_fn.on_call()
 def add_artist(req: https_fn.CallableRequest):
+    db = firestore.client(app)
+    tracking_controller = TrackingController(spotify, songstats, db)
     # Message text passed from the client.
     try:
         spotify_url = req.data["spotify_url"]
