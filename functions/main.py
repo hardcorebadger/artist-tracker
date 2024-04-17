@@ -50,9 +50,9 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/debug")
     def debug():
         # wipe_collection(db, 'artists_v2')
-        # aids = spotify.get_playlist_artists('37i9dQZF1E4BtY7pDviRhq')
-        # for a in aids:
-        #     tracking_controller.add_artist(a, 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
+        aids = spotify.get_playlist_artists('37i9dQZF1E4A2FqXjcsyRn')
+        for a in aids:
+            tracking_controller.add_artist(a, 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
         return 'success', 200
 
     @v2_api.post("/eval-artist")
@@ -160,27 +160,21 @@ def fn_v1_api(req: https_fn.Request) -> https_fn.Response:
 #   airtable_v1_cron(task_controller, v1_controller)
 
 # Figures out how many artists to do per batch given an update interval and minimum SLA
-interval_minutes = 5
-supported_volume = 10000
-daily_run_count = 60*24 / interval_minutes
-weekly_run_count = daily_run_count * 7
-weekly_batch_size = int(supported_volume / weekly_run_count) + 1
-daily_batch_size = int(supported_volume / daily_run_count) + 1
 
-@scheduler_fn.on_schedule(schedule=f"*/{interval_minutes} * * * *")
+@scheduler_fn.on_schedule(schedule=f"*/2 * * * *")
 def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     db = firestore.client(app)
     tracking_controller = TrackingController(spotify, songstats, db)
+    eval_controller = EvalController(spotify, youtube, db)
     task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT)
 
-    eval_cron(task_controller, tracking_controller, weekly_batch_size)
-    stats_cron(task_controller, tracking_controller, daily_batch_size)
-    # do up to an additional 100 stat pulls and 10 evals for onboarding as well
-    onboarding_cron(task_controller, tracking_controller, ingest_batch=50, eval_batch=50)
+    # does 300 evals per hours, doesn't care where they are in OB, TODO prios by oldest first so new artists go first
+    eval_cron(task_controller, eval_controller, 10)
+    # only looks at artists who are ingested, updates 750 stats per hour
+    stats_cron(task_controller, tracking_controller, 25)
 
-    # For sanity's sake this is how many that actually is
-    # Evals: 5 + 50 burst
-    # Stats: 35 + 50 burst
+    # deals with messiness of waiting for songstats to ingest, pulls info and stats for the artist for first time, 1.5k per hr
+    onboarding_cron(task_controller, tracking_controller, 50)
 
 
 #################################

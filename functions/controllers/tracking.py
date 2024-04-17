@@ -195,16 +195,6 @@ class TrackingController():
         ids.append(d.id)
     
     return ids
-
-  def find_needs_eval_refresh(self, limit: int):
-    docs = self.db.collection("artists_v2").where(
-        filter=BaseCompositeFilter(operator=StructuredQuery.CompositeFilter.Operator.AND, filters=[
-          FieldFilter('ob_status', "==", "onboarded"),
-          FieldFilter('eval_as_of', "<", (datetime.now()-timedelta(days=7)))
-        ])
-    ).limit(limit).get()
-    ids = [d.id for d in docs]
-    return ids
   
   def find_needs_stats_refresh(self, limit: int):
     docs = self.db.collection("artists_v2").where(

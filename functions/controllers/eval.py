@@ -2,6 +2,8 @@ from lib import SpotifyClient, YoutubeClient, ErrorResponse
 from datetime import datetime, timedelta
 import re
 from fuzzywuzzy import fuzz
+from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilter, StructuredQuery
+
 
 #     "copyright_eval" : {
 #         "signed_status": SIGNED UNSIGNED UNKNOWN,
@@ -50,7 +52,7 @@ class EvalController():
         raise ErrorResponse('Artist not found', 404, 'Tracking')
     # check the artist is ingested
     data = doc.to_dict()
-    
+
     # This flow works without any of the ingest data
     # if data['ob_status'] == 'needs_ingest':
     #     raise ErrorResponse('Artist not ingested', 405, 'Tracking')
@@ -280,3 +282,10 @@ class EvalController():
 
   def _is_probably_same_track(self, youtube_video_title, spotify_song_title, youtube_channel_title, spotify_artist_name, threshold=80):
       return self._fuzzy_equal(youtube_channel_title, spotify_artist_name, threshold) and self._fuzzy_equal(youtube_video_title, spotify_song_title, threshold)
+  
+  def find_needs_eval_refresh(self, limit: int):
+    docs = self.db.collection("artists_v2").where(
+        filter=FieldFilter('eval_as_of', "<", (datetime.now()-timedelta(days=7)))
+    ).limit(limit).get()
+    ids = [d.id for d in docs]
+    return ids
