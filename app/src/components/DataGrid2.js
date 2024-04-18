@@ -135,8 +135,9 @@ export default function DataGridController({initialReportName, initialColumnSele
   console.log("grid rerender")
 
   const [artists, artistsLoading, artistsError] = useCollection(
-    query(collection(db, 'artists'), 
-      where("organizations", "array-contains", user.org.id),
+    query(collection(db, 'artists_v2'), 
+      where("ob_status", "==", "onboarded"),
+      // where("organizations", "array-contains", user.org.id),
       // where("distro_type", "==", "DIY")
     ),
     {

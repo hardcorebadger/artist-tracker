@@ -49,31 +49,52 @@ import { Sparklines, SparklinesLine } from 'react-sparklines';
 export const defaultReportName = "New artist report"
 
 export const defaultColumnSelection = {
-  "distro": true,
-  "status": true,
-  "distro_type": true,
+  "eval_distro": true,
+  "eval_status": true,
+  "eval_distro_type": true,
   "spotify_url": true,
-  "global_streams": {
+  "stat_tiktok__views_total__rel": {
     "latest": true,
     "previous": false,
     "wow": false,
     "mom": false,
     "series": true
   },
-  "spotify_streams": {
+  "stat_spotify__streams_current__rel": {
     "latest": false,
     "previous": false,
     "wow": false,
     "mom": false,
     "series": false
   },
+  "stat_instagram__followers_total__rel": {
+    "latest": false,
+    "previous": false,
+    "wow": false,
+    "mom": false,
+    "series": false
+  },
+  "stat_shazam__shazams_total__rel": {
+    "latest": false,
+    "previous": false,
+    "wow": false,
+    "mom": false,
+    "series": false
+  },
+  "stat_youtube__video_views_total__rel": {
+    "latest": false,
+    "previous": false,
+    "wow": false,
+    "mom": false,
+    "series": false
+  }
 }
 
-export const defaultColumnOrder = ['name', 'spotify_url', 'global_streams-series', 'status', 'distro', 'global_streams-latest']
+export const defaultColumnOrder = ['name', 'spotify_url', 'eval_status', 'eval_distro', 'stat_spotify__streams_current__rel-latest']
 
 export const columnOptions = {
-  "distro": {
-    name: 'distro',
+  "eval_distro": {
+    name: 'eval_distro',
     header: 'Distributor',
     isMetric: false,
     defaultFilter: {
@@ -82,8 +103,8 @@ export const columnOptions = {
       value: ''
     }
   },
-  "status": {
-    name: 'status',
+  "eval_status": {
+    name: 'eval_status',
     header: 'Status',
     isMetric: false,
     filterEditor: SelectFilter,
@@ -98,15 +119,15 @@ export const columnOptions = {
       value: ''
     }
   },
-  "distro_type": {
-    name: 'distro_type',
+  "eval_distro_type": {
+    name: 'eval_distro_type',
     header: 'Distribution Type',
     isMetric: false,
     filterEditor: SelectFilter,
-    render: row => <Badge colorScheme={row.value == 'DIY' ? 'green' : row.value == 'Indie' ? 'yellow' : 'red'}>{row.value}</Badge>,
+    render: row => <Badge colorScheme={row.value == 'diy' ? 'green' : row.value == 'indie' ? 'yellow' : 'red'}>{row.value}</Badge>,
     filterEditorProps: {
       placeholder: 'All',
-      dataSource: [{id:'DIY', label: 'DIY'}, {id:'Major', label: 'Major'}, {id:'Indie', label: 'Indie'}]
+      dataSource: [{id:'diy', label: 'diy'}, {id:'major', label: 'major'}, {id:'indie', label: 'indie'}]
     },
     defaultFilter: {
       type: 'string',
@@ -120,14 +141,29 @@ export const columnOptions = {
     render: row => <Link color='primary.500' href={row.value} isExternal>Spotify <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></Link>,
     isMetric: false
   },
-  "global_streams": {
-    name: 'global_streams',
-    header: 'Streams',
+  "stat_tiktok__views_total__rel": {
+    name: 'stat_tiktok__views_total__rel',
+    header: 'Tiktok Views',
     isMetric: true
   },
-  "spotify_streams": {
-    name: 'spotify_streams',
+  "stat_spotify__streams_current__rel": {
+    name: 'stat_spotify__streams_current__rel',
     header: 'Spotify Streams',
+    isMetric: true
+  },
+  "stat_instagram__followers_total__rel": {
+    name: 'stat_instagram__followers_total__rel',
+    header: 'Instagram Followers',
+    isMetric: true
+  },
+  "stat_shazam__shazams_total__rel": {
+    name: 'stat_shazam__shazams_total__rel',
+    header: 'Shazams',
+    isMetric: true
+  },
+  "stat_youtube__video_views_total__rel": {
+    name: 'stat_youtube__video_views_total__rel',
+    header: 'Youtube Views',
     isMetric: true
   }
 }
@@ -136,7 +172,7 @@ export const metricFunctions = {
   "latest": {
     name: 'latest',
     header: "Latest",
-    op: input => input[0],
+    op: input => input.length > 0 ? input[0] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -151,7 +187,7 @@ export const metricFunctions = {
   "previous": {
     name: 'previous',
     header: "Previous",
-    op: input => input[1],
+    op: input => input.length > 0 ? input[1] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -166,7 +202,7 @@ export const metricFunctions = {
   "wow": {
     name: 'wow',
     header: "Week / Week",
-    op: input => (input[0] - input[1]) / input[1],
+    op: input => input.length > 0 ? (input[0] - input[1]) / input[1] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -181,7 +217,7 @@ export const metricFunctions = {
   "mom": {
     name: 'mom',
     header: "Month / Month",
-    op: input => (input[0] - input[4]) / input[4],
+    op: input => input.length > 0 ? (input[0] - input[4]) / input[4] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -196,23 +232,16 @@ export const metricFunctions = {
   "series": {
     name: 'series',
     header: "Trendline",
-    op: input => input.slice().reverse(),
+    op: input => input.length > 0 ? input.slice().reverse() : [],
     options: {
       type: 'number',
       sortable: false,
       render: row => {
-        return <Sparklines data={row.value} >
+        return (
+        <Sparklines data={row.value} >
           <SparklinesLine color="#329795" />
         </Sparklines>
-        // return <Chart
-        //   options={miniBarChartOptions}
-        //   series={[{
-        //     name: "Streams",
-        //     data: row.value
-        //   }]}
-        //   type="line"
-        //   width="60"
-        // />
+        )
       }
     }
   }
