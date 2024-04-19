@@ -9,6 +9,7 @@ import { updateProfile, sendEmailVerification } from 'firebase/auth';
 import { setDoc, doc, getDoc } from 'firebase/firestore';
 import { firebaseConfig } from "./config";
 
+
 const is_dev = location.hostname === "localhost"
 
 // Initialize Firebase
@@ -18,10 +19,10 @@ export const analytics = getAnalytics(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
 
-// if (is_dev) {
-//   console.log("Localhost detected. Using emulators.")
-//   connectFunctionsEmulator(functions, '127.0.0.1', 5001)
-// }
+if (is_dev) {
+  console.log("Localhost detected. Using emulators.")
+  connectFunctionsEmulator(functions, '127.0.0.1', 5001)
+}
 
 // Initialize Firebase Authentication and get a reference to the service
 export const auth = fbauth.getAuth(app);
