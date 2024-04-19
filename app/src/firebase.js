@@ -4,7 +4,7 @@ import { getAnalytics } from "firebase/analytics";
 import * as fbauth from "firebase/auth";
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { getFirestore } from "firebase/firestore"
-import { getFunctions, httpsCallable, connectFunctionsEmulator} from "firebase/functions";
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from "firebase/functions";
 import { updateProfile, sendEmailVerification } from 'firebase/auth';
 import { setDoc, doc, getDoc } from 'firebase/firestore';
 import { firebaseConfig } from "./config";

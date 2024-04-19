@@ -9,7 +9,7 @@ class SongstatsClient():
     self.root_uri = f"https://api.songstats.com/enterprise/v1"
 
   def get(self, path, data=None):
-    res = requests.get(f"{self.root_uri}{path}", headers= {
+    res = requests.get(f"{self.root_uri}{path}", timeout=5, headers= {
       "Content-Type": "application/json",
       "apikey": self.key
     },
@@ -43,7 +43,155 @@ class SongstatsClient():
       "end_date": end.strftime("%Y-%m-%d")
     })
   
+  def __interpolate_data(self, v):
+    smoothed = [v[0]]
+    z = 0
+    for a in range(len(v) - 1):
+        b = a + 1
+        if v[b] - v[a] > 0:
+            # interpolate from index z to intex b
+            avg = (v[b] - v[z]) / (b - z)
+            cum = v[z]
+            for i in range(b - z - 1):
+                cum = cum + avg
+                smoothed.append(cum)
+            smoothed.append(v[b])
+            z = b
+    # forward projection
+    last_diff = smoothed[len(smoothed)-1] - smoothed[len(smoothed)-2]
+    running = smoothed[len(smoothed)-1]
+    for i in range(len(v) - len(smoothed)):
+        running = running + last_diff
+        smoothed.append(running)
+    return [int(i) for i in smoothed]
+  
+  def __date_normalize_daily_stats(self, start:datetime.date, end:datetime.date, stats_raw):
+    dates = [start + timedelta(days=i) for i in range((end-start).days+1)]
+    # print(len(dates))
+    day_to_index = {}
+    for i, d in enumerate(dates):
+      day_to_index[d] = i
+    
+    stats = {}
+    # for each source in the stats
+    for source in stats_raw:
+      # skip anything without data history
+      if 'source' not in source or 'data' not in source or 'history' not in source['data'] or len(source['data']['history']) == 0:
+        continue
+      # set up a stat prefix based on source
+      prefix = source['source'] + "__"
+      # iterate over the days in the stats
+      for i, entry in enumerate(source['data']['history']):
+        # an object with date and some stats, rip the stats
+        for key in entry:
+          # skip the date, otherwise its a stat
+          if key == 'date':
+            continue
+
+          # get a key for the stat using the source prefix
+          index = prefix + key
+          # create the stat index if its not there
+          if index not in stats:
+            stats[index] = []
+
+          # figure out which date this is, and backfill any missing ones
+          day = datetime.strptime(entry['date'], "%Y-%m-%d").date()
+          # this is the index in the array we want it to be
+          norm_index = day_to_index[day]
+          # this is the amount to backfill to get there
+          missing = norm_index - len(stats[index])
+          if missing > 0:
+            # interpolate that many to the array to catch up
+            last = stats[index][len(stats[index])-1] if len(stats[index]) > 0 else entry[key]
+            diff = (entry[key] - last)
+            inc = 0 if len(stats[index]) == 0 else diff / missing
+            run = last
+            for m in range(missing):
+              run = run + inc
+              stats[index].append(int(run))
+          stats[index].append(entry[key])
+
+    for s in stats:
+      # print(f"{s}={len(stats[s])}")
+      missing = len(dates) - len(stats[s])
+      last = stats[s][len(stats[s])-1]
+      last_prev = stats[s][len(stats[s])-2] if len(stats[s]) > 1 else last
+      inc = last - last_prev
+      run = last
+      for i in range(missing):
+        run = run + inc
+        stats[s].append(run)
+        
+      # print(f"{s}={len(stats[s])}")
+    
+    # for i, d in enumerate(dates):
+    #   print(f"{d.strftime('%Y-%m-%d')} = {stats['spotify__streams_current'][i]}")
+
+    return dates, stats
+  
+  def __rollup_stats(self, start, week_end, end, dates, interpolated_daily_stats):
+    # weekly extraction
+    weekly_dates = []
+    weekly_rollups = {}
+    for i, d in enumerate(dates):
+      # only look at the week ends OR the incomplete week at the end
+      weekdiff = (week_end - d).days
+      daydiff = (end - d).days
+      if daydiff != 0 and weekdiff != 0 and weekdiff % 7 != 0:
+        continue
+      weekly_dates.append(d.strftime("%Y-%m-%d"))
+      for stat in interpolated_daily_stats:
+        if stat not in weekly_rollups:
+          weekly_rollups[stat] = []
+        weekly_rollups[stat].append(interpolated_daily_stats[stat][i])
+    return weekly_dates, weekly_rollups
+  
   def get_stat_weeks(self, spotify_id : str, weeks : int):
+    start, week_end, end = self._get_days_for_weeks(weeks)
+    res = self.get_historic_stats(spotify_id, start, end)
+
+    # Overview
+    # 1. Get date normalized daily arrays of cumulatives
+    dates, daily_stats = self.__date_normalize_daily_stats(start, end, res['stats'])
+
+    # 2. Interpolate all of them
+    interpolated_daily_stats = {}
+    for stat in daily_stats:
+      interpolated_daily_stats[stat] = self.__interpolate_data(daily_stats[stat])
+
+    # 3. Rollup weeklies
+    weekly_dates, weekly_stats = self.__rollup_stats(start, week_end, end, dates, interpolated_daily_stats)
+
+    # 4. Compute diffs
+    weekly_diffs = {}
+    for stat in weekly_stats:
+      data = weekly_stats[stat]
+      weekly_diffs[stat] = [b-a for a, b in zip(data, data[1:])]
+
+    # 5. Package for return
+    stats = {}
+    for s in weekly_stats:
+      stats[s] = {}
+      stats[s]['abs'] = weekly_stats[s]
+      stats[s]['rel'] = weekly_diffs[s]
+    # TODO the dates are off by one for the rel data
+    return {'stats': stats, 'as_of': weekly_dates}
+
+    rollups = {}
+    dates = []
+    # for each source in the stats
+    for source in res['stats']:
+      # skip anything without data history
+      if 'source' not in source or 'data' not in source or 'history' not in source['data']:
+        continue
+      # set up a stat prefix based on source
+      prefix = source['source'] + "__"
+      # iterate over the days in the stats
+      for i, day in enumerate(source['data']['history']):
+        pass
+    return None
+  
+  def get_stat_weeks_old(self, spotify_id : str, weeks : int):
     start, week_end, end = self._get_days_for_weeks(weeks)
     res = self.get_historic_stats(spotify_id, start, end)
     rollups = {}
@@ -58,11 +206,11 @@ class SongstatsClient():
       # iterate over the days in the stats
       for i, day in enumerate(source['data']['history']):
         # only look at the week ends OR the incomplete week at the end
-        d = datetime.strptime(day['date'], "%Y-%m-%d").date()
-        weekdiff = (week_end - d).days
-        daydiff = (end - d).days
-        if daydiff != 0 and weekdiff != 0 and weekdiff % 7 != 0:
-          continue
+        # d = datetime.strptime(day['date'], "%Y-%m-%d").date()
+        # weekdiff = (week_end - d).days
+        # daydiff = (end - d).days
+        # if daydiff != 0 and weekdiff != 0 and weekdiff % 7 != 0:
+        #   continue
         #  grab all the stats
         for key in day:
           if key == 'date':
@@ -72,14 +220,37 @@ class SongstatsClient():
           index = prefix + key
           # create the stat index if its not there
           if index not in rollups:
-            rollups[index] = {'abs':[]}
+            rollups[index] = []
           # append the week end value to the array
-          rollups[index]['abs'].append(day[key])
+          rollups[index].append(day[key])
 
+    smoothed_rollups = {}
     for stat in rollups:
-      data = rollups[stat]['abs']
-      rollups[stat]['rel'] = [b-a for a, b in zip(data, data[1:])]
+      data = rollups[stat]
+      smoothed_rollups[stat] = self.__interpolate_data(rollups[stat])
+      # rollups[stat]['rel'] = [b-a for a, b in zip(data, data[1:])]
+    
+    # weekly extraction
+    weekly_dates = []
+    weekly_rollups = {}
+    for i, d in enumerate(dates):
+      # only look at the week ends OR the incomplete week at the end
+      d = datetime.strptime(d, "%Y-%m-%d").date()
+      weekdiff = (week_end - d).days
+      daydiff = (end - d).days
+      if daydiff != 0 and weekdiff != 0 and weekdiff % 7 != 0:
+        continue
+      weekly_dates.append(dates[i])
+      for stat in smoothed_rollups:
+        if index not in weekly_rollups:
+          weekly_rollups[index] = {'abs':[]}
+        weekly_rollups[index]['abs'].append(smoothed_rollups[index][i])
+    
+    for stat in weekly_rollups:
+      data = weekly_rollups[stat]['abs']
+      weekly_rollups[stat]['rel'] = [b-a for a, b in zip(data, data[1:])]
 
-    return {'stats': rollups, 'as_of': dates}
+    return {'stats': weekly_rollups, 'as_of': weekly_dates}
+  
   
  

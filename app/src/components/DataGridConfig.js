@@ -232,7 +232,7 @@ export const metricFunctions = {
   "series": {
     name: 'series',
     header: "Trendline",
-    op: input => input.length > 0 ? input.slice().reverse() : [],
+    op: input => input,
     options: {
       type: 'number',
       sortable: false,
