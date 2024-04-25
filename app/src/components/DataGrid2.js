@@ -45,8 +45,8 @@ const bakeColumns = (selection) => {
       name: 'name',
       header: "Artist",
       render: row => <Text color='text.default' fontWeight='semibold'>{row.value}</Text>,
-      defaultFlex: 1
-      // maxWidth: 300,
+      defaultFlex: 1,
+      minWidth: 150
       // cell: row => {return (<Text fontWeight="bold">{row.name}</Text>)}
     }
   ]
