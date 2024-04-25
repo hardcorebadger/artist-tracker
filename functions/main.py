@@ -8,7 +8,7 @@ import flask
 from datetime import datetime, timedelta
 import traceback
 
-# from local_scripts import wipe_collection
+# from local_scripts import reset_update_as_of
 
 #################################
 # App Initialization
@@ -50,9 +50,10 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/debug")
     def debug():
         # wipe_collection(db, 'artists_v2')
-        aids = spotify.get_playlist_artists('37i9dQZF1E4A2FqXjcsyRn')
-        for a in aids:
-            tracking_controller.add_artist(a, 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
+        # reset_update_as_of(db)
+        # aids = spotify.get_playlist_artists('37i9dQZF1E4A2FqXjcsyRn')
+        # for a in aids:
+        #     tracking_controller.add_artist(a, 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
         return 'success', 200
 
     @v2_api.post("/eval-artist")
