@@ -96,7 +96,7 @@ export default function DataGridController({currentSelection, applySelection}) {
                 })
                 return (
                   <Box w="100%" p={2} borderRadius="md" key={k}>
-                    <HStack justifyContent="space-between"><Text fontSize="sm">{v.name}</Text>
+                    <HStack justifyContent="space-between"><Text fontSize="sm">{v.header}</Text>
                     <Menu>
                       <MenuButton colorScheme={total_enabled > 0 ? 'primary' : 'gray'} size="xs" as={Button} rightIcon={<Iconify icon="mdi:caret-down" />}>
                         {total_enabled > 0 ? total_enabled : "-"}
@@ -104,7 +104,7 @@ export default function DataGridController({currentSelection, applySelection}) {
                       <MenuList>
                         {Object.entries(metricFunctions).map(([mk,mv]) => (
                           <MenuItem key={mk}>
-                          <HStack w="100%" justifyContent="space-between"><Text fontSize="sm">{mv.name}</Text><Checkbox colorScheme='primary' isChecked={columnSelection[k][mk]} onChange={e => setColumn(e.target.checked, k, mk)}></Checkbox></HStack>
+                          <HStack w="100%" justifyContent="space-between"><Text fontSize="sm">{mv.header}</Text><Checkbox colorScheme='primary' isChecked={columnSelection[k][mk]} onChange={e => setColumn(e.target.checked, k, mk)}></Checkbox></HStack>
                           </MenuItem>
                         ))}
                       </MenuList>
@@ -115,7 +115,7 @@ export default function DataGridController({currentSelection, applySelection}) {
               } else {
                 return (
                 <Box w="100%" p={2} borderRadius="md" key={k}>
-                  <HStack justifyContent="space-between"><Text fontSize="sm">{v.name}</Text><Checkbox colorScheme='primary' isChecked={columnSelection[k]} onChange={(e) => setColumn(e.target.checked, k, null)}></Checkbox></HStack>
+                  <HStack justifyContent="space-between"><Text fontSize="sm">{v.header}</Text><Checkbox colorScheme='primary' isChecked={columnSelection[k]} onChange={(e) => setColumn(e.target.checked, k, null)}></Checkbox></HStack>
                 </Box>
                 )
               }
