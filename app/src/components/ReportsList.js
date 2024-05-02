@@ -17,11 +17,15 @@ import { useNavigate } from 'react-router-dom';
 import { useUser } from '../routing/AuthGuard';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { db } from '../firebase';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, addDoc } from 'firebase/firestore';
 import { Link as ReactRouterLink } from 'react-router-dom'
 import { format } from "date-fns"
+import { defaultColumnOrder, defaultColumnSelection, buildDefaultFilters, defaultReportName} from '../components/DataGridConfig';
+import {useState, useContext} from 'react';
 
 export default function ReportsList() {
+
+  const [createReportLoading, setCreateReportLoading] = useState(false)
 
   const user = useUser()
   const navigate = useNavigate()
@@ -36,12 +40,25 @@ export default function ReportsList() {
 
   const reportItems = reportError || reportsLoading ? null : reports.docs.map((d) => ({'id':d.id, 'name': d.data().name, 'creator':'wh@thehoops.co', 'last_modified':new Date(), 'path': '/app/reports/'+d.id}))
 
+  const createReport = async () => {
+    setCreateReportLoading(true)
+    const docRef = await addDoc(collection(db, 'reports'), {
+      organization: user.org.id,
+      type: 'artist',
+      name: "New Report",
+      columnSelection: defaultColumnSelection,
+      columnOrder: defaultColumnOrder,
+      filterValue: buildDefaultFilters()
+    })
+    navigate('/app/reports/'+docRef.id)
+    setCreateReportLoading(false)
+  }
 
   return (
         <VStack spacing={10} align="left">
           <HStack justifyContent='space-between'>
           <Heading size="lg">My reports</Heading>
-          <Button colorScheme='primary' as={ReactRouterLink} to='/app/reports/new'>New report</Button>
+          <Button isLoading={createReportLoading} colorScheme='primary' onClick={createReport}>Create Report</Button>
           </HStack>
           <Card>
           <TableContainer>
