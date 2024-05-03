@@ -12,6 +12,7 @@ import {
   Grid,
   GridItem,
   Input,
+  useToast
 } from '@chakra-ui/react';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import { Link as RouterLink } from 'react-router-dom';
@@ -21,6 +22,9 @@ import Iconify from '../components/Iconify';
 import ReportsList from '../components/ReportsList';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
+import { collection, query, where } from 'firebase/firestore';
+import { useCollection } from 'react-firebase-hooks/firestore';
+import { db } from '../firebase';
 
 function StatCard({title, value}) {
   return (
@@ -34,6 +38,7 @@ function StatCard({title, value}) {
 }
 
 function AddLinkCard() {
+  const toast = useToast()
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -44,11 +49,24 @@ function AddLinkCard() {
     const resp = await addArtist({spotify_url:url});
     setLoading(false)
     setUrl('')
-    // const resp = await helloWorld();
-    console.log(resp)
-    // const d = await getDoc(doc(db, "email-templates", "example-1"))
-    // if (d.exists())
-    //   console.log(d.data())
+
+    if (resp.data.status == 200) {
+      toast({
+        title: resp.data.added_count + ' artist(s) added!',
+        description: "We're running some analysis, the new artist(s) will be available soon.",
+        status: 'success',
+        duration: 9000,
+        isClosable: true,
+      })
+    } else {
+      toast({
+        title: 'Failed to add artists',
+        description: resp.data.status == 400 ? resp.data.message : "Something went wrong while, try refrshing and add again.",
+        status: 'error',
+        duration: 9000,
+        isClosable: true,
+      })
+    }
   }
   return (
     <Card p={25}>
@@ -64,6 +82,16 @@ function AddLinkCard() {
 
 function PageDefault() {
   const user = useUser()
+  const [artists, artistsLoading, artistsError] = useCollection(
+    query(collection(db, 'artists_v2'), 
+      where("ob_status", "==", "onboarded"),
+      where("watching", "array-contains", user.org.id)
+    ),
+    {
+      snapshotListenOptions: { includeMetadataChanges: true },
+    }
+  )
+  const artist_list = artistsError || artistsLoading ? null : artists.docs.map((d) => d.data())
 
   return (
       <PageLayoutContained size="lg">
@@ -77,9 +105,9 @@ function PageDefault() {
           </GridItem>
           <GridItem colSpan={1}>
             <Stack>
-            <StatCard title="Total Artists" value={4982}></StatCard>
-            <StatCard title="Total Unsigned" value={3813}></StatCard>
-            <StatCard title="Total Tracked" value={3813}></StatCard>
+            <StatCard title="Total Artists" value={artist_list ? artist_list.length : "-"}></StatCard>
+            {/* <StatCard title="Total Unsigned" value={3813}></StatCard>
+            <StatCard title="Total Tracked" value={3813}></StatCard> */}
             <AddLinkCard/>
             </Stack>
           </GridItem>

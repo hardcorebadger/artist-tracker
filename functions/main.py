@@ -8,7 +8,6 @@ import flask
 from datetime import datetime, timedelta
 import traceback
 
-# from local_scripts import reset_update_as_of, migrate_relations
 
 #################################
 # App Initialization
@@ -190,9 +189,21 @@ def add_artist(req: https_fn.CallableRequest):
     try:
         spotify_url = req.data["spotify_url"]
         spotify_id = spotify.url_to_id(spotify_url)
-        uid = req.auth.uid
-        user_data = get_user(uid, db)
-        msg, status = tracking_controller.add_ingest_update_artist(spotify_id, uid, user_data['organization'])
-        return {'message': msg, 'status': status}
+        if spotify_id == 'invalid':
+            spotify_id = spotify.url_to_id(spotify_url, 'playlist')
+            if spotify_id == 'invalid':
+                return {'message': 'Invalid URL, try copy pasting an artist or playlist URL from Spotify directly.', 'status': 400, 'added_count': 0}
+            else:
+                uid = req.auth.uid
+                user_data = get_user(uid, db)
+                aids = spotify.get_playlist_artists(spotify_id)
+                for a in aids:
+                    tracking_controller.add_artist(a, uid, user_data['organization'])
+                return {'message': 'sucess', 'status': 200, 'added_count': len(aids)}
+        else:
+            uid = req.auth.uid
+            user_data = get_user(uid, db)
+            msg, status = tracking_controller.add_ingest_update_artist(spotify_id, uid, user_data['organization'])
+            return {'message': msg, 'status': status, 'added_count': 1}
     except ErrorResponse as e:
         raise e.to_https_fn_error()

@@ -22,6 +22,7 @@ import { Link as ReactRouterLink } from 'react-router-dom'
 import { format } from "date-fns"
 import { defaultColumnOrder, defaultColumnSelection, buildDefaultFilters, defaultReportName} from '../components/DataGridConfig';
 import {useState, useContext} from 'react';
+import UserAvatar from './UserAvatar'
 
 export default function ReportsList() {
 
@@ -38,12 +39,16 @@ export default function ReportsList() {
     }
   )
 
-  const reportItems = reportError || reportsLoading ? null : reports.docs.map((d) => ({'id':d.id, 'name': d.data().name, 'creator':'wh@thehoops.co', 'last_modified':new Date(), 'path': '/app/reports/'+d.id}))
+  const reportItems = reportError || reportsLoading ? null : reports.docs.map((d) => ({'id':d.id, 'path': '/app/reports/'+d.id, ...d.data()}))
 
   const createReport = async () => {
     setCreateReportLoading(true)
     const docRef = await addDoc(collection(db, 'reports'), {
       organization: user.org.id,
+      created_by: user.auth.uid,
+      created_on: Date.now(),
+      last_modified_on: Date.now(),
+      last_modified_by: user.auth.uid,
       type: 'artist',
       name: "New Report",
       columnSelection: defaultColumnSelection,
@@ -74,9 +79,9 @@ export default function ReportsList() {
             <Tbody>
               {reportItems && reportItems.map(item => (
               <Tr key={item.id} sx={{'&:hover':{backgroundColor:'#e7fffa', cursor:'pointer'}}} onClick={()=>navigate(item.path)}>
-                <Td>{item.name}</Td>
-                <Td>{format(item.last_modified, 'yyyy-MM-dd')}</Td>
-                <Td>{item.creator}</Td>
+                <Td fontWeight='semibold'>{item.name}</Td>
+                <Td>{format(Date(item.last_modified_on), 'yyyy-MM-dd')}</Td>
+                <Td><UserAvatar userId={item.created_by}/></Td>
               </Tr>
               ))}
            </Tbody>
