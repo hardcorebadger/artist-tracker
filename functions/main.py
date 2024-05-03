@@ -8,7 +8,7 @@ import flask
 from datetime import datetime, timedelta
 import traceback
 
-# from local_scripts import reset_update_as_of
+from local_scripts import reset_update_as_of, migrate_relations
 
 #################################
 # App Initialization
@@ -49,6 +49,8 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
+        migrate_relations(db)
+
         # wipe_collection(db, 'artists_v2')
         # reset_update_as_of(db)
         # aids = spotify.get_playlist_artists('37i9dQZF1E4A2FqXjcsyRn')
@@ -78,7 +80,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         if 'spotify_id' not in data:
             raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
 
-        return tracking_controller.add_artist(data['spotify_id'], 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
+        return tracking_controller.add_artist(data['spotify_id'], 'URTJbErZ7YTCwzSyoXvF4vBd9Xj1', '8AasHpt0Y2CNmogY6TpM')
 
     @v2_api.post("/ingest-artist")
     def ingest_artist():

@@ -33,30 +33,33 @@ class TrackingController():
     # if artist exists add the user/org to tracking
     if doc.exists:
       data = doc.to_dict()
-      user = get_user(user_id, self.db)
-      # TODO fix this - to filter by org the IDs need to be the key in a dict or something
-      # also this will add the same org twice
-      # gotta go back the to set-list thing from befoe and find somewhere else for the attached data
-      data['organizations'].append({
-        "org_id": org_id,
-        "favorite": False
-      })
-      data['found_by'].append({
-        "organization": org_id,
-        "user_id": user_id,
-        "user_first": user['first_name'],
-        "user_last": user['last_name'],
-        "found_on": datetime.now().strftime("%Y-%m-%d")
-      })
+
+      if org_id not in data['watching']:
+        data['watching'].append(org_id)
+        data['watching_details'][org_id] = {
+          "added_on": datetime.now().strftime("%Y-%m-%d")
+        }
+        if user_id not in data['found_by_first']:
+          data['found_by_first'].append(user_id)
+      
+      if user_id not in data['found_by']:
+        data['found_by'].append(user_id)
+        data['found_by_details'][user_id] = {
+          "found_on": datetime.now().strftime("%Y-%m-%d")
+        }
+      
       ref.update({
-          "organizations": data['organizations'],
+          "watching": data['watching'],
+          "watching_details": data['watching_details'],
+          "found_by_first": data['found_by_first'],
           "found_by": data['found_by'],
+          "found_by_details": data['found_by_details'],
       })
+
       return 'Artist exists, added to tracking', 200
     
     # check if the ID is valid (this will raise a 400 if the artist is invalid)
     artist = self.spotify.get_artist(spotify_id)
-    user = get_user(user_id, self.db)
     
     # create an artist
     new_schema = {
@@ -76,21 +79,34 @@ class TrackingController():
         "eval_distro": "",
         "eval_label": "",
         "eval_prios": "unknown",
-        "organizations": [
-          {
-            "org_id": org_id,
-            "favorite": False
+        "watching": [org_id],
+        "watching_details": {
+          org_id: {
+            "added_on": datetime.now().strftime("%Y-%m-%d")
           }
-        ],
-        "found_by": [
-          {
-            "organization": org_id,
-            "user_id": user_id,
-            "user_first": user['first_name'],
-            "user_last": user['last_name'],
+        },
+        "found_by": [user_id],
+        "found_by_first": [user_id],
+        "found_by_details": {
+          user_id: {
             "found_on": datetime.now().strftime("%Y-%m-%d")
           }
-        ],
+        }
+        # "organizations": [
+        #   {
+        #     "org_id": org_id,
+        #     "favorite": False
+        #   }
+        # ],
+        # "found_by": [
+        #   {
+        #     "organization": org_id,
+        #     "user_id": user_id,
+        #     "user_first": user['first_name'],
+        #     "user_last": user['last_name'],
+        #     "found_on": datetime.now().strftime("%Y-%m-%d")
+        #   }
+        # ],
     }
     for s in HOT_TRACKING_FIELDS:
       new_schema[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = []
