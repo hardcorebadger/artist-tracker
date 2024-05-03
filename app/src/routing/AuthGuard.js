@@ -5,7 +5,7 @@ import LoadingScreen from './LoadingScreen';
 import { db, useAuth, signOut } from '../firebase';
 import { reload, sendEmailVerification } from 'firebase/auth';
 import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
-import { collection, doc } from 'firebase/firestore';
+import { collection, doc, query, where } from 'firebase/firestore';
 import VerifyScreen from './VerifyScreen';
 import { products as productMap } from '../config'
 
@@ -126,7 +126,16 @@ function OrganizationGuard({user, profileData, orgId, children}) {
     }
   )
 
-  if (orgLoading || productsLoading) {
+  const [users, usersLoading, usersError] = useCollection(
+    query(collection(db, 'users'), 
+      where("organization", "==", orgId),
+    ),
+    {
+      snapshotListenOptions: { includeMetadataChanges: true },
+    }
+  )
+
+  if (orgLoading || productsLoading || usersLoading) {
     return <LoadingScreen />;
   }
 
@@ -141,11 +150,19 @@ function OrganizationGuard({user, profileData, orgId, children}) {
     products.docs.map((doc) => {productData[doc.data().id] = doc.data()})
   }
 
+  let orgUsers = {}
+  if (users) {
+    users.docs.forEach(d => {
+      orgUsers[d.id] = d.data()
+    })
+  }
+
   const main = <UserContext.Provider value={{
     org: {
       products: productData,
       id: orgId,
-      info: org.data()
+      info: org.data(),
+      users: orgUsers
     },
     profile: profileData,
     auth: user,

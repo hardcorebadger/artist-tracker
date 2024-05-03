@@ -62,6 +62,10 @@ function PageArtistReport() {
   const onReportSave = async (columnSelection, columnOrder, filterValue, reportName) => {
     await setDoc(doc(db, 'reports', id), {
       organization: user.org.id,
+      last_modified_by: user.auth.uid,
+      last_modified_on: Date.now(),
+      created_on: reportData.created_on,
+      created_by: reportData.created_by,
       type: 'artist',
       name: reportName,
       columnSelection: columnSelection,
@@ -73,6 +77,10 @@ function PageArtistReport() {
   const onReportSaveNew = async (columnSelection, columnOrder, filterValue, reportName) => {
     const docRef = await addDoc(collection(db, 'reports'), {
       organization: user.org.id,
+      last_modified_by: user.auth.uid,
+      last_modified_on: Date.now(),
+      created_by: user.auth.uid,
+      created_on: Date.now(),
       type: 'artist',
       name: reportName,
       columnSelection: columnSelection,

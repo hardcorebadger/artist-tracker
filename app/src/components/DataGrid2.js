@@ -132,7 +132,7 @@ const applyColumnOrder = (currentOrder, selectedColumns) => {
 export default function DataGridController({initialReportName, initialColumnSelection, initialColumnOrder, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
   const user = useUser()
   const navigate = useNavigate()
-  console.log("grid rerender")
+  // console.log("grid rerender")
 
   const [artists, artistsLoading, artistsError] = useCollection(
     query(collection(db, 'artists_v2'), 
