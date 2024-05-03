@@ -137,8 +137,7 @@ export default function DataGridController({initialReportName, initialColumnSele
   const [artists, artistsLoading, artistsError] = useCollection(
     query(collection(db, 'artists_v2'), 
       where("ob_status", "==", "onboarded"),
-      // where("organizations", "array-contains", user.org.id),
-      // where("distro_type", "==", "DIY")
+      where("watching", "array-contains", user.org.id)
     ),
     {
       snapshotListenOptions: { includeMetadataChanges: true },
