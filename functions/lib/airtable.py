@@ -62,6 +62,9 @@ class AirtableClient():
   def get_artists_by_status(self, status):
     return self.get(f'/{self.tables["artists"]}', data={'filterByFormula':'{Status}="'+status+'"'})
   
+  def get_artists_by_migration_status(self, status):
+    return self.get(f'/{self.tables["artists"]}', data={'filterByFormula':'{Migration Status}="'+status+'"'})
+  
   def get_new_artists(self):
     return self.get_artists_by_status("0 - New")
 

@@ -7,7 +7,7 @@ from controllers import AirtableV1Controller, TaskController, TrackingController
 import flask
 from datetime import datetime, timedelta
 import traceback
-
+from local_scripts import migrate_from_v1
 
 #################################
 # App Initialization
@@ -48,6 +48,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
+        migrate_from_v1(airtable, spotify, tracking_controller)
         # wipe_collection(db, 'artists_v2')
         # reset_update_as_of(db)
         # aids = spotify.get_playlist_artists('37i9dQZF1E4A2FqXjcsyRn')

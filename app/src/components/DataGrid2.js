@@ -16,7 +16,7 @@ import { useUser } from '../routing/AuthGuard';
 import Iconify from '../components/Iconify';
 import DataTable from 'react-data-table-component';
 import { collection, query, where } from 'firebase/firestore';
-import { useCollection } from 'react-firebase-hooks/firestore';
+import { useCollectionOnce } from 'react-firebase-hooks/firestore';
 import { db } from '../firebase';
 import Chart from "react-apexcharts";
 import numeral from 'numeral'
@@ -134,14 +134,11 @@ export default function DataGridController({initialReportName, initialColumnSele
   const navigate = useNavigate()
   // console.log("grid rerender")
 
-  const [artists, artistsLoading, artistsError] = useCollection(
+  const [artists, artistsLoading, artistsError] = useCollectionOnce(
     query(collection(db, 'artists_v2'), 
       where("ob_status", "==", "onboarded"),
       where("watching", "array-contains", user.org.id)
-    ),
-    {
-      snapshotListenOptions: { includeMetadataChanges: true },
-    }
+    )
   )
   
   const [columnSelection, setColumnSelection] = useState(deepCopy(initialColumnSelection))

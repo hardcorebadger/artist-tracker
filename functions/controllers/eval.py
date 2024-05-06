@@ -226,15 +226,19 @@ class EvalController():
       pline = None
 
       for line in lines:
-          if 'Provided to YouTube by ' in line:
-              distributor = line.split('Provided to YouTube by ')[1]
-          if '℗' in line:
-              l = line.split('℗ ')[1]
-              if 'under exclusive license to ' in l:
-                  pline = l.split('under exclusive license to ')[1]
-              else:
-                  pline = l
-              pline = re.sub(r'\b\d{4}\b', '', pline).strip()
+        if 'Provided to YouTube by ' in line:
+            distributor = line.split('Provided to YouTube by ')[1]
+        if '℗' in line:
+            l = line.split('℗ ')[1]
+            if 'under exclusive license to ' in l:
+                pline = l.split('under exclusive license to ')[1]
+            else:
+                pline = l
+            pline = re.sub(r'\b\d{4}\b', '', pline).strip()
+      
+      #   cant perform checks without distro, assume unknown
+      if distributor == None:
+          return distributor, pline, 'unknown'
 
 
       distro_type = 'indie'
