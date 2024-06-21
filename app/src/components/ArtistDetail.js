@@ -44,14 +44,20 @@ const chartOptions = {
   dataLabels: {
     enabled: false
   },
+  markers: {
+    size: 5
+  },
   stroke: {
-    curve: 'smooth'
+    curve: 'straight'
   },
   tooltip: {
     x: {
       format: 'dd/MM/yy HH:mm'
     },
   },
+  yaxis: {
+    min: 0
+  }
 }
 
 const bakeStats = () => {

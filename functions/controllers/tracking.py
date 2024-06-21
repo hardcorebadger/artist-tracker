@@ -167,8 +167,7 @@ class TrackingController():
     # if data['ob_status'] != 'ingested' and not is_ob:
     #   raise ErrorResponse('Artist not ingested', 401, 'Tracking')
 
-    # hit SS for the historic stats going back 8 weeks rel (9 abs) from as_of
-    stats = self.songstats.get_stat_weeks(spotify_id, 9)
+    stats = self.songstats.get_stat_weeks(spotify_id, 8)
 
     print("[INGEST] has stats")
 
@@ -176,7 +175,7 @@ class TrackingController():
     #  update the hot tracking stats on the artist
     update = {"stat_dates": stats['as_of'], "stats_as_of": datetime.now()}
     for s in HOT_TRACKING_FIELDS:
-      update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = stats['stats'][s][HOT_TRACKING_FIELDS[s]] if s in stats['stats'] else []
+      update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = stats['stats'][s] if s in stats['stats'] else []
     ref.update(update)
     print("[INGEST] stats updated")
 

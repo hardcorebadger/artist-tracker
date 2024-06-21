@@ -172,7 +172,7 @@ export const metricFunctions = {
   "latest": {
     name: 'latest',
     header: "Latest",
-    op: input => input.length > 0 ? input[0] : 0,
+    op: input => input.length > 0 ? input[input.length-1] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -187,7 +187,7 @@ export const metricFunctions = {
   "previous": {
     name: 'previous',
     header: "Previous",
-    op: input => input.length > 0 ? input[1] : 0,
+    op: input => input.length > 1 ? input[input.length-2] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -202,7 +202,7 @@ export const metricFunctions = {
   "wow": {
     name: 'wow',
     header: "Week / Week",
-    op: input => input.length > 0 ? (input[0] - input[1]) / input[1] : 0,
+    op: input => input.length > 1 ? (input[input.length-1] - input[input.length-2]) / input[input.length-1] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -217,7 +217,7 @@ export const metricFunctions = {
   "mom": {
     name: 'mom',
     header: "Month / Month",
-    op: input => input.length > 0 ? (input[0] - input[4]) / input[4] : 0,
+    op: input => input.length > 3 ? (input[input.length-1] - input[input.length-5]) / input[input.length-1] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -238,7 +238,7 @@ export const metricFunctions = {
       sortable: false,
       render: row => {
         return (
-        <Sparklines data={row.value} >
+        <Sparklines data={row.value} min={0}>
           <SparklinesLine color="#329795" />
         </Sparklines>
         )

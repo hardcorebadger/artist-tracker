@@ -1,5 +1,6 @@
 import requests
 import json
+import pandas as pd
 from datetime import datetime, timedelta
 from .errors import ErrorResponse
 
@@ -25,10 +26,10 @@ class SongstatsClient():
       "spotify_artist_id": spotify_id
     })
   
-  def _get_days_for_weeks(self, weeks):
+  def _get_days_for_weeks(self, weeks, day_end=3):
     most_recent_day = (datetime.now() - timedelta(days=1)).date()
     # Calculate the most recent Thursday
-    days_since_thursday = (most_recent_day.weekday() - 3) % 7  # Thursday is weekday 3
+    days_since_thursday = (most_recent_day.weekday() - day_end) % 7  # Thursday is weekday 3
     most_recent_thursday = most_recent_day - timedelta(days=days_since_thursday)
     weeks_ago_from_thursday = most_recent_thursday - timedelta(weeks=weeks)
     start = weeks_ago_from_thursday
@@ -146,7 +147,46 @@ class SongstatsClient():
         weekly_rollups[stat].append(interpolated_daily_stats[stat][i])
     return weekly_dates, weekly_rollups
   
+  def __merge_stats_to_df(self, stats):
+    dfs = []
+    for stat in stats:
+        source = stat['source']
+        if 'data' not in stat:
+            continue
+        if 'history' not in stat['data']:
+            continue
+        data = stat['data']['history']
+        if len(data) == 0:
+            continue
+        
+        df = pd.DataFrame(data)
+        df['date'] = pd.to_datetime(df['date'])
+        df = df.rename(columns=lambda x: f"{source}__{x}" if x != 'date' else x)
+        df.set_index('date', inplace=True)
+        
+        dfs.append(df)
+        
+    if len(dfs) == 0:
+      return None
+    # Merge all DataFrames on the date index
+    result_df = pd.concat(dfs, axis=1)
+    # forward fill missing data, 14 day moving average, weekly resample, trim startup weeks
+    rolling = result_df.ffill().rolling(window=14).mean().resample("W").mean().iloc[2:, :]
+    return rolling
+
   def get_stat_weeks(self, spotify_id : str, weeks : int):
+    start, week_end, end = self._get_days_for_weeks(weeks+3, day_end=6) # get sunday weeks
+    res = self.get_historic_stats(spotify_id, start, week_end)
+    df = self.__merge_stats_to_df(res['stats']) # this will chop 2 weeks off for smoothing
+    # stats list
+    rel = df.diff(periods=1).iloc[2:, :].bfill().fillna(0).astype(int) # this will chop 1 week off for diffs, 1 week to trim to 8 in finals
+    json_dict = rel.to_dict(orient='list')
+    # dates list
+    dates = [ts.strftime('%Y-%m-%d') for ts in rel.index.to_list()]
+    return {'stats': json_dict, 'as_of': dates}
+
+  
+  def get_stat_weeks_old_2(self, spotify_id : str, weeks : int):
     start, week_end, end = self._get_days_for_weeks(weeks)
     res = self.get_historic_stats(spotify_id, start, end)
 
