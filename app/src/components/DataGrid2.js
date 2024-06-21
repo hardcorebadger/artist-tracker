@@ -1,4 +1,4 @@
-import {useState, useContext, useRef, useCallback} from 'react';
+import {useState, useContext, useRef, useCallback, useEffect} from 'react';
 import {
   Box,
   Text,
@@ -15,7 +15,7 @@ import {
 import { useUser } from '../routing/AuthGuard';
 import Iconify from '../components/Iconify';
 import DataTable from 'react-data-table-component';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, doc, query, updateDoc, where } from 'firebase/firestore';
 import { useCollectionOnce } from 'react-firebase-hooks/firestore';
 import { db } from '../firebase';
 import Chart from "react-apexcharts";
@@ -30,6 +30,7 @@ import { deepCopy, deepCompare } from '../util/objectUtil';
 import EditableTitle from './EditableTitle';
 import ConfirmButton from './ConfirmButton';
 import { useNavigate } from 'react-router-dom';
+import FavoritesButton from './FavoritesButton';
 
 const gridStyle = { minHeight: 'calc(100vh - 173px)' }
 
@@ -39,8 +40,15 @@ const metricColumnFactory = (metric, func) => ({
     ...metricFunctions[func].options
 })
 
-const bakeColumns = (selection) => {
+const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly) => {
   let columns = [
+    {
+      name: 'favorite',
+      header: <FavoritesButton filled={favoritesOnly} sx={{marginBottom:-1}} action={toggleFavs}/>,
+      render: row => <FavoritesButton filled={row.value} action={toggleRowFav} data={row.data.id}/>,
+      sortable: false,
+      width: 10,
+    },
     {
       name: 'name',
       header: "Artist",
@@ -65,11 +73,14 @@ const bakeColumns = (selection) => {
   return columns
 }
 
-const bakeRows = (selectedColumns, raw_data) => {
+const bakeRows = (selectedColumns, raw_data, orgId) => {
   let baked_rows = []
   raw_data.forEach(row => {
     let baked_row = {
-      name: row['name']
+      name: row['name'],
+      favorite: row['watching_details'][orgId]['favorite'],
+      id: row['spotify_id'],
+      raw: row
     }
     Object.keys(selectedColumns).forEach(key => {
       if (columnOptions[key].isMetric) {
@@ -80,7 +91,11 @@ const bakeRows = (selectedColumns, raw_data) => {
         })
       } else {
         if (selectedColumns[key])
-          baked_row[key] = row[key]
+          if (columnOptions[key].op != null) {
+            baked_row[key] = columnOptions[key].op(row[key])
+          } else {
+            baked_row[key] = row[key]
+          }
           // columns.push(columnOptions[key])
       }
     })
@@ -102,6 +117,9 @@ const compareState = (
 }
 
 const applyColumnOrder = (currentOrder, selectedColumns) => {
+  if (!currentOrder.includes('favorite')) {
+    currentOrder.push('favorite')
+  }
   if (!currentOrder.includes('name')) {
     currentOrder.push('name')
   }
@@ -150,6 +168,8 @@ export default function DataGridController({initialReportName, initialColumnSele
   const [reportName, setReportName] = useState(initialReportName)
 
   const [gridApi, setGridApi] = useState(null)
+
+  const [favoritesOnly, setFavoritesOnly] = useState(false)
   
   const applyColumnSelection = (selection) => {
     setColumnSelection(selection)
@@ -167,18 +187,65 @@ export default function DataGridController({initialReportName, initialColumnSele
     }
   }
 
+  const onFavoritesToggled = () => {
+    console.log("filter")
+    setFavoritesOnly(!favoritesOnly)
+  }
+
+  const onRowFavoriteToggled = async (id) => {
+    // console.log(id)
+    const newData = [...data]
+    let update = null
+    newData.forEach((d) => {
+      if (d.id == id) {
+        update = d.raw['watching_details']
+        d.favorite = !d.favorite
+        update[user.org.id]['favorite'] = d.favorite
+        // console.log(d)
+      }
+    })
+    setData(newData)
+    // console.log(update)
+    if (update != null) {
+      await updateDoc(doc(db, 'artists_v2', id), {
+        watching_details: update,
+      })
+    }
+  }
+
   // apply column selection and reformat the rows to match
-  const columns = bakeColumns(columnSelection)
-  const raw_data = artistsError || artistsLoading ? [] : artists.docs.map((d) => d.data())
-  const data = bakeRows(columnSelection, raw_data)
-  const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnSelection, columnSelection, initialColumnOrder, columnOrder, initialFilterValues, filterValue)
+  const columns = bakeColumns(columnSelection, onFavoritesToggled, onRowFavoriteToggled, favoritesOnly)
   
+
+  const [data, setData] = useState([])
+
+  useEffect(() => {
+    const raw_data = artistsError || artistsLoading ? [] : artists.docs.map((d) => d.data())
+    setData(bakeRows(columnSelection, raw_data, user.org.id))
+  }, [artists]);
+
+  let d = data
+  if (favoritesOnly) {
+    d = []
+    data.forEach((dd) => {
+      if (dd.favorite)
+        d.push(dd)
+    })
+  }
+  // const data = bakeRows(columnSelection, raw_data, user.org.id)
+  const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnSelection, columnSelection, initialColumnOrder, columnOrder, initialFilterValues, filterValue)
+  let bakedColOrder = ['favorite', 'name']
+  columnOrder.forEach((col) => {
+    bakedColOrder.push(col);
+  })
+  // console.log(columnOrder)
   const onRowClick = useCallback((rowProps, event) => {
     // with real data we need the ID in here
     const id = rowProps.data.spotify_url.split('/')[rowProps.data.spotify_url.split('/').length - 1]
     onOpenArtist(id)
     // navigate('/app/artists/'+id)
   }, [])
+
 
   return (
     <VStack spacing={5} align="left">
@@ -207,17 +274,17 @@ export default function DataGridController({initialReportName, initialColumnSele
         idProperty="id"
         emptyText={<Spinner thickness='4px' emptyColor='gray.200' color='primary.500' size='xl'/>}
         columns={columns}
-        dataSource={data}
+        dataSource={d}
         style={gridStyle}
         showColumnMenuTool={false}
-        columnOrder={columnOrder}
+        columnOrder={bakedColOrder}
         onColumnOrderChange={setColumnOrder}
         defaultFilterValue={filterValue}
         onReady={setGridApi}
         onFilterValueChange={setFilterValue}
         showCellBorders="horizontal"
         theme='blue-light'
-        onRowClick={onRowClick}
+        // onRowClick={onRowClick}
       />
     </VStack>
   );

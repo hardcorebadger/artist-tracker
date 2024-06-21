@@ -7,7 +7,7 @@ from controllers import AirtableV1Controller, TaskController, TrackingController
 import flask
 from datetime import datetime, timedelta
 import traceback
-from local_scripts import migrate_from_v1
+from local_scripts import migrate_add_favs_and_tags
 
 #################################
 # App Initialization
@@ -29,7 +29,7 @@ songstats = SongstatsClient(SONGSTATS_API_KEY)
 # V2 API
 # ##############################
 
-@https_fn.on_request()
+@https_fn.on_request(memory=512)
 def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     db = firestore.client(app)
@@ -48,6 +48,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
+        migrate_add_favs_and_tags(db)
         # migrate_from_v1(airtable, spotify, tracking_controller)
         # wipe_collection(db, 'artists_v2')
         # reset_update_as_of(db)
@@ -103,7 +104,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 # V1 API 
 # ###########################
 
-@https_fn.on_request(memory=512)
+@https_fn.on_request()
 def fn_v1_api(req: https_fn.Request) -> https_fn.Response:
 
     v1_controller = AirtableV1Controller(airtable, spotify, youtube)

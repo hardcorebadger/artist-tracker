@@ -82,7 +82,9 @@ class TrackingController():
         "watching": [org_id],
         "watching_details": {
           org_id: {
-            "added_on": datetime.now().strftime("%Y-%m-%d")
+            "added_on": datetime.now().strftime("%Y-%m-%d"),
+            "favorite": False,
+            "tags": []
           }
         },
         "found_by": [user_id],

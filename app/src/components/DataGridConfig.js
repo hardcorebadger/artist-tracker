@@ -1,5 +1,6 @@
 import NumberFilter from '@inovua/reactdatagrid-community/NumberFilter'
 import SelectFilter from '@inovua/reactdatagrid-community/SelectFilter'
+
 import {
   Badge,
   Link
@@ -53,6 +54,7 @@ export const defaultColumnSelection = {
   "eval_status": true,
   "eval_distro_type": true,
   "spotify_url": true,
+  "genres": false,
   "stat_tiktok__views_total__rel": {
     "latest": true,
     "previous": false,
@@ -90,7 +92,7 @@ export const defaultColumnSelection = {
   }
 }
 
-export const defaultColumnOrder = ['name', 'spotify_url', 'eval_status', 'eval_distro', 'stat_spotify__streams_current__rel-latest']
+export const defaultColumnOrder = ['spotify_url', 'eval_status', 'eval_distro', 'stat_spotify__streams_current__rel-latest']
 
 export const columnOptions = {
   "eval_distro": {
@@ -140,6 +142,17 @@ export const columnOptions = {
     header: 'Spotify URL',
     render: row => <Link color='primary.500' href={row.value} isExternal>Spotify <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></Link>,
     isMetric: false
+  },
+  "genres": {
+    name: 'genres',
+    op: input => input.length > 0 ? input[0] : "",
+    header: 'Genre',
+    isMetric: false,
+    defaultFilter: {
+      type: 'string',
+      operator: 'startsWith',
+      value: ''
+    }
   },
   "stat_tiktok__views_total__rel": {
     name: 'stat_tiktok__views_total__rel',
