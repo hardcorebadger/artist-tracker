@@ -103,7 +103,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 # V1 API 
 # ###########################
 
-@https_fn.on_request()
+@https_fn.on_request(memory=512)
 def fn_v1_api(req: https_fn.Request) -> https_fn.Response:
 
     v1_controller = AirtableV1Controller(airtable, spotify, youtube)

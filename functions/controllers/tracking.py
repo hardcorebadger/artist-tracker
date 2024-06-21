@@ -166,8 +166,18 @@ class TrackingController():
     # data = doc.to_dict()
     # if data['ob_status'] != 'ingested' and not is_ob:
     #   raise ErrorResponse('Artist not ingested', 401, 'Tracking')
-
-    stats = self.songstats.get_stat_weeks(spotify_id, 8)
+    try:
+      stats = self.songstats.get_stat_weeks(spotify_id, 8)
+    except ErrorResponse as e:
+      # Artist somehow got removed from songstats, but them back in OB
+      if e.status_code == 404:
+          ref.update({
+            "ob_status": "waiting_ingest",
+            "ob_wait_till": datetime.now() + timedelta(minutes=10)
+          })
+          return 'Waiting for data', 201
+      raise e
+    
 
     print("[INGEST] has stats")
 
