@@ -21,7 +21,7 @@ export default function SiteLayout() {
         </HStack>
         </RouterLink>
         <HStack align='center'>
-          <ColorModeSwitcher/>
+          {/* <ColorModeSwitcher/> */}
           {location.pathname !== '/' &&
           <Button as={RouterLink} to='/auth/login' colorScheme='gray' size='sm'>Login</Button>
           }

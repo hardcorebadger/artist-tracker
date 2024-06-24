@@ -17,7 +17,7 @@ import {
 } from '@chakra-ui/react';
 import { LockIcon } from '@chakra-ui/icon'
 import Logo from '../components/Logo';
-import screenies from '../resources/screenies.png';
+import screenies from '../resources/promo.png';
 import TechnologyLogo from '../components/TechnologyLogo';
 import Iconify from '../components/Iconify';
 import { signOut, db } from '../firebase';
@@ -40,8 +40,8 @@ function PageDefault() {
       <Container maxW='700' textAlign='center' pt='75' pb='75'>
         <VStack align='center' spacing={10}>
           <Logo/>
-          <Heading size='4xl'>The best bootstrap for <chakra.span color='primary.500'>indie hackers</chakra.span></Heading>
-          <Text color="text.subtle" pl='100' pr='100' fontSize='lg' >Small clean code base. Simple stack with old-faithful frameworks react and php. All the things you need to launch and make that money.</Text>
+          <Heading size='4xl'>The best A&R system for <chakra.span color='primary.500'>indie labels</chakra.span></Heading>
+          <Text color="text.subtle" pl='100' pr='100' fontSize='lg' >Find and track new artists relevant to you. Act daily on cross platform data. Organize your team, leads and data in one place.</Text>
           <HStack>
             <Button size='lg' colorScheme='primary' as={RouterLink} to="/auth/register">Sign up</Button>
             <Button size='lg' colorScheme='gray' as={RouterLink} to="/auth/login">Log in</Button>
@@ -53,7 +53,7 @@ function PageDefault() {
         <Image src={screenies}/>
       </Container>
       {/* Technologies */}
-      <Container maxW={700} textAlign='center' pt='20' pb='40'>
+      {/* <Container maxW={700} textAlign='center' pt='20' pb='40'>
         <VStack align='center' spacing={20}>
           <VStack spacing={5}>
             <Heading size='lg'>A stack everyone understands</Heading>
@@ -72,9 +72,9 @@ function PageDefault() {
             </HStack>
           </VStack>
         </VStack>
-      </Container>
+      </Container> */}
       {/* Features */}
-      <Box backgroundColor="bg.well">
+      {/* <Box backgroundColor="bg.well">
         <Container maxW={900} textAlign='center' pt='100'>
           <VStack align='center' spacing={8}>
             <Heading size='3xl'>Everything you need, without the bells and whistles ⚡️</Heading>
@@ -139,9 +139,9 @@ function PageDefault() {
             </Card>
           </SimpleGrid>
         </Container>
-      </Box>
+      </Box> */}
       {/* Pricing */}
-      <Box backgroundColor='primary.mode.400'>
+      {/* <Box backgroundColor='primary.mode.400'>
         <Container maxW='700' textAlign='center' pt='100' pb='100'>
           <VStack align='center' spacing={5}>
             <Heading size='3xl' color='white'>Wallet friendly pricing</Heading>
@@ -240,9 +240,9 @@ function PageDefault() {
             </Card>
             </SimpleGrid>
         </Container>
-      </Box>
+      </Box> */}
       {/* Testimonials */}
-      <Container maxW={700} textAlign='center' pt='20' >
+      {/* <Container maxW={700} textAlign='center' pt='20' >
       <Heading size='lg'>Loved by hackers like you ❤️</Heading>
       </Container>
       <Container maxW={1200} pt='20' pb='20'>
@@ -312,10 +312,11 @@ function PageDefault() {
             
           </VStack>
         </SimpleGrid>
-      </Container>
+      </Container> */}
       {/* Footer */}
       <Container maxW='300' pb='20'>
-        <Text color="text.subtle">Hacked together with ⚡️ in NYC</Text>
+        <Text color="text.subtle">Built with with ⚡️ in NYC</Text>
+        {/* <Text color="text.subtle">Contact will@newwrld.io to get access</Text> */}
       </Container>
     </Box>
   );

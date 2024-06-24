@@ -297,8 +297,8 @@ function AccountSummarySection() {
       </GridItem>
       <GridItem>
       <VStack spacing={1} align="left">
-      <HStack align="center" spacing={3}><Text color="text.subtle">Plan</Text><Text>{sub_id ? prodInfo.display : "None"}</Text></HStack>
-        <Link color="primary.default" as={RouterLink} to='/app/settings/billing'>Manage subscription</Link>
+      {/* <HStack align="center" spacing={3}><Text color="text.subtle">Plan</Text><Text>{sub_id ? prodInfo.display : "None"}</Text></HStack> */}
+        {/* <Link color="primary.default" as={RouterLink} to='/app/settings/billing'>Manage subscription</Link> */}
         </VStack>
       </GridItem>
     </Grid>
