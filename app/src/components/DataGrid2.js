@@ -47,6 +47,7 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly) => {
       header: <FavoritesButton filled={favoritesOnly} sx={{marginBottom:-1}} action={toggleFavs}/>,
       render: row => <FavoritesButton filled={row.value} action={toggleRowFav} data={row.data.id}/>,
       sortable: false,
+      draggable: true,
       width: 10,
     },
     {
@@ -54,6 +55,7 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly) => {
       header: "Artist",
       render: row => <Text color='text.default' fontWeight='semibold'>{row.value}</Text>,
       defaultFlex: 1,
+      draggable: true,
       minWidth: 130
       // cell: row => {return (<Text fontWeight="bold">{row.name}</Text>)}
     }
@@ -117,12 +119,6 @@ const compareState = (
 }
 
 const applyColumnOrder = (currentOrder, selectedColumns) => {
-  if (!currentOrder.includes('favorite')) {
-    currentOrder.push('favorite')
-  }
-  if (!currentOrder.includes('name')) {
-    currentOrder.push('name')
-  }
   Object.keys(selectedColumns).forEach(key => {
     if (columnOptions[key].isMetric) {
       Object.keys(selectedColumns[key]).forEach(subkey => {
@@ -238,6 +234,11 @@ export default function DataGridController({initialReportName, initialColumnSele
   columnOrder.forEach((col) => {
     bakedColOrder.push(col);
   })
+  const setBakedColumnOrder = (colOrder) => {
+    colOrder.splice(colOrder.indexOf('name'),1)
+    colOrder.splice(colOrder.indexOf('favorite'),1)
+    setColumnOrder(colOrder)
+  }
   // console.log(columnOrder)
   const onRowClick = useCallback((rowProps, event) => {
     // with real data we need the ID in here
@@ -278,7 +279,7 @@ export default function DataGridController({initialReportName, initialColumnSele
         style={gridStyle}
         showColumnMenuTool={false}
         columnOrder={bakedColOrder}
-        onColumnOrderChange={setColumnOrder}
+        onColumnOrderChange={setBakedColumnOrder}
         defaultFilterValue={filterValue}
         onReady={setGridApi}
         onFilterValueChange={setFilterValue}
