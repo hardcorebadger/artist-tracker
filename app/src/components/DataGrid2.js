@@ -84,7 +84,7 @@ const bakeRows = (selectedColumns, raw_data, orgId) => {
       id: row['spotify_id'],
       raw: row
     }
-    Object.keys(selectedColumns).forEach(key => {
+    Object.keys(columnOptions).forEach(key => {
       if (columnOptions[key].isMetric) {
         Object.keys(selectedColumns[key]).forEach(subkey => {
           if (selectedColumns[key][subkey]) {
@@ -92,13 +92,11 @@ const bakeRows = (selectedColumns, raw_data, orgId) => {
           }
         })
       } else {
-        if (selectedColumns[key])
-          if (columnOptions[key].op != null) {
-            baked_row[key] = columnOptions[key].op(row[key])
-          } else {
-            baked_row[key] = row[key]
-          }
-          // columns.push(columnOptions[key])
+        if (columnOptions[key].op != null) {
+          baked_row[key] = columnOptions[key].op(row[key])
+        } else {
+          baked_row[key] = row[key]
+        }
       }
     })
     baked_rows.push(baked_row)
@@ -214,7 +212,8 @@ export default function DataGridController({initialReportName, initialColumnSele
   
 
   const [data, setData] = useState([])
-
+  if (data.length > 0)
+    console.log(data[0])
   useEffect(() => {
     const raw_data = artistsError || artistsLoading ? [] : artists.docs.map((d) => d.data())
     setData(bakeRows(columnSelection, raw_data, user.org.id))

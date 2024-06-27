@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilter, StructuredQuery
 
 HOT_TRACKING_FIELDS = {
+  "spotify__monthly_listeners_current": "abs",
   "spotify__streams_current": "rel",
   "youtube__video_views_total": "rel",
   "tiktok__views_total": "rel",
@@ -136,7 +137,14 @@ class TrackingController():
             "ob_wait_till": datetime.now() + timedelta(minutes=10)
           })
           return 'Waiting for data', 201
+      elif e.status_code == 429:
+          ref.update({
+            "ob_status": "waiting_ingest",
+            "ob_wait_till": datetime.now() + timedelta(days=30)
+          })
+          return 'Waiting for data', 201
       raise e
+      
     print("[INGEST] has info")
     
     # get the stats now that we know the artist is in SS
@@ -176,6 +184,12 @@ class TrackingController():
           ref.update({
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(minutes=10)
+          })
+          return 'Waiting for data', 201
+      elif e.status_code == 429:
+          ref.update({
+            "ob_status": "waiting_ingest",
+            "ob_wait_till": datetime.now() + timedelta(days=30)
           })
           return 'Waiting for data', 201
       raise e

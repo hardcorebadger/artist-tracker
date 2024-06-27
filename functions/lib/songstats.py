@@ -167,17 +167,19 @@ class SongstatsClient():
         dfs.append(df)
         
     if len(dfs) == 0:
-      return None
+      return None, False
     # Merge all DataFrames on the date index
     result_df = pd.concat(dfs, axis=1)
     # forward fill missing data, 14 day moving average, weekly resample, trim startup weeks
     rolling = result_df.ffill().rolling(window=14).mean().resample("W").mean().iloc[2:, :]
-    return rolling
+    return rolling, True
 
   def get_stat_weeks(self, spotify_id : str, weeks : int):
     start, week_end, end = self._get_days_for_weeks(weeks+3, day_end=6) # get sunday weeks
     res = self.get_historic_stats(spotify_id, start, week_end)
-    df = self.__merge_stats_to_df(res['stats']) # this will chop 2 weeks off for smoothing
+    df, status = self.__merge_stats_to_df(res['stats']) # this will chop 2 weeks off for smoothing
+    if status == False:
+      return {'stats': {}, 'as_of': dates}
     # stats list
     rel = df.diff(periods=1).iloc[2:, :].bfill().fillna(0).astype(int) # this will chop 1 week off for diffs, 1 week to trim to 8 in finals
     json_dict = rel.to_dict(orient='list')

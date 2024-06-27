@@ -55,6 +55,7 @@ export const defaultColumnSelection = {
   "eval_distro_type": true,
   "spotify_url": true,
   "genres": false,
+  "eval_prios": false,
   "stat_tiktok__views_total__rel": {
     "latest": true,
     "previous": false,
@@ -130,6 +131,22 @@ export const columnOptions = {
     filterEditorProps: {
       placeholder: 'All',
       dataSource: [{id:'diy', label: 'diy'}, {id:'major', label: 'major'}, {id:'indie', label: 'indie'}]
+    },
+    defaultFilter: {
+      type: 'string',
+      operator: 'startsWith',
+      value: ''
+    }
+  },
+  "eval_prios": {
+    name: 'eval_prios',
+    header: 'Backcatalog Status',
+    isMetric: false,
+    filterEditor: SelectFilter,
+    render: row => <Badge colorScheme={row.value == 'clean' ? 'green' : 'red'}>{row.value}</Badge>,
+    filterEditorProps: {
+      placeholder: 'All',
+      dataSource: [{id:'clean', label: 'clean'}, {id:'dirty', label: 'dirty'}]
     },
     defaultFilter: {
       type: 'string',

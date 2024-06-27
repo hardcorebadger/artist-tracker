@@ -163,7 +163,7 @@ def fn_v1_api(req: https_fn.Request) -> https_fn.Response:
 
 # Figures out how many artists to do per batch given an update interval and minimum SLA
 
-@scheduler_fn.on_schedule(schedule=f"*/2 * * * *")
+@scheduler_fn.on_schedule(schedule=f"*/2 * * * *", memory=512)
 def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     db = firestore.client(app)
     tracking_controller = TrackingController(spotify, songstats, db)
