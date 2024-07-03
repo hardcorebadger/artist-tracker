@@ -1,14 +1,24 @@
 from lib import SongstatsClient, ErrorResponse, SpotifyClient, get_user
 from datetime import datetime, timedelta
 from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilter, StructuredQuery
+from google.cloud.firestore_v1.transforms import DELETE_FIELD
 
 HOT_TRACKING_FIELDS = {
   "spotify__monthly_listeners_current": "abs",
+  "deezer__followers_total": "abs",
+  "tiktok__followers_total": "abs",
+  "youtube__subscribers_total": "abs",
+  "soundcloud__followers_total": "abs",
+  "instagram__followers_total": "abs"
+}
+
+DEPRECATED_STATS = {
+  "spotify__monthly_listeners_current": "rel",
   "spotify__streams_current": "rel",
   "youtube__video_views_total": "rel",
   "tiktok__views_total": "rel",
   "shazam__shazams_total": "rel",
-  "instagram__followers_total": "rel"
+  "instagram__followers_total": "rel" 
 }
 
 class TrackingController():
@@ -177,7 +187,7 @@ class TrackingController():
     # if data['ob_status'] != 'ingested' and not is_ob:
     #   raise ErrorResponse('Artist not ingested', 401, 'Tracking')
     try:
-      stats = self.songstats.get_stat_weeks(spotify_id, 8)
+      stats = self.songstats.get_stat_weeks_abs(spotify_id, 8)
     except ErrorResponse as e:
       # Artist somehow got removed from songstats, but them back in OB
       if e.status_code == 404:

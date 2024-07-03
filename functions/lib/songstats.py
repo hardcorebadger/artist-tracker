@@ -147,6 +147,33 @@ class SongstatsClient():
         weekly_rollups[stat].append(interpolated_daily_stats[stat][i])
     return weekly_dates, weekly_rollups
   
+  def __merge_stats_to_df_abs(self, stats):
+    dfs = []
+    for stat in stats:
+        source = stat['source']
+        if 'data' not in stat:
+            continue
+        if 'history' not in stat['data']:
+            continue
+        data = stat['data']['history']
+        if len(data) == 0:
+            continue
+        
+        df = pd.DataFrame(data)
+        df['date'] = pd.to_datetime(df['date'])
+        df = df.rename(columns=lambda x: f"{source}__{x}" if x != 'date' else x)
+        df.set_index('date', inplace=True)
+        
+        dfs.append(df)
+        
+    if len(dfs) == 0:
+      return None, False
+    # Merge all DataFrames on the date index
+    result_df = pd.concat(dfs, axis=1)
+    # forward fill missing data, 14 day moving average, weekly resample, trim startup weeks
+    weekly = result_df.ffill().bfill().fillna(0).resample("W").last().iloc[2:, :].astype(int)
+    return weekly, True
+  
   def __merge_stats_to_df(self, stats):
     dfs = []
     for stat in stats:
@@ -187,6 +214,17 @@ class SongstatsClient():
     dates = [ts.strftime('%Y-%m-%d') for ts in rel.index.to_list()]
     return {'stats': json_dict, 'as_of': dates}
 
+  def get_stat_weeks_abs(self, spotify_id : str, weeks : int):
+    start, week_end, end = self._get_days_for_weeks(weeks+1, day_end=6) # get sunday weeks
+    res = self.get_historic_stats(spotify_id, start, week_end)
+    df, status = self.__merge_stats_to_df_abs(res['stats']) 
+    if status == False:
+      return {'stats': {}, 'as_of': dates}
+    # stats list
+    json_dict = df.to_dict(orient='list')
+    # dates list
+    dates = [ts.strftime('%Y-%m-%d') for ts in df.index.to_list()]
+    return {'stats': json_dict, 'as_of': dates}
   
   def get_stat_weeks_old_2(self, spotify_id : str, weeks : int):
     start, week_end, end = self._get_days_for_weeks(weeks)

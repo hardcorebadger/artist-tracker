@@ -56,35 +56,42 @@ export const defaultColumnSelection = {
   "spotify_url": true,
   "genres": false,
   "eval_prios": false,
-  "stat_tiktok__views_total__rel": {
+  "stat_spotify__monthly_listeners_current__abs": {
     "latest": true,
     "previous": false,
     "wow": false,
     "mom": false,
     "series": true
   },
-  "stat_spotify__streams_current__rel": {
+  "stat_deezer__followers_total__abs": {
     "latest": false,
     "previous": false,
     "wow": false,
     "mom": false,
     "series": false
   },
-  "stat_instagram__followers_total__rel": {
+  "stat_tiktok__followers_total__abs": {
     "latest": false,
     "previous": false,
     "wow": false,
     "mom": false,
     "series": false
   },
-  "stat_shazam__shazams_total__rel": {
+  "stat_youtube__subscribers_total__abs": {
     "latest": false,
     "previous": false,
     "wow": false,
     "mom": false,
     "series": false
   },
-  "stat_youtube__video_views_total__rel": {
+  "stat_soundcloud__followers_total__abs": {
+    "latest": false,
+    "previous": false,
+    "wow": false,
+    "mom": false,
+    "series": false
+  },
+  "stat_instagram__followers_total__abs": {
     "latest": false,
     "previous": false,
     "wow": false,
@@ -93,7 +100,7 @@ export const defaultColumnSelection = {
   }
 }
 
-export const defaultColumnOrder = ['spotify_url', 'eval_status', 'eval_distro', 'stat_spotify__streams_current__rel-latest']
+export const defaultColumnOrder = ['spotify_url', 'eval_status', 'eval_distro', 'stat_spotify__monthly_listeners_current__abs-latest']
 
 export const columnOptions = {
   "eval_distro": {
@@ -171,29 +178,34 @@ export const columnOptions = {
       value: ''
     }
   },
-  "stat_tiktok__views_total__rel": {
-    name: 'stat_tiktok__views_total__rel',
-    header: 'Tiktok Views',
+  "stat_spotify__monthly_listeners_current__abs": {
+    name: 'stat_spotify__monthly_listeners_current__abs',
+    header: 'Spotify Monthly Listeners',
     isMetric: true
   },
-  "stat_spotify__streams_current__rel": {
-    name: 'stat_spotify__streams_current__rel',
-    header: 'Spotify Streams',
+  "stat_deezer__followers_total__abs": {
+    name: 'stat_deezer__followers_total__abs',
+    header: 'Deezer Followers',
     isMetric: true
   },
-  "stat_instagram__followers_total__rel": {
-    name: 'stat_instagram__followers_total__rel',
+  "stat_tiktok__followers_total__abs": {
+    name: 'stat_tiktok__followers_total__abs',
+    header: 'Tiktok Followers',
+    isMetric: true
+  },
+  "stat_youtube__subscribers_total__abs": {
+    name: 'stat_youtube__subscribers_total__abs',
+    header: 'Youtube Subscribers',
+    isMetric: true
+  },
+  "stat_soundcloud__followers_total__abs": {
+    name: 'stat_soundcloud__followers_total__abs',
+    header: 'Souncloud Followers',
+    isMetric: true
+  },
+  "stat_instagram__followers_total__abs": {
+    name: 'stat_instagram__followers_total__abs',
     header: 'Instagram Followers',
-    isMetric: true
-  },
-  "stat_shazam__shazams_total__rel": {
-    name: 'stat_shazam__shazams_total__rel',
-    header: 'Shazams',
-    isMetric: true
-  },
-  "stat_youtube__video_views_total__rel": {
-    name: 'stat_youtube__video_views_total__rel',
-    header: 'Youtube Views',
     isMetric: true
   }
 }
@@ -202,7 +214,7 @@ export const metricFunctions = {
   "latest": {
     name: 'latest',
     header: "Latest",
-    op: input => input.length > 0 ? input[input.length-1] : 0,
+    op: input => input && input.length > 0 ? input[input.length-1] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -217,7 +229,7 @@ export const metricFunctions = {
   "previous": {
     name: 'previous',
     header: "Previous",
-    op: input => input.length > 1 ? input[input.length-2] : 0,
+    op: input => input && input.length > 1 ? input[input.length-2] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -232,7 +244,7 @@ export const metricFunctions = {
   "wow": {
     name: 'wow',
     header: "Week / Week",
-    op: input => input.length > 1 ? (input[input.length-1] - input[input.length-2]) / input[input.length-1] : 0,
+    op: input => input && input.length > 1 ? (input[input.length-1] - input[input.length-2]) / input[input.length-2] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -247,7 +259,7 @@ export const metricFunctions = {
   "mom": {
     name: 'mom',
     header: "Month / Month",
-    op: input => input.length > 3 ? (input[input.length-1] - input[input.length-5]) / input[input.length-1] : 0,
+    op: input => input && input.length > 3 ? (input[input.length-1] - input[input.length-5]) / input[input.length-5] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -262,7 +274,7 @@ export const metricFunctions = {
   "series": {
     name: 'series',
     header: "Trendline",
-    op: input => input,
+    op: input => input ? input : [],
     options: {
       type: 'number',
       sortable: false,
