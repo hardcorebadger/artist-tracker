@@ -206,7 +206,7 @@ class SongstatsClient():
     res = self.get_historic_stats(spotify_id, start, week_end)
     df, status = self.__merge_stats_to_df(res['stats']) # this will chop 2 weeks off for smoothing
     if status == False:
-      return {'stats': {}, 'as_of': dates}
+      return {'stats': {}, 'as_of': []}
     # stats list
     rel = df.diff(periods=1).iloc[2:, :].bfill().fillna(0).astype(int) # this will chop 1 week off for diffs, 1 week to trim to 8 in finals
     json_dict = rel.to_dict(orient='list')
@@ -219,7 +219,7 @@ class SongstatsClient():
     res = self.get_historic_stats(spotify_id, start, week_end)
     df, status = self.__merge_stats_to_df_abs(res['stats']) 
     if status == False:
-      return {'stats': {}, 'as_of': dates}
+      return {'stats': {}, 'as_of': []}
     # stats list
     json_dict = df.to_dict(orient='list')
     # dates list
