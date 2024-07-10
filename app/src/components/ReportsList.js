@@ -20,7 +20,7 @@ import { db } from '../firebase';
 import { collection, query, where, addDoc } from 'firebase/firestore';
 import { Link as ReactRouterLink } from 'react-router-dom'
 import { format } from "date-fns"
-import { defaultColumnOrder, defaultColumnSelection, buildDefaultFilters, defaultReportName} from '../components/DataGridConfig';
+import { defaultColumnOrder, buildDefaultFilters, defaultReportName} from '../components/DataGridConfig';
 import {useState, useContext} from 'react';
 import UserAvatar from './UserAvatar'
 
@@ -51,7 +51,6 @@ export default function ReportsList() {
       last_modified_by: user.auth.uid,
       type: 'artist',
       name: "New Report",
-      columnSelection: defaultColumnSelection,
       columnOrder: defaultColumnOrder,
       filterValue: buildDefaultFilters()
     })
@@ -90,4 +89,4 @@ export default function ReportsList() {
         </Card>
         </VStack>
   );
-}
+} 

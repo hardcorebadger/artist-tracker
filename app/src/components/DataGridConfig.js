@@ -49,57 +49,6 @@ import { Sparklines, SparklinesLine } from 'react-sparklines';
 
 export const defaultReportName = "New artist report"
 
-export const defaultColumnSelection = {
-  "eval_distro": true,
-  "eval_status": true,
-  "eval_distro_type": true,
-  "spotify_url": true,
-  "genres": false,
-  "eval_prios": false,
-  "stat_spotify__monthly_listeners_current__abs": {
-    "latest": true,
-    "previous": false,
-    "wow": false,
-    "mom": false,
-    "series": true
-  },
-  "stat_deezer__followers_total__abs": {
-    "latest": false,
-    "previous": false,
-    "wow": false,
-    "mom": false,
-    "series": false
-  },
-  "stat_tiktok__followers_total__abs": {
-    "latest": false,
-    "previous": false,
-    "wow": false,
-    "mom": false,
-    "series": false
-  },
-  "stat_youtube__subscribers_total__abs": {
-    "latest": false,
-    "previous": false,
-    "wow": false,
-    "mom": false,
-    "series": false
-  },
-  "stat_soundcloud__followers_total__abs": {
-    "latest": false,
-    "previous": false,
-    "wow": false,
-    "mom": false,
-    "series": false
-  },
-  "stat_instagram__followers_total__abs": {
-    "latest": false,
-    "previous": false,
-    "wow": false,
-    "mom": false,
-    "series": false
-  }
-}
-
 export const defaultColumnOrder = ['spotify_url', 'eval_status', 'eval_distro', 'stat_spotify__monthly_listeners_current__abs-latest']
 
 export const columnOptions = {
@@ -288,6 +237,26 @@ export const metricFunctions = {
     }
   }
 
+}
+
+export const buildColumnSelection = (columnOrder) => {
+  let columnSelection = {}
+  Object.keys(columnOptions).forEach(c => {
+    let col = columnOptions[c]
+    if (!col.isMetric) {
+      columnSelection[c] = columnOrder.includes(c)
+    } else {
+      columnSelection[c] = {}
+      Object.keys(metricFunctions).forEach(m => {
+        // c = stat_instagram__followers_total__abs
+        // m = latest
+        // let orderKey = c + "-" + m
+        // let selected = columnOrder.includes(c + "-" + m)
+        columnSelection[c][m] = columnOrder.includes(c + "-" + m)
+      })
+    }
+  })
+  return columnSelection
 }
 
 export const buildDefaultFilters = () => {

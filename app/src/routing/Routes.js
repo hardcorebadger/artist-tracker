@@ -59,7 +59,6 @@ export default function Router() {
           children: [
             { index: true, element: <Navigate to="all" replace />   },
             { path: 'all', element: <PageReports /> },
-            { path: 'new', element: <PageNewReport /> },
             { path: ':id', element: <PageArtistReport /> },
           ]
         },
@@ -101,7 +100,6 @@ export default function Router() {
   ]);
 }
 
-const PageNewReport = Loadable(lazy(() => import('../pages/PageNewReport')));
 const PageArtistReport = Loadable(lazy(() => import('../pages/PageArtistReport')));
 const PageReports = Loadable(lazy(() => import('../pages/PageReports')));
 const PageAddArtist = Loadable(lazy(() => import('../pages/PageAddArtist')));

@@ -59,7 +59,7 @@ function PageArtistReport() {
   // automatically pass the new props
   // cause rerender
 
-  const onReportSave = async (columnSelection, columnOrder, filterValue, reportName) => {
+  const onReportSave = async (columnOrder, filterValue, reportName) => {
     await setDoc(doc(db, 'reports', id), {
       organization: user.org.id,
       last_modified_by: user.auth.uid,
@@ -68,13 +68,12 @@ function PageArtistReport() {
       created_by: reportData.created_by,
       type: 'artist',
       name: reportName,
-      columnSelection: columnSelection,
       columnOrder: columnOrder,
       filterValue: filterValue
     })
   }
 
-  const onReportSaveNew = async (columnSelection, columnOrder, filterValue, reportName) => {
+  const onReportSaveNew = async (columnOrder, filterValue, reportName) => {
     const docRef = await addDoc(collection(db, 'reports'), {
       organization: user.org.id,
       last_modified_by: user.auth.uid,
@@ -83,7 +82,6 @@ function PageArtistReport() {
       created_on: Date.now(),
       type: 'artist',
       name: reportName,
-      columnSelection: columnSelection,
       columnOrder: columnOrder,
       filterValue: filterValue
     })
@@ -106,7 +104,6 @@ function PageArtistReport() {
     <Box sx={{opacity:activeArtist!=0?0:1,height:activeArtist!=0?0:'auto'}} >
     <DataGrid2
     initialReportName={reportData.name} 
-    initialColumnSelection={reportData.columnSelection} 
     initialColumnOrder={reportData.columnOrder} 
     initialFilterValues={reportData.filterValue} 
     onSave={onReportSave} 

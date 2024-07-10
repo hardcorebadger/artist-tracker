@@ -25,7 +25,7 @@ import '@inovua/reactdatagrid-community/base.css'
 import '@inovua/reactdatagrid-community/theme/blue-light.css'
 import DataGridColumnMenu from './DataGridColumnMenu'
 import './DataGridStyles.css'
-import { columnOptions, metricFunctions } from './DataGridConfig';
+import { columnOptions, metricFunctions, buildColumnSelection } from './DataGridConfig';
 import { deepCopy, deepCompare } from '../util/objectUtil';
 import EditableTitle from './EditableTitle';
 import ConfirmButton from './ConfirmButton';
@@ -105,12 +105,10 @@ const bakeRows = (selectedColumns, raw_data, orgId) => {
 }
 
 const compareState = (
-  initialColumnSelection, columnSelection, 
   initialColumnOrder, columnOrder, 
   initialFilterValues, filterValue
 ) => {
   return (
-  deepCompare(initialColumnSelection, columnSelection) && 
   deepCompare(initialColumnOrder, columnOrder) &&
   deepCompare(initialFilterValues, filterValue)
   )
@@ -141,7 +139,7 @@ const applyColumnOrder = (currentOrder, selectedColumns) => {
   return currentOrder
 }
 
-export default function DataGridController({initialReportName, initialColumnSelection, initialColumnOrder, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
+export default function DataGridController({initialReportName, initialColumnOrder, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
   const user = useUser()
   const navigate = useNavigate()
   // console.log("grid rerender")
@@ -153,8 +151,6 @@ export default function DataGridController({initialReportName, initialColumnSele
     )
   )
   
-  const [columnSelection, setColumnSelection] = useState(deepCopy(initialColumnSelection))
-
   const [columnOrder, setColumnOrder] = useState(deepCopy(initialColumnOrder))
 
   const [filterValue, setFilterValue] = useState(deepCopy(initialFilterValues))
@@ -166,12 +162,11 @@ export default function DataGridController({initialReportName, initialColumnSele
   const [favoritesOnly, setFavoritesOnly] = useState(false)
   
   const applyColumnSelection = (selection) => {
-    setColumnSelection(selection)
-    setColumnOrder(applyColumnOrder(columnOrder, selection))
+    console.log(selection)
+    setColumnOrder(deepCopy(applyColumnOrder(columnOrder, selection)))
   }
 
   const revertState = () => {
-    setColumnSelection(deepCopy(initialColumnSelection))
     setColumnOrder(deepCopy(initialColumnOrder))
     setFilterValue(deepCopy(initialFilterValues))
     setReportName(initialReportName)
@@ -208,7 +203,7 @@ export default function DataGridController({initialReportName, initialColumnSele
   }
 
   // apply column selection and reformat the rows to match
-  const columns = bakeColumns(columnSelection, onFavoritesToggled, onRowFavoriteToggled, favoritesOnly)
+  const columns = bakeColumns(buildColumnSelection(columnOrder), onFavoritesToggled, onRowFavoriteToggled, favoritesOnly)
   
 
   const [data, setData] = useState([])
@@ -216,7 +211,7 @@ export default function DataGridController({initialReportName, initialColumnSele
     console.log(data[0])
   useEffect(() => {
     const raw_data = artistsError || artistsLoading ? [] : artists.docs.map((d) => d.data())
-    setData(bakeRows(columnSelection, raw_data, user.org.id))
+    setData(bakeRows(buildColumnSelection(columnOrder), raw_data, user.org.id))
   }, [artists]);
 
   let d = data
@@ -228,7 +223,7 @@ export default function DataGridController({initialReportName, initialColumnSele
     })
   }
   // const data = bakeRows(columnSelection, raw_data, user.org.id)
-  const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnSelection, columnSelection, initialColumnOrder, columnOrder, initialFilterValues, filterValue)
+  const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterValue)
   let bakedColOrder = ['favorite', 'name']
   columnOrder.forEach((col) => {
     bakedColOrder.push(col);
@@ -263,10 +258,10 @@ export default function DataGridController({initialReportName, initialColumnSele
         onAffirm={onDelete}
         />
         }
-        <DataGridColumnMenu currentSelection={columnSelection} applySelection={applyColumnSelection} />
+        <DataGridColumnMenu currentSelection={buildColumnSelection(columnOrder)} applySelection={applyColumnSelection} />
         {(hasBeenEdited && onSaveNew)&& <Button colorScheme='primary' variant='outline' onClick={revertState}>Revert</Button>}
-        {hasBeenEdited&& <Button colorScheme='primary' onClick={() => onSave(columnSelection, columnOrder, filterValue, reportName)}>Save</Button> }
-        {(hasBeenEdited && onSaveNew) && <Button colorScheme='primary' onClick={() => onSaveNew(columnSelection, columnOrder, filterValue, reportName)}>Save as New</Button>}
+        {hasBeenEdited&& <Button colorScheme='primary' onClick={() => onSave(columnOrder, filterValue, reportName)}>Save</Button> }
+        {(hasBeenEdited && onSaveNew) && <Button colorScheme='primary' onClick={() => onSaveNew(columnOrder, filterValue, reportName)}>Save as New</Button>}
       </HStack>
       
       </HStack>
