@@ -4,10 +4,13 @@ import * as ReactDOM from 'react-dom/client';
 import App from './App';
 import reportWebVitals from './chakra/reportWebVitals';
 import * as serviceWorker from './chakra/serviceWorker';
+import { LicenseInfo } from '@mui/x-license';
 
 const container = document.getElementById('root');
 const root = ReactDOM.createRoot(container);
-
+LicenseInfo.setLicenseKey(
+  '4bb4e0380ced9f6000f7f44b17a7f071T1JERVI6NDI5NjIsRVhQSVJZPTE2ODMxNTUwNjMwMDAsS0VZVkVSU0lPTj0x',
+);
 root.render(
 
       <StrictMode>

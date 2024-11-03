@@ -1,4 +1,5 @@
-import DataGrid2 from '../components/DataGrid2';
+// import DataGrid2 from '../components/DataGrid2';
+import MuiDataGridController from '../components/MuiDataGrid'
 // import { defaultColumnOrder, defaultColumnSelection, buildDefaultFilters } from '../components/DataGridConfig';
 import { setDoc, doc, getDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -102,7 +103,7 @@ function PageArtistReport() {
       </PageLayoutContained>
     }
     <Box sx={{opacity:activeArtist!=0?0:1,height:activeArtist!=0?0:'auto'}} >
-    <DataGrid2
+    <MuiDataGridController
     initialReportName={reportData.name} 
     initialColumnOrder={reportData.columnOrder} 
     initialFilterValues={reportData.filterValue} 

@@ -53,8 +53,8 @@ export const defaultColumnOrder = ['spotify_url', 'eval_status', 'eval_distro', 
 
 export const columnOptions = {
   "eval_distro": {
-    name: 'eval_distro',
-    header: 'Distributor',
+    field: 'eval_distro',
+    headerName: 'Distributor',
     isMetric: false,
     defaultFilter: {
       type: 'string',
@@ -63,8 +63,8 @@ export const columnOptions = {
     }
   },
   "eval_status": {
-    name: 'eval_status',
-    header: 'Status',
+    field: 'eval_status',
+    headerName: 'Status',
     isMetric: false,
     filterEditor: SelectFilter,
     filterEditorProps: {
@@ -79,8 +79,8 @@ export const columnOptions = {
     }
   },
   "eval_distro_type": {
-    name: 'eval_distro_type',
-    header: 'Distribution Type',
+    field: 'eval_distro_type',
+    headerName: 'Distribution Type',
     isMetric: false,
     filterEditor: SelectFilter,
     render: row => <Badge colorScheme={row.value == 'diy' ? 'green' : row.value == 'indie' ? 'yellow' : 'red'}>{row.value}</Badge>,
@@ -95,8 +95,8 @@ export const columnOptions = {
     }
   },
   "eval_prios": {
-    name: 'eval_prios',
-    header: 'Backcatalog Status',
+    field: 'eval_prios',
+    headerName: 'Backcatalog Status',
     isMetric: false,
     filterEditor: SelectFilter,
     render: row => <Badge colorScheme={row.value == 'clean' ? 'green' : 'red'}>{row.value}</Badge>,
@@ -111,15 +111,15 @@ export const columnOptions = {
     }
   },
   "spotify_url": {
-    name: 'spotify_url',
-    header: 'Spotify URL',
+    field: 'spotify_url',
+    headerName: 'Spotify URL',
     render: row => <Link color='primary.500' href={row.value} isExternal>Spotify <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></Link>,
     isMetric: false
   },
   "genres": {
-    name: 'genres',
+    field: 'genres',
     op: input => input.length > 0 ? input[0] : "",
-    header: 'Genre',
+    headerName: 'Genre',
     isMetric: false,
     defaultFilter: {
       type: 'string',
@@ -128,41 +128,41 @@ export const columnOptions = {
     }
   },
   "stat_spotify__monthly_listeners_current__abs": {
-    name: 'stat_spotify__monthly_listeners_current__abs',
-    header: 'Spotify Monthly Listeners',
+    field: 'stat_spotify__monthly_listeners_current__abs',
+    headerName: 'Spotify Monthly Listeners',
     isMetric: true
   },
   "stat_deezer__followers_total__abs": {
-    name: 'stat_deezer__followers_total__abs',
-    header: 'Deezer Followers',
+    field: 'stat_deezer__followers_total__abs',
+    headerName: 'Deezer Followers',
     isMetric: true
   },
   "stat_tiktok__followers_total__abs": {
-    name: 'stat_tiktok__followers_total__abs',
-    header: 'Tiktok Followers',
+    field: 'stat_tiktok__followers_total__abs',
+    headerName: 'Tiktok Followers',
     isMetric: true
   },
   "stat_youtube__subscribers_total__abs": {
-    name: 'stat_youtube__subscribers_total__abs',
-    header: 'Youtube Subscribers',
+    field: 'stat_youtube__subscribers_total__abs',
+    headerName: 'Youtube Subscribers',
     isMetric: true
   },
   "stat_soundcloud__followers_total__abs": {
-    name: 'stat_soundcloud__followers_total__abs',
-    header: 'Souncloud Followers',
+    field: 'stat_soundcloud__followers_total__abs',
+    headerName: 'Souncloud Followers',
     isMetric: true
   },
   "stat_instagram__followers_total__abs": {
-    name: 'stat_instagram__followers_total__abs',
-    header: 'Instagram Followers',
+    field: 'stat_instagram__followers_total__abs',
+    headerfield: 'Instagram Followers',
     isMetric: true
   }
 }
 
 export const metricFunctions = {
   "latest": {
-    name: 'latest',
-    header: "Latest",
+    field: 'latest',
+    headerName: "Latest",
     op: input => input && input.length > 0 ? input[input.length-1] : 0,
     defaultFilter: {
       type: 'number',
@@ -176,8 +176,8 @@ export const metricFunctions = {
     }
   },
   "previous": {
-    name: 'previous',
-    header: "Previous",
+    field: 'previous',
+    headerName: "Previous",
     op: input => input && input.length > 1 ? input[input.length-2] : 0,
     defaultFilter: {
       type: 'number',
@@ -191,8 +191,8 @@ export const metricFunctions = {
     }
   },
   "wow": {
-    name: 'wow',
-    header: "Week / Week",
+    field: 'wow',
+    headerName: "Week / Week",
     op: input => input && input.length > 1 ? (input[input.length-1] - input[input.length-2]) / input[input.length-2] : 0,
     defaultFilter: {
       type: 'number',
@@ -206,8 +206,8 @@ export const metricFunctions = {
     }
   },
   "mom": {
-    name: 'mom',
-    header: "Month / Month",
+    field: 'mom',
+    headerName: "Month / Month",
     op: input => input && input.length > 3 ? (input[input.length-1] - input[input.length-5]) / input[input.length-5] : 0,
     defaultFilter: {
       type: 'number',
@@ -221,8 +221,8 @@ export const metricFunctions = {
     }
   },
   "series": {
-    name: 'series',
-    header: "Trendline",
+    field: 'series',
+    headerName: "Trendline",
     op: input => input ? input : [],
     options: {
       type: 'number',
@@ -265,11 +265,11 @@ export const buildDefaultFilters = () => {
     if (columnOptions[option].isMetric) {
       Object.keys(metricFunctions).forEach(func => {
         if ('defaultFilter' in metricFunctions[func])
-          defaultFilters.push({name:option+"-"+func, ...metricFunctions[func].defaultFilter})
+          defaultFilters.push({field:option+"-"+func, ...metricFunctions[func].defaultFilter})
       })
     } else {
       if ('defaultFilter' in columnOptions[option])
-        defaultFilters.push({name:option, ...columnOptions[option].defaultFilter})
+        defaultFilters.push({field:option, ...columnOptions[option].defaultFilter})
     }
   })
   return defaultFilters
