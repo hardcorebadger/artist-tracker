@@ -1,33 +1,20 @@
-import { Heading, HStack, Text, VStack, IconButton, Button } from "@chakra-ui/react";
-import { 
-    DataGridPro, 
-    GridToolbar,
-    GridToolbarContainer,
-    GridToolbarColumnsButton,
-    GridToolbarFilterButton,
-    GridToolbarExport,
-    GridToolbarDensitySelector,
-} from '@mui/x-data-grid-pro';
+import { HStack, Text, VStack, IconButton, Button } from "@chakra-ui/react";
+import { DataGridPro } from '@mui/x-data-grid-pro';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
-
 import { red } from '@mui/material/colors';
 import { createTheme } from '@mui/material/styles';
 import EditableTitle from "./EditableTitle";
 import ConfirmButton from "./ConfirmButton";
 import DataGridColumnMenu from './DataGridColumnMenu'
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Iconify from "./Iconify";
 import { buildColumnSelection, columnOptions, metricFunctions } from "./DataGridConfig";
 import { deepCompare, deepCopy } from "../util/objectUtil";
-import { Box } from "@mui/material";
-import { useUser } from "../routing/AuthGuard";
-import { useNavigate } from "react-router-dom";
-import { useCollectionOnce } from "react-firebase-hooks/firestore";
-import { collection, query, where } from "firebase/firestore";
-import { db } from "../firebase";
+import { httpsCallable } from "firebase/functions";
+import { functions } from '../firebase';
 
-// A custom theme for this app
+// MUI theme for the data grid
 const theme = createTheme({
   cssVariables: true,
   palette: {
@@ -43,25 +30,7 @@ const theme = createTheme({
   },
 });
 
-function CustomToolbar() {
-    return (
-      <GridToolbarContainer>
-        <GridToolbarColumnsButton />
-        <GridToolbarFilterButton />
-        <GridToolbarDensitySelector
-          slotProps={{ tooltip: { title: "Hi" } }}
-        />
-        <Box sx={{ flexGrow: 1 }} />
-        <GridToolbarExport
-          slotProps={{
-            tooltip: { title: 'Export data' },
-            button: { variant: 'outlined' },
-          }}
-        />
-      </GridToolbarContainer>
-    );
-}
-
+// compares the state of the report to the saved version to see if we should show save button
 const compareState = (
     initialColumnOrder, columnOrder, 
     initialFilterValues, filterValue
@@ -72,13 +41,14 @@ const compareState = (
     )
   }
 
+// Comes up with column names based on a stat and the function (ie WoW, MoM etc)
 const metricColumnFactory = (metric, func) => ({
     field: metric + "-" + func,
     headerName: columnOptions[metric].headerName + " (" + metricFunctions[func].headerName + ")",
     ...metricFunctions[func].options
 })
 
-
+// given a new column selection from the selector menu, build a new column order based on current ordering
 const applyColumnOrder = (currentOrder, selectedColumns) => {
     Object.keys(selectedColumns).forEach(key => {
       if (columnOptions[key].isMetric) {
@@ -104,107 +74,61 @@ const applyColumnOrder = (currentOrder, selectedColumns) => {
     return currentOrder
   }
   
-
+// given a column selection from available columns, build the columns for MUI format
 const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly) => {
-    let columns = [
-    //   {
-    //     field: 'favorite',
-    //     header: <FavoritesButton filled={favoritesOnly} sx={{marginBottom:-1}} action={toggleFavs}/>,
-    //     render: row => <FavoritesButton filled={row.value} action={toggleRowFav} data={row.data.id}/>,
-    //     sortable: false,
-    //     draggable: true,
-    //     width: 10,
-    //   },
-      {
-        field: 'name',
-        headerName: "Artist",
-        disableReorder: true
-        // render: row => <Text color='text.default' fontWeight='semibold'>{row.value}</Text>,
-        // defaultFlex: 1,
-        // draggable: true,
-        // minWidth: 130
-        // cell: row => {return (<Text fontWeight="bold">{row.name}</Text>)}
-      }
-    ]
-    Object.keys(selection).forEach(key => {
-      if (columnOptions[key].isMetric) {
-        Object.keys(selection[key]).forEach(subkey => {
-          if (selection[key][subkey]) {
-            columns.push(metricColumnFactory(key, subkey))
-          }
-        })
-      } else {
-        if (selection[key])
-          columns.push(columnOptions[key])
-      }
-    })
-    // console.log(selection)
-    return columns
-  }
-
-  const bakeRows = (selectedColumns, raw_data) => {
-    let baked_rows = []
-    raw_data.forEach(row => {
-      let baked_row = {
-        name: row['name'],
-        // favorite: row['watching_details'][orgId]['favorite'],
-        id: row['spotify_id'],
-        raw: row
-      }
-      Object.keys(columnOptions).forEach(key => {
-        if (columnOptions[key].isMetric) {
-          Object.keys(selectedColumns[key]).forEach(subkey => {
-            if (selectedColumns[key][subkey]) {
-              baked_row[key+"-"+subkey] = metricFunctions[subkey].op(row[key])
-            }
-          })
-        } else {
-          if (columnOptions[key].op != null) {
-            baked_row[key] = columnOptions[key].op(row[key])
-          } else {
-            baked_row[key] = row[key]
-          }
+  let columns = [
+    {
+      field: 'name',
+      headerName: "Artist",
+      disableReorder: true
+    }
+  ]
+  Object.keys(selection).forEach(key => {
+    if (columnOptions[key].isMetric) {
+      Object.keys(selection[key]).forEach(subkey => {
+        if (selection[key][subkey]) {
+          columns.push(metricColumnFactory(key, subkey))
         }
       })
-      baked_rows.push(baked_row)
-    })
-    return baked_rows
-  }
+    } else {
+      if (selection[key])
+        columns.push(columnOptions[key])
+    }
+  })
+  // console.log(selection)
+  return columns
+}
+
+
 
 export default function MuiDataGridController({initialReportName, initialColumnOrder, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
-    
-    const user = useUser()
-    
+
+    // Server side data source for the table
+    const getArtists = httpsCallable(functions, 'get_artists')
+
+    // calls every time we need an update
+    // params are printing on server (main.py at the bottom)
     const customDataSource = {
       getRows: async (params) => {
-        // const response = await fetch('https://my-api.com/data', {
-        //   method: 'GET',
-        //   body: JSON.stringify(params),
-        // });
-        // const data = await response.json();
-        console.log("This is what you send to the server")
         console.log(params)
+        const resp = await getArtists({...params});
+        console.log(resp)
+       
         return {
-          rows: [
-            {
-              id: 1,
-              name: 'fake artist',
-              eval_distro: 'Vydia',
-              eval_status: 'signed',
-              spotify_url: 'httsp://play.spotify.com/artist/b947fg73g8v',
-              genres: [],
-              "stat_spotify__monthly_listeners_current__abs-latest": 8947784
-            }
-          ],
-          rowCount: 1,
+          rows: resp.data.rows,
+          rowCount: resp.data.rowCount,
         };
       },
     }
+
+    // example of how columns are supposed to look for MUI
 
     // const columns = [
     //     { field: 'col1', headerName: 'Column 1', width: 150 },
     //     { field: 'col2', headerName: 'Column 2', width: 150 },
     // ];
+
+    // saves state for report config (currently only works for add/remove column, rest (reorder, filter, sort) are TODO)
 
     const [reportName, setReportName] = useState(initialReportName)
 
@@ -212,25 +136,23 @@ export default function MuiDataGridController({initialReportName, initialColumnO
 
     const [filterValue, setFilterValue] = useState(deepCopy(initialFilterValues))
 
+    // callback from the column menu to the grid to set the columns
     const applyColumnSelection = (selection) => {
         console.log(selection)
         setColumnOrder(deepCopy(applyColumnOrder(columnOrder, selection)))
     }
 
+    // reset to the saved version of the report
     const revertState = () => {
         setColumnOrder(deepCopy(initialColumnOrder))
         setFilterValue(deepCopy(initialFilterValues))
         setReportName(initialReportName)
-        // if (gridApi) {
-        //   console.log("gird ref hit")
-        //   gridApi.current.setFilterValue(deepCopy(initialFilterValues));
-        // }
-      }
+    }
     
+    // bake the columns for MUI based on current column order object
     const columns = bakeColumns(buildColumnSelection(columnOrder), null, null, null)
 
-    // const rows = bakeRows(buildColumnSelection(columnOrder), raw_data)
-
+    // check current state vs saved report config to see if we should show save button
     const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterValue)
 
     return (
@@ -282,6 +204,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                  />
                 </div>
         </ThemeProvider>
+        {/* End MUI */}
       </VStack>
     )
 }

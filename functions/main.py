@@ -210,3 +210,32 @@ def add_artist(req: https_fn.CallableRequest):
             return {'message': msg, 'status': status, 'added_count': 1}
     except ErrorResponse as e:
         raise e.to_https_fn_error()
+
+@https_fn.on_call()
+def get_artists(req: https_fn.CallableRequest):    
+
+    # request schema from MUI
+    # req.data = {'groupKeys': [], 'paginationModel': {'page': 0, 'pageSize': 10}, 'sortModel': [], 'filterModel': {'items': [], 'logicOperator': 'and', 'quickFilterValues': [], 'quickFilterLogicOperator': 'and'}, 'start': 0, 'end': 9}
+    print(req.data)
+
+    # How to get the user and the org IDs
+    db = firestore.client(app)
+    uid = req.auth.uid
+    user_data = get_user(uid, db)
+    print(user_data)
+
+    # Mock response format
+    return {
+        "rows": [
+            {
+              'id': 1,
+              'name': 'fake artist',
+              'eval_distro': 'Vydia',
+              'eval_status': 'signed',
+              'spotify_url': 'httsp://play.spotify.com/artist/b947fg73g8v',
+              'genres': [],
+              "stat_spotify__monthly_listeners_current__abs-latest": 8947784
+            }
+        ],
+        "rowCount": 1
+    }
