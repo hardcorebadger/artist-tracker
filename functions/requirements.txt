@@ -2,6 +2,9 @@ firebase_functions~=0.2.0
 openai
 google-cloud-tasks
 fuzzywuzzy
-python-Levenshtein
+#levenshtein
 ytmusicapi
 pandas
+cloud-sql-python-connector
+sqlalchemy
+pg8000
