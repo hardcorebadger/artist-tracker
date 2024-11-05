@@ -5,3 +5,6 @@ fuzzywuzzy
 python-Levenshtein
 ytmusicapi
 pandas
+cloud-sql-python-connector
+sqlalchemy
+pg8000

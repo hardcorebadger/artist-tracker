@@ -6,3 +6,5 @@ from .songstats import SongstatsClient
 from .spotify import SpotifyClient
 from .youtube import YoutubeClient
 from .utils import get_user
+from .cloud_sql import CloudSQLClient
+from .models import *

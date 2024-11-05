@@ -2,7 +2,7 @@ from firebase_admin import initialize_app, firestore
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, params, logger, options
 from cron_jobs import airtable_v1_cron, eval_cron, stats_cron, onboarding_cron
 from tmp_keys import *
-from lib import SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user
+from lib import SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, CloudSQLClient
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController
 import flask
 from datetime import datetime, timedelta
@@ -24,6 +24,7 @@ spotify.authorize()
 airtable = AirtableClient(AIRTABLE_TOKEN, AIRTABLE_BASE, AIRTABLE_TABLES)
 youtube = YoutubeClient(YOUTUBE_TOKEN)
 songstats = SongstatsClient(SONGSTATS_API_KEY)
+sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD, SQL_DB)
 
 # ##############################
 # V2 API
@@ -48,6 +49,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
+        sql.test()
         # dump_unclean(db)
         # migrate_add_favs_and_tags(db)
         # migrate_from_v1(airtable, spotify, tracking_controller)
