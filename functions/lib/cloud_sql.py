@@ -1,3 +1,5 @@
+import array
+
 from google.cloud.sql.connector import Connector, IPTypes
 import sqlalchemy
 import pg8000
@@ -57,11 +59,12 @@ class CloudSQLClient():
         # Base.metadata.create_all(self.db)
         session.close()
 
-    def test(self):
+    def load_all_for_model(self, modelClass):
         session = self.get_session()
-        stmt = select(Artist)
-
-        for i in session.scalars(stmt):
-            print(i)
+        stmt = select(modelClass)
+        result = session.scalars(stmt).all()
         session.close()
+        return result
+
+
     
