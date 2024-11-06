@@ -56,7 +56,6 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-
         old_artists = db.collection("artists_v2").limit(15).get()
         import_sql(old_artists, db.collection('users').get())
         # dump_unclean(db)

@@ -4,6 +4,7 @@ from typing import List
 
 from sqlalchemy import Column, Integer, SmallInteger, JSON, Float, Boolean, Text, String, TIMESTAMP, create_engine, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -54,6 +55,9 @@ class Evaluation(Base):
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     artist: Mapped["Artist"] = relationship(back_populates="evaluations")
 
+    def __repr__(self):
+        return f"<Evaluation({self.id=}, {self.artist_id=}, {self.status=}, {self.distributor=}, {self.distributor_type}, {self.label})>"
+
 class OrganizationArtist(Base):
     __tablename__ = 'organization_artists'
 
@@ -64,6 +68,9 @@ class OrganizationArtist(Base):
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     artist: Mapped["Artist"] = relationship(back_populates="organizations")
 
+    def __repr__(self):
+        return f"<OrganizationArtist({self.organization_id=}, {self.artist_id=}, {self.favorite=}, {self.created_at=})>"
+
 class UserArtist(Base):
     __tablename__ = 'user_artists'
     user_id = Column(String(28),  nullable=False, primary_key=True)
@@ -73,10 +80,18 @@ class UserArtist(Base):
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     artist: Mapped["Artist"] = relationship(back_populates="users")
 
+    def __repr__(self):
+        return f"<UserArtist({self.user_id=}, {self.organization_id=}, {self.artist_id=}, {self.created_at=})>"
+
 class Statistic(Base):
     __tablename__ = 'statistics'
     artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False, primary_key=True)
     statistic_type_id: Mapped[int] = mapped_column(Integer, ForeignKey('statistic_types.id'), nullable=False, primary_key=True)
+
+    @hybrid_property
+    def statistic_type_key(self):
+        return self.type.key
+
     latest = Column(Float, nullable=False)
     before_latest = Column(Float, nullable=False)
     week_over_week = Column(Float, nullable=False)
@@ -89,6 +104,9 @@ class Statistic(Base):
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     artist: Mapped["Artist"] = relationship(back_populates="statistics")
     type: Mapped["StatisticType"] = relationship()
+
+    def __repr__(self):
+        return f"<Statistic({self.artist_id=}-{self.statistic_type_id}, {self.statistic_type_key}, {self.latest}, {self.before_latest=}, {self.week_over_week=}, {self.month_over_month}, {self.min}, {self.max}, {self.avg}, {self.data})>"
 
 class StatisticType(Base):
     __tablename__ = 'statistic_types'
@@ -112,8 +130,15 @@ class ArtistLink(Base):
     link_source_id: Mapped[int] = mapped_column(Integer, ForeignKey('link_sources.id'), nullable=False)
     path = Column(Text, nullable=False)
 
+    @hybrid_property
+    def url(self):
+        return self.source.url_scheme.replace('{identifier}', self.path)
+
     artist: Mapped["Artist"] = relationship(back_populates="links")
     source: Mapped["LinkSource"] = relationship(back_populates="links")
+
+    def __repr__(self):
+        return f"<ArtistLink({self.id=}, {self.artist_id=}, {self.link_source_id=}, {self.path=}, {self.url})>"
 
 
 class LinkSource(Base):
@@ -124,3 +149,6 @@ class LinkSource(Base):
     url_scheme = Column(Text, nullable=False)
     display_name = Column(Text, nullable=True)
     links: Mapped["ArtistLink"] = relationship(back_populates="source")
+
+    def __repr__(self):
+        return f"<LinkSource({self.id=}, {self.key=}, {self.logo=}, {self.url_scheme=}, {self.display_name})>"
