@@ -7,12 +7,13 @@ import { createTheme } from '@mui/material/styles';
 import EditableTitle from "./EditableTitle";
 import ConfirmButton from "./ConfirmButton";
 import DataGridColumnMenu from './DataGridColumnMenu'
-import { useState } from "react";
+import {useContext, useEffect, useState} from "react";
 import Iconify from "./Iconify";
 import { buildColumnSelection, columnOptions, metricFunctions } from "./DataGridConfig";
 import { deepCompare, deepCopy } from "../util/objectUtil";
 import { httpsCallable } from "firebase/functions";
 import { functions } from '../firebase';
+import {StatisticTypeContext} from "../App";
 
 // MUI theme for the data grid
 const theme = createTheme({
@@ -45,6 +46,8 @@ const compareState = (
 const metricColumnFactory = (metric, func) => ({
     field: metric + "-" + func,
     headerName: columnOptions[metric].headerName + " (" + metricFunctions[func].headerName + ")",
+    valueGetter: (value, row) => row['statistics'].filter((stat) => stat['statistic_type_id'] === columnOptions[metric].statTypeId)[0][func],
+
     ...metricFunctions[func].options
 })
 
@@ -75,7 +78,7 @@ const applyColumnOrder = (currentOrder, selectedColumns) => {
   }
   
 // given a column selection from available columns, build the columns for MUI format
-const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly) => {
+const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTypes) => {
   let columns = [
     {
       field: 'name',
@@ -83,6 +86,18 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly) => {
       disableReorder: true
     }
   ]
+  for (let typeIndex in statTypes) {
+      const type = statTypes[typeIndex];
+      const key = 'statistic.' + type['id']
+      const sourceName = type['source'].charAt(0).toUpperCase() + type['source'].slice(1);
+      columnOptions[key] = {
+          field: key,
+          keyName: type['source'] + "." + type['key'],
+          headerName:  sourceName +' ' + type['name'],
+          statTypeId: type['id'],
+          isMetric: true
+      }
+  }
   Object.keys(selection).forEach(key => {
     if (columnOptions[key].isMetric) {
       Object.keys(selection[key]).forEach(subkey => {
@@ -102,24 +117,54 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly) => {
 
 
 export default function MuiDataGridController({initialReportName, initialColumnOrder, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
+    const [statTypes, setStatTypes] = useState(null)
+    const [currentParams, setCurrentParams] = useState(null)
+    const [currentRows, setCurrentRows] = useState(null)
+    const { statisticTypes, setStatisticTypes } = useContext(StatisticTypeContext);
 
     // Server side data source for the table
     const getArtists = httpsCallable(functions, 'get_artists')
+    const [rows, setRows] = useState([]);
+    const [paginationModel, setPaginationModel] = useState({
+        page: 0,
+        pageSize: 10,
+    });
+    const [filterModel, setFilterModel] = useState({ items: [] });
+    const [sortModel, setSortModel] = useState([]);
 
+    useEffect(() => {
+        const fetcher = async () => {
+            // fetch data from server
+            const resp = await getArtists({page: paginationModel.page,
+                pageSize: paginationModel.pageSize,
+                sortModel,
+                filterModel});
+
+            setRows({
+                rows: resp.data.rows,
+                rowCount: resp.data.rowCount
+            });
+        };
+        fetcher();
+    }, [paginationModel, sortModel, filterModel]);
     // calls every time we need an update
     // params are printing on server (main.py at the bottom)
-    const customDataSource = {
-      getRows: async (params) => {
-        console.log(params)
-        const resp = await getArtists({...params});
-        console.log(resp)
-       
-        return {
-          rows: resp.data.rows,
-          rowCount: resp.data.rowCount,
-        };
-      },
-    }
+    // const customDataSource = {
+    //
+    //   getRows: async (params) => {
+    //     console.log('params: ', params)
+    //       console.log('current: ')
+    //   if (currentRows !== null && JSON.stringify(params) === JSON.stringify(currentParams)) {
+    //       return currentRows
+    //   }
+    //   const resp = await getArtists({...params});
+    //       const returnData = {
+    //           rows: resp.data.rows,
+    //           rowCount: resp.data.rowCount,
+    //       };
+    //     return returnData;
+    //   },
+    // }
 
     // example of how columns are supposed to look for MUI
 
@@ -150,7 +195,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     }
     
     // bake the columns for MUI based on current column order object
-    const columns = bakeColumns(buildColumnSelection(columnOrder), null, null, null)
+    const columns = bakeColumns(buildColumnSelection(columnOrder), null, null, null, statisticTypes)
 
     // check current state vs saved report config to see if we should show save button
     const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterValue)
@@ -191,9 +236,16 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                 }}
                 >
                 <DataGridPro
-                  columns={columns} 
-                  unstable_dataSource={customDataSource}
+                  columns={columns}
+                  rows={rows?.rows ?? []}
+                  sortingMode="server"
+                  filterMode="server"
+                  paginationMode="server"
+                  onPaginationModelChange={setPaginationModel}
+                  onSortModelChange={setSortModel}
+                  onFilterModelChange={setFilterModel}
                   pagination
+                  rowCount={rows?.rowCount ?? 0}
                   initialState={{
                     pagination: {
                       paginationModel: { pageSize: 10, page: 0 },
@@ -208,3 +260,11 @@ export default function MuiDataGridController({initialReportName, initialColumnO
       </VStack>
     )
 }
+
+String.prototype.ucwords = function() {
+    const str = this.toLowerCase();
+    return str.replace(/(^([a-zA-Z\p{M}]))|([ -][a-zA-Z\p{M}])/g,
+        function(s){
+            return s.toUpperCase();
+        });
+};

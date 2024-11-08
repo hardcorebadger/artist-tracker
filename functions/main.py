@@ -2,9 +2,11 @@ from array import array
 
 from firebase_admin import initialize_app, firestore
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, params, logger, options
+from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter
 from openai import organization
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload, subqueryload
 
 from cron_jobs import airtable_v1_cron, eval_cron, stats_cron, onboarding_cron
 from tmp_keys import *
@@ -56,8 +58,29 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        old_artists = db.collection("artists_v2").limit(15).get()
-        import_sql(old_artists, db.collection('users').get())
+
+        sql_session = sql.get_session()
+        query = (select(Artist).options(
+            subqueryload(Artist.statistics).joinedload(Statistic.type),
+            joinedload(Artist.users, innerjoin=True),
+            joinedload(Artist.organizations, innerjoin=True),
+            joinedload(Artist.evaluations, innerjoin=True),
+        ))
+        # .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
+        sortFieldKey: str = 'statistic.30-latest'
+        if (sortFieldKey.startswith('statistic.')):
+            statisticKeyParts = sortFieldKey.split('.')
+            statisticId = statisticKeyParts[1].split('-')
+            statisticFunc = statisticId[1]
+            statisticId = int(statisticId[0])
+            column = Statistic.__table__.columns[statisticFunc].desc()
+            query = query.join(Statistic,
+                               Artist.statistics).filter(Statistic.statistic_type_id == statisticId).order_by(
+                column)
+
+
+        # old_artists = db.collection("artists_v2").limit(15).get()
+        # import_sql(old_artists, db.collection('users').get())
         # dump_unclean(db)
         # migrate_add_favs_and_tags(db)
         # migrate_from_v1(airtable, spotify, tracking_controller)
@@ -66,7 +89,13 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         # aids = spotify.get_playlist_artists('37i9dQZF1E4A2FqXjcsyRn')
         # for a in aids:
         #     tracking_controller.add_artist(a, 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
-        return 'success', 200
+
+        artists = sql_session.scalars(query).unique().fetchmany(10)
+
+        return {
+            "sql": query.compile(compile_kwargs={"literal_binds": True}).string,
+            "rows": list(map(lambda artist: artist.as_dict(), artists))
+        }
 
     @v2_api.post("/eval-artist")
     def eval_artist():
@@ -289,18 +318,18 @@ def import_sql(old_artists, users):
                 if newStatType.format == 'int':
                     valueSet = list(map(int, value))
                     latest: int = valueSet[len(valueSet) - 1]
-                    before_latest: int = valueSet[len(valueSet) - 2]
+                    previous: int = valueSet[len(valueSet) - 2]
                 else:
                     valueSet = list(map(float, value))
                     latest: float = valueSet[len(valueSet) - 1]
-                    before_latest: float = valueSet[len(valueSet) - 2]
+                    previous: float = valueSet[len(valueSet) - 2]
 
-                wow = 0 if before_latest <= 0 else (latest - before_latest) / before_latest
+                wow = 0 if previous <= 0 else (latest - previous) / previous
                 mom = 0 if valueSet[3] <= 0 else  (valueSet[7] - valueSet[3]) / valueSet[3]
                 stats.append(Statistic(
                     type = newStatType,
                     latest = latest,
-                    before_latest = before_latest,
+                    previous = previous,
                     max = max(valueSet),
                     min = min(valueSet),
                     avg = sum(valueSet) / len(valueSet),
@@ -385,6 +414,13 @@ def add_artist(req: https_fn.CallableRequest):
     except ErrorResponse as e:
         raise e.to_https_fn_error()
 
+
+@https_fn.on_call()
+def get_statistic_types(req: https_fn.CallableRequest):
+    sql_session = sql.get_session()
+    print(req.data)
+    return list(map(lambda type: type.as_dict(), sql_session.scalars(select(StatisticType)).all()))
+
 @https_fn.on_call()
 def get_artists(req: https_fn.CallableRequest):    
 
@@ -396,8 +432,39 @@ def get_artists(req: https_fn.CallableRequest):
     db = firestore.client(app)
     uid = req.auth.uid
     user_data = get_user(uid, db)
-    print(user_data)
 
+    sql_session = sql.get_session()
+    query = (select(Artist).options(
+        subqueryload(Artist.statistics).joinedload(Statistic.type),
+        joinedload(Artist.users, innerjoin=True),
+        joinedload(Artist.organizations, innerjoin=True),
+        joinedload(Artist.evaluations, innerjoin=True),
+    ))
+    # .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
+    if req.data['sortModel'] and len(req.data['sortModel']) > 0:
+        sorts = req.data['sortModel']
+        for sort in sorts:
+            sortFieldKey: str = sort['field']
+            if (sortFieldKey.startswith('statistic.')):
+                statisticKeyParts = sortFieldKey.split('.')
+                statisticId = statisticKeyParts[1].split('-')
+                statisticFunc = statisticId[1]
+                statisticId = int(statisticId[0])
+                column = Statistic.__table__.columns[statisticFunc].asc()
+                if sort['sort'] == 'desc':
+                    column = Statistic.__table__.columns[statisticFunc].desc()
+                query = query.join(Statistic, Artist.statistics).where(Statistic.statistic_type_id == statisticId).order_by(column)
+                # query = query.filter(Artist.statistics.any(Statistic.statistic_type_id == statisticId & Statistic[statisticFunc] ))
+
+
+
+    artists = sql_session.scalars(query).unique().fetchmany(10)
+
+
+    print(user_data)
+    return {
+        "rows": list(map(lambda artist: artist.as_dict(), artists))
+    }
     # Mock response format
     return {
         "rows": [
@@ -406,9 +473,12 @@ def get_artists(req: https_fn.CallableRequest):
               'name': 'fake artist',
               'eval_distro': 'Vydia',
               'eval_status': 'signed',
+                'evaluation': {
+                    'distributor': 'ASD'
+                },
               'spotify_url': 'httsp://play.spotify.com/artist/b947fg73g8v',
               'genres': [],
-              "stat_spotify__monthly_listeners_current__abs-latest": 8947784
+              "stat_spotify__monthly_listeners__abs-latest": 8947784
             }
         ],
         "rowCount": 1

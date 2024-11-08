@@ -9,6 +9,10 @@ import Iconify from '../components/Iconify';
 // import Chart from "react-apexcharts";
 import numeral from 'numeral'
 import { Sparklines, SparklinesLine } from 'react-sparklines';
+import {useState} from "react";
+import {httpsCallable} from "firebase/functions";
+import {functions} from "../firebase";
+
 
 // const miniBarChartOptions = {
 //   chart: {
@@ -49,11 +53,12 @@ import { Sparklines, SparklinesLine } from 'react-sparklines';
 
 export const defaultReportName = "New artist report"
 
-export const defaultColumnOrder = ['spotify_url', 'eval_status', 'eval_distro', 'stat_spotify__monthly_listeners_current__abs-latest']
+export const defaultColumnOrder = ['link_spotify', 'evaluation.status', 'evaluation.distributor', 'evaluation.back_catalog', 'statistic.spotify.monthly_listeners-latest']
 
 export const columnOptions = {
-  "eval_distro": {
-    field: 'eval_distro',
+  "evaluation.distributor": {
+    field: 'evaluation.distributor',
+    valueGetter: (value, row) => row.evaluation.distributor,
     headerName: 'Distributor',
     isMetric: false,
     defaultFilter: {
@@ -62,25 +67,27 @@ export const columnOptions = {
       value: ''
     }
   },
-  "eval_status": {
-    field: 'eval_status',
+  "evaluation.status": {
+    field: 'evaluation.status',
     headerName: 'Status',
+    valueGetter: (value, row) => (row.evaluation.status === 0 ? 'unsigned' : 'signed'),
     isMetric: false,
     filterEditor: SelectFilter,
     filterEditorProps: {
       placeholder: 'All',
       dataSource: [{id:'signed', label: 'Signed'}, {id:'unsigned', label: 'Unsigned'}]
     },
-    render: row => <Badge colorScheme={row.value == 'signed' ? 'red' : 'green'}>{row.value}</Badge>,
+    render: row => <Badge colorScheme={row.value === 'signed' ? 'red' : 'green'}>{row.value}</Badge>,
     defaultFilter: {
       type: 'string',
       operator: 'startsWith',
       value: ''
     }
   },
-  "eval_distro_type": {
-    field: 'eval_distro_type',
-    headerName: 'Distribution Type',
+  "evaluation.distributor_type": {
+    field: 'evaluation.distributor_type',
+    headerName: 'Distributor Type',
+    valueGetter: (value, row) => row.evaluation.distributor_type === 1 ? 'indie' : (row.evaluation.distributor_type === 2) ? 'major' : ('diy'),
     isMetric: false,
     filterEditor: SelectFilter,
     render: row => <Badge colorScheme={row.value == 'diy' ? 'green' : row.value == 'indie' ? 'yellow' : 'red'}>{row.value}</Badge>,
@@ -94,9 +101,10 @@ export const columnOptions = {
       value: ''
     }
   },
-  "eval_prios": {
-    field: 'eval_prios',
+  "evaluation.back_catalog": {
+    field: 'evaluation.back_catalog',
     headerName: 'Backcatalog Status',
+    valueGetter: (value, row) => (row.evaluation.status === 2 ? 'dirty' : 'clean'),
     isMetric: false,
     filterEditor: SelectFilter,
     render: row => <Badge colorScheme={row.value == 'clean' ? 'green' : 'red'}>{row.value}</Badge>,
@@ -110,8 +118,8 @@ export const columnOptions = {
       value: ''
     }
   },
-  "spotify_url": {
-    field: 'spotify_url',
+  "link_spotify": {
+    field: 'link_spotify',
     headerName: 'Spotify URL',
     render: row => <Link color='primary.500' href={row.value} isExternal>Spotify <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></Link>,
     isMetric: false
@@ -127,47 +135,17 @@ export const columnOptions = {
       value: ''
     }
   },
-  "stat_spotify__monthly_listeners_current__abs": {
-    field: 'stat_spotify__monthly_listeners_current__abs',
-    headerName: 'Spotify Monthly Listeners',
-    isMetric: true
-  },
-  "stat_deezer__followers_total__abs": {
-    field: 'stat_deezer__followers_total__abs',
-    headerName: 'Deezer Followers',
-    isMetric: true
-  },
-  "stat_tiktok__followers_total__abs": {
-    field: 'stat_tiktok__followers_total__abs',
-    headerName: 'Tiktok Followers',
-    isMetric: true
-  },
-  "stat_youtube__subscribers_total__abs": {
-    field: 'stat_youtube__subscribers_total__abs',
-    headerName: 'Youtube Subscribers',
-    isMetric: true
-  },
-  "stat_soundcloud__followers_total__abs": {
-    field: 'stat_soundcloud__followers_total__abs',
-    headerName: 'Souncloud Followers',
-    isMetric: true
-  },
-  "stat_instagram__followers_total__abs": {
-    field: 'stat_instagram__followers_total__abs',
-    headerfield: 'Instagram Followers',
-    isMetric: true
-  }
 }
 
 export const metricFunctions = {
   "latest": {
     field: 'latest',
     headerName: "Latest",
-    op: input => input && input.length > 0 ? input[input.length-1] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
     },
+
     options: {
       type: 'number',
       sortable: true,
@@ -178,7 +156,6 @@ export const metricFunctions = {
   "previous": {
     field: 'previous',
     headerName: "Previous",
-    op: input => input && input.length > 1 ? input[input.length-2] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -190,10 +167,9 @@ export const metricFunctions = {
       render: row => <span>{numeral(row.value).format('0.0a')}</span>
     }
   },
-  "wow": {
-    field: 'wow',
+  "week_over_week": {
+    field: 'week_over_week',
     headerName: "Week / Week",
-    op: input => input && input.length > 1 ? (input[input.length-1] - input[input.length-2]) / input[input.length-2] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -205,10 +181,9 @@ export const metricFunctions = {
       render: row => <span>{numeral(row.value).format('0.00%')}</span>
     }
   },
-  "mom": {
-    field: 'mom',
+  "month_over_month": {
+    field: 'month_over_month',
     headerName: "Month / Month",
-    op: input => input && input.length > 3 ? (input[input.length-1] - input[input.length-5]) / input[input.length-5] : 0,
     defaultFilter: {
       type: 'number',
       operator: 'gte'
@@ -220,10 +195,9 @@ export const metricFunctions = {
       render: row => <span>{numeral(row.value).format('0.00%')}</span>
     }
   },
-  "series": {
-    field: 'series',
+  "data": {
+    field: 'data',
     headerName: "Trendline",
-    op: input => input ? input : [],
     options: {
       type: 'number',
       sortable: false,
@@ -248,11 +222,11 @@ export const buildColumnSelection = (columnOrder) => {
     } else {
       columnSelection[c] = {}
       Object.keys(metricFunctions).forEach(m => {
-        // c = stat_instagram__followers_total__abs
+        // c = stat_instagram__followers_total
         // m = latest
         // let orderKey = c + "-" + m
         // let selected = columnOrder.includes(c + "-" + m)
-        columnSelection[c][m] = columnOrder.includes(c + "-" + m)
+        columnSelection[c][m] = columnOrder.includes('statistic.'+columnOptions[c]['keyName'] + "-" + m)
       })
     }
   })

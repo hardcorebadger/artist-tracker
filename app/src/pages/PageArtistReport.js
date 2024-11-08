@@ -2,15 +2,17 @@
 import MuiDataGridController from '../components/MuiDataGridServer'
 // import { defaultColumnOrder, defaultColumnSelection, buildDefaultFilters } from '../components/DataGridConfig';
 import { setDoc, doc, getDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import {db, functions} from '../firebase';
 import { useUser } from '../routing/AuthGuard';
 import { useParams } from 'react-router-dom';
 import { useDocument } from 'react-firebase-hooks/firestore';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, HStack, Heading, Skeleton, Text, VStack } from '@chakra-ui/react';
-import { useState } from 'react';
+import {useContext, useEffect, useState} from 'react';
 import ArtistDetail from '../components/ArtistDetail';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
+import {StatisticTypeContext} from "../App";
+import {httpsCallable} from "firebase/functions";
 
 function PageArtistReport() {
   const user = useUser()
@@ -22,6 +24,17 @@ function PageArtistReport() {
       snapshotListenOptions: { includeMetadataChanges: true },
     }
   )
+  const { statisticTypes, setStatisticTypes } = useContext(StatisticTypeContext);
+
+  useEffect(() => {
+    if (statisticTypes == null || statisticTypes?.length === 0) {
+      const getTypes = httpsCallable(functions, 'get_statistic_types')
+      getTypes().then((response) => {
+        setStatisticTypes(response.data)
+      });
+    }
+  }, []);
+
   const [activeArtist, setActiveArtist] = useState(0)
 
   const onOpenArtist = (id) => {
@@ -93,8 +106,6 @@ function PageArtistReport() {
     await deleteDoc(doc(db, 'reports', id))
     navigate('/app/reports/all')
   }
-
-  if (reportData)
   return (
     <>
     {activeArtist != 0 && 
@@ -104,9 +115,9 @@ function PageArtistReport() {
     }
     <Box sx={{opacity:activeArtist!=0?0:1,height:activeArtist!=0?0:'auto'}} >
     <MuiDataGridController
-    initialReportName={reportData.name} 
-    initialColumnOrder={reportData.columnOrder} 
-    initialFilterValues={reportData.filterValue} 
+    initialReportName={reportData?.name}
+    initialColumnOrder={reportData?.columnOrder}
+    initialFilterValues={reportData?.filterValue}
     onSave={onReportSave} 
     onSaveNew={onReportSaveNew} 
     onDelete={onReportDelete}

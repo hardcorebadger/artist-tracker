@@ -25,7 +25,8 @@ import { useUser } from "../routing/AuthGuard";
 import { useNavigate } from "react-router-dom";
 import { useCollectionOnce } from "react-firebase-hooks/firestore";
 import { collection, query, where } from "firebase/firestore";
-import { db } from "../firebase";
+import {db, functions} from "../firebase";
+import {httpsCallable} from "firebase/functions";
 
 // A custom theme for this app
 const theme = createTheme({
@@ -126,6 +127,8 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly) => {
         // cell: row => {return (<Text fontWeight="bold">{row.name}</Text>)}
       }
     ]
+
+
     Object.keys(selection).forEach(key => {
       if (columnOptions[key].isMetric) {
         Object.keys(selection[key]).forEach(subkey => {

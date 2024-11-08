@@ -1,7 +1,9 @@
 import json
 from google.cloud import tasks_v2
-from lib import ErrorResponse
 import traceback
+
+from lib import ErrorResponse
+
 
 class TaskController():
   def __init__(self, project_id, location, v1_api_root, v2_api_root):

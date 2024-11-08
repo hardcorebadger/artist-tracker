@@ -3,8 +3,10 @@ from datetime import datetime, timedelta
 from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilter, StructuredQuery
 from google.cloud.firestore_v1.transforms import DELETE_FIELD
 
+from lib import CloudSQLClient, Artist
+
 HOT_TRACKING_FIELDS = {
-  "spotify__monthly_listeners_current": "abs",
+  "spotify__monthly_listeners": "abs",
   "deezer__followers_total": "abs",
   "tiktok__followers_total": "abs",
   "youtube__subscribers_total": "abs",
@@ -13,7 +15,7 @@ HOT_TRACKING_FIELDS = {
 }
 
 DEPRECATED_STATS = {
-  "spotify__monthly_listeners_current": "rel",
+  "spotify__monthly_listeners": "rel",
   "spotify__streams_current": "rel",
   "youtube__video_views_total": "rel",
   "tiktok__views_total": "rel",
@@ -22,10 +24,11 @@ DEPRECATED_STATS = {
 }
 
 class TrackingController():
-  def __init__(self, spotify: SpotifyClient, songstats : SongstatsClient, db):
+  def __init__(self, spotify: SpotifyClient, songstats : SongstatsClient, sql: CloudSQLClient, db):
     self.spotify = spotify
     self.songstats = songstats
     self.db = db
+    self.sql = sql
   
   # #####################
   # Onboarding
@@ -36,13 +39,17 @@ class TrackingController():
     if status != 200:
       return msg, status
     return self.ingest_artist(spotify_id)
-  
+
+  # def add_artist_sql(self, spotify_id, user_id, org_id):
+
+
+
   def add_artist(self, spotify_id, user_id, org_id):
     ref = self.db.collection("artists_v2").document(spotify_id)
     doc = ref.get()
-
     # if artist exists add the user/org to tracking
     if doc.exists:
+
       data = doc.to_dict()
 
       if org_id not in data['watching']:
