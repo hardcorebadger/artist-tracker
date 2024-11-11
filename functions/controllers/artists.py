@@ -21,10 +21,10 @@ class ArtistController():
         db = firestore.client(app)
         # How to get the user and the org IDs
         page = int(req.data.get('page')) or 0
-        pageSize = int(req.data.get('pageSize')) or 10
+        page_size = int(req.data.get('pageSize')) or 10
 
         sql_session = self.sql.get_session()
-        query = self.build_query(req, db, sql_session).limit(pageSize).offset(page * pageSize)
+        query = self.build_query(req, db, sql_session).limit(page_size).offset(page * page_size)
         count = self.build_query(req, db, sql_session, True).count()
         artists = sql_session.scalars(query).unique()
 
@@ -37,7 +37,7 @@ class ArtistController():
         uid = req.auth.uid
         user_data = get_user(uid, db)
         query = (select(Artist).options(
-            subqueryload(Artist.statistics).joinedload(Statistic.type),
+            joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type),
             joinedload(Artist.users, innerjoin=True),
             joinedload(Artist.organizations, innerjoin=True),
             joinedload(Artist.evaluation, innerjoin=False),
