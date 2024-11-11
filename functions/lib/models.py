@@ -21,6 +21,7 @@ class Artist(Base):
     avatar = Column(Text)
     created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
+    evaluation_id: Mapped[int] = mapped_column(Integer, ForeignKey('evaluations.id'), nullable=False)
 
     links: Mapped[List["ArtistLink"]] = relationship(
         back_populates = "artist", cascade = "all, delete-orphan"
@@ -38,11 +39,13 @@ class Artist(Base):
         back_populates = "artist", cascade = "all, delete-orphan"
     )
 
-    evaluations: Mapped[List["Evaluation"]] = relationship(back_populates = "artist", cascade = "all, delete-orphan")
+    evaluation: Mapped["Evaluation"] = relationship()
 
     def as_dict(self):
         dict = {c.name: getattr(self, c.name) for c in self.__table__.columns}
-        dict['evaluation'] = list(map(lambda eval: eval.as_dict(), self.evaluations)).pop()
+        dict['evaluation'] = None
+        if (self.evaluation != None):
+            dict['evaluation'] = self.evaluation.as_dict()
         # dict['links'] = list(map(lambda link: link.as_dict(), self.links))
         for link in self.links:
             dict['link_' + link.source.key] = link.url
@@ -69,14 +72,13 @@ class Evaluation(Base):
     __tablename__ = 'evaluations'
 
     id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
-    artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
+    artist_id = UUID(as_uuid=True)
     status = Column(Integer, nullable=False, default=0)
     distributor = Column(String(256), nullable=True)
     distributor_type = Column(SmallInteger, nullable=True)
     label = Column(String(256), nullable=True)
     created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
-    artist: Mapped["Artist"] = relationship(back_populates="evaluations")
 
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -93,6 +95,7 @@ class OrganizationArtist(Base):
     created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     artist: Mapped["Artist"] = relationship(back_populates="organizations")
+    added_by = Column(String(28),  nullable=False, primary_key=True)
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 

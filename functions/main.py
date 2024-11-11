@@ -8,6 +8,7 @@ from openai import organization
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload, subqueryload
 
+from controllers.artists import ArtistController
 from cron_jobs import airtable_v1_cron, eval_cron, stats_cron, onboarding_cron
 from tmp_keys import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
@@ -34,6 +35,7 @@ airtable = AirtableClient(AIRTABLE_TOKEN, AIRTABLE_BASE, AIRTABLE_TABLES)
 youtube = YoutubeClient(YOUTUBE_TOKEN)
 songstats = SongstatsClient(SONGSTATS_API_KEY)
 sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD, SQL_DB)
+artists = ArtistController(PROJECT_ID, LOCATION, sql)
 
 # ##############################
 # V2 API
@@ -64,7 +66,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
             subqueryload(Artist.statistics).joinedload(Statistic.type),
             joinedload(Artist.users, innerjoin=True),
             joinedload(Artist.organizations, innerjoin=True),
-            joinedload(Artist.evaluations, innerjoin=True),
+            joinedload(Artist.evaluation, innerjoin=True),
         ))
         # .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
         sortFieldKey: str = 'statistic.30-latest'
@@ -258,10 +260,11 @@ def import_sql(old_artists, users):
             for orgId, watchDetails in artist.get('watching_details').items():
                 orgs.append(OrganizationArtist(
                     organization_id = orgId,
+                    added_by = watchDetails.get('added_by'),
                     favorite = watchDetails.get('favorite'),
                     created_at = watchDetails.get('added_on'),
                 ))
-            evals = list()
+            eval = None
             if artist.get('eval_as_of') != None:
                 status = 1
                 if artist.get('eval_status') == 'dirty':
@@ -277,13 +280,13 @@ def import_sql(old_artists, users):
                     distributor_type = 0
                 else:
                     distributor_type = 3
-                evals.append(Evaluation(
+                eval = Evaluation(
                     distributor = artist.get('eval_distro'),
                     distributor_type = distributor_type,
                     label = artist.get('eval_label'),
                     created_at = artist.get('eval_as_of'),
                     status = status
-                ))
+                )
             stats = list()
             stat_dates = artist.get('stat_dates')
             for key, value in artist.to_dict().items():
@@ -352,7 +355,7 @@ def import_sql(old_artists, users):
                 onboard_wait_until = None,
                 links = list(map(lambda x: convert_artist_link(x, link_sources), artist.get('links'))),
                 organizations = orgs,
-                evaluations = evals,
+                evaluation = eval,
                 statistics = stats,
                 users = userArtists
             ))
@@ -421,65 +424,8 @@ def get_statistic_types(req: https_fn.CallableRequest):
     print(req.data)
     return list(map(lambda type: type.as_dict(), sql_session.scalars(select(StatisticType)).all()))
 
+
 @https_fn.on_call()
-def get_artists(req: https_fn.CallableRequest):    
+def get_artists(req: https_fn.CallableRequest):
 
-    # request schema from MUI
-    # req.data = {'groupKeys': [], 'paginationModel': {'page': 0, 'pageSize': 10}, 'sortModel': [], 'filterModel': {'items': [], 'logicOperator': 'and', 'quickFilterValues': [], 'quickFilterLogicOperator': 'and'}, 'start': 0, 'end': 9}
-    print(req.data)
-
-    # How to get the user and the org IDs
-    db = firestore.client(app)
-    uid = req.auth.uid
-    user_data = get_user(uid, db)
-
-    sql_session = sql.get_session()
-    query = (select(Artist).options(
-        subqueryload(Artist.statistics).joinedload(Statistic.type),
-        joinedload(Artist.users, innerjoin=True),
-        joinedload(Artist.organizations, innerjoin=True),
-        joinedload(Artist.evaluations, innerjoin=True),
-    ))
-    # .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
-    if req.data['sortModel'] and len(req.data['sortModel']) > 0:
-        sorts = req.data['sortModel']
-        for sort in sorts:
-            sortFieldKey: str = sort['field']
-            if (sortFieldKey.startswith('statistic.')):
-                statisticKeyParts = sortFieldKey.split('.')
-                statisticId = statisticKeyParts[1].split('-')
-                statisticFunc = statisticId[1]
-                statisticId = int(statisticId[0])
-                column = Statistic.__table__.columns[statisticFunc].asc()
-                if sort['sort'] == 'desc':
-                    column = Statistic.__table__.columns[statisticFunc].desc()
-                query = query.join(Statistic, Artist.statistics).where(Statistic.statistic_type_id == statisticId).order_by(column)
-                # query = query.filter(Artist.statistics.any(Statistic.statistic_type_id == statisticId & Statistic[statisticFunc] ))
-
-
-
-    artists = sql_session.scalars(query).unique().fetchmany(10)
-
-
-    print(user_data)
-    return {
-        "rows": list(map(lambda artist: artist.as_dict(), artists))
-    }
-    # Mock response format
-    return {
-        "rows": [
-            {
-              'id': 1,
-              'name': 'fake artist',
-              'eval_distro': 'Vydia',
-              'eval_status': 'signed',
-                'evaluation': {
-                    'distributor': 'ASD'
-                },
-              'spotify_url': 'httsp://play.spotify.com/artist/b947fg73g8v',
-              'genres': [],
-              "stat_spotify__monthly_listeners__abs-latest": 8947784
-            }
-        ],
-        "rowCount": 1
-    }
+    return artists.get_artists(req, app)

@@ -58,7 +58,7 @@ export const defaultColumnOrder = ['link_spotify', 'evaluation.status', 'evaluat
 export const columnOptions = {
   "evaluation.distributor": {
     field: 'evaluation.distributor',
-    valueGetter: (value, row) => row.evaluation.distributor,
+    valueGetter: (value, row) => row.evaluation?.distributor ?? 'N/A',
     headerName: 'Distributor',
     isMetric: false,
     defaultFilter: {
@@ -70,7 +70,7 @@ export const columnOptions = {
   "evaluation.status": {
     field: 'evaluation.status',
     headerName: 'Status',
-    valueGetter: (value, row) => (row.evaluation.status === 0 ? 'unsigned' : 'signed'),
+    valueGetter: (value, row) =>  (row.evaluation ? (row.evaluation?.status === 0 ? 'unsigned' : 'signed') : 'unknown'),
     isMetric: false,
     filterEditor: SelectFilter,
     filterEditorProps: {
@@ -87,7 +87,7 @@ export const columnOptions = {
   "evaluation.distributor_type": {
     field: 'evaluation.distributor_type',
     headerName: 'Distributor Type',
-    valueGetter: (value, row) => row.evaluation.distributor_type === 1 ? 'indie' : (row.evaluation.distributor_type === 2) ? 'major' : ('diy'),
+    valueGetter: (value, row) => row.evaluation?.distributor_type === 1 ? 'indie' : (row.evaluation?.distributor_type === 2) ? 'major' : ('diy'),
     isMetric: false,
     filterEditor: SelectFilter,
     render: row => <Badge colorScheme={row.value == 'diy' ? 'green' : row.value == 'indie' ? 'yellow' : 'red'}>{row.value}</Badge>,
@@ -104,7 +104,7 @@ export const columnOptions = {
   "evaluation.back_catalog": {
     field: 'evaluation.back_catalog',
     headerName: 'Backcatalog Status',
-    valueGetter: (value, row) => (row.evaluation.status === 2 ? 'dirty' : 'clean'),
+    valueGetter: (value, row) => (row.evaluation?.status === 2 ? 'dirty' : 'clean'),
     isMetric: false,
     filterEditor: SelectFilter,
     render: row => <Badge colorScheme={row.value == 'clean' ? 'green' : 'red'}>{row.value}</Badge>,
