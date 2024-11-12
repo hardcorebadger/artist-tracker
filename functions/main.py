@@ -47,6 +47,8 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     db = firestore.client(app)
     tracking_controller = TrackingController(spotify, songstats, sql, db)
     eval_controller = EvalController(spotify, youtube, db)
+    artist_controller = ArtistController(PROJECT_ID, LOCATION, sql)
+
     v2_api = flask.Flask(__name__)
 
     @v2_api.errorhandler(Exception)
@@ -61,25 +63,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/debug")
     def debug():
 
-        sql_session = sql.get_session()
-        query = (select(Artist).options(
-            subqueryload(Artist.statistics).joinedload(Statistic.type),
-            joinedload(Artist.users, innerjoin=True),
-            joinedload(Artist.organizations, innerjoin=True),
-            joinedload(Artist.evaluation, innerjoin=True),
-        ))
-        # .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
-        sortFieldKey: str = 'statistic.30-latest'
-        if (sortFieldKey.startswith('statistic.')):
-            statisticKeyParts = sortFieldKey.split('.')
-            statisticId = statisticKeyParts[1].split('-')
-            statisticFunc = statisticId[1]
-            statisticId = int(statisticId[0])
-            column = Statistic.__table__.columns[statisticFunc].desc()
-            query = query.join(Statistic,
-                               Artist.statistics).filter(Statistic.statistic_type_id == statisticId).order_by(
-                column)
-
+        return artist_controller.get_artists_test(flask.request.get_json(), app)
 
         # old_artists = db.collection("artists_v2").limit(15).get()
         # import_sql(old_artists, db.collection('users').get())
@@ -91,13 +75,11 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         # aids = spotify.get_playlist_artists('37i9dQZF1E4A2FqXjcsyRn')
         # for a in aids:
         #     tracking_controller.add_artist(a, 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
-
-        artists = sql_session.scalars(query).unique().fetchmany(10)
-
-        return {
-            "sql": query.compile(compile_kwargs={"literal_binds": True}).string,
-            "rows": list(map(lambda artist: artist.as_dict(), artists))
-        }
+        #
+        # return {
+        #     "sql": query.compile(compile_kwargs={"literal_binds": True}).string,
+        #     "rows": list(map(lambda artist: artist.as_dict(), artists))
+        # }
 
     @v2_api.post("/eval-artist")
     def eval_artist():
@@ -421,11 +403,12 @@ def add_artist(req: https_fn.CallableRequest):
 @https_fn.on_call()
 def get_statistic_types(req: https_fn.CallableRequest):
     sql_session = sql.get_session()
-    print(req.data)
-    return list(map(lambda type: type.as_dict(), sql_session.scalars(select(StatisticType)).all()))
+    types = sql_session.scalars(select(StatisticType)).all()
+    sql_session.close()
+    return list(map(lambda type: type.as_dict(), types))
 
 
 @https_fn.on_call()
 def get_artists(req: https_fn.CallableRequest):
 
-    return artists.get_artists(req, app)
+    return artists.get_artists(req.auth.uid, req.data, app)

@@ -1,7 +1,10 @@
+import time
+
 from firebase_admin import firestore, initialize_app
 from firebase_functions import https_fn
 from sqlalchemy import select, func
-from sqlalchemy.orm import subqueryload, joinedload
+from sqlalchemy.dialects.mssql.information_schema import columns
+from sqlalchemy.orm import subqueryload, joinedload, defer
 
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
     CloudSQLClient, LinkSource, ArtistLink, OrganizationArtist, Evaluation, StatisticType, Statistic, UserArtist
@@ -13,41 +16,53 @@ class ArtistController():
         self.location = location
         self.sql = sql
 
-    def get_artists(self, req: https_fn.CallableRequest, app):
+    def get_artists_test(self, data, app):
+        return (self.get_artists('9sRMdvFDUKVKckwpzeARiG6x2LG2', data, app))
+    def get_artists(self, uid, data, app):
 
         # request schema from MUI
         # req.data = {'groupKeys': [], 'paginationModel': {'page': 0, 'pageSize': 10}, 'sortModel': [], 'filterModel': {'items': [], 'logicOperator': 'and', 'quickFilterValues': [], 'quickFilterLogicOperator': 'and'}, 'start': 0, 'end': 9}
-        print(req.data)
         db = firestore.client(app)
         # How to get the user and the org IDs
-        page = int(req.data.get('page')) or 0
-        page_size = int(req.data.get('pageSize')) or 10
+        page = int(data.get('page', 0))
+        page_size = int(data.get('pageSize', 10))
 
         sql_session = self.sql.get_session()
-        query = self.build_query(req, db, sql_session).limit(page_size).offset(page * page_size)
-        count = self.build_query(req, db, sql_session, True).count()
-        artists = sql_session.scalars(query).unique()
+        count = self.build_query(uid, data, db, sql_session, True).count()
+        start = time.time()
+        query = self.build_query(uid, data, db, sql_session).limit(page_size).offset(page * page_size)
+        artists_set = sql_session.scalars(query).unique()
 
+        end = time.time()
+        length = end-start
+        print("It took", length, "seconds!")
+
+        artists = list(map(lambda artist: artist.as_dict(), artists_set))
+
+        sql_session.close()
+        db.close()
         return {
-            "rows": list(map(lambda artist: artist.as_dict(), artists)),
+            "rows": artists,
             "rowCount": count
         }
 
-    def build_query(self, req, db, sql_session, count = False):
-        uid = req.auth.uid
+    def build_query(self, uid, data, db, sql_session, count = False):
         user_data = get_user(uid, db)
-        query = (select(Artist).options(
-            joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type),
-            joinedload(Artist.users, innerjoin=True),
-            joinedload(Artist.organizations, innerjoin=True),
-            joinedload(Artist.evaluation, innerjoin=False),
-        ))
-        if count:
-            query = sql_session.query(Artist)
+        query = sql_session.query(Artist)
+
+        if count == False:
+            query = (select(Artist).options(
+                joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True).defer(StatisticType.created_at).defer(StatisticType.updated_at),
+                joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True).defer(LinkSource.logo),
+                joinedload(Artist.users, innerjoin=True),
+                joinedload(Artist.organizations, innerjoin=True),
+                joinedload(Artist.evaluation, innerjoin=False),
+            ))
+
 
         # .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
-        if req.data['sortModel'] and len(req.data['sortModel']) > 0:
-            sorts = req.data['sortModel']
+        if data.get('sortModel', False) and len(data['sortModel']) > 0:
+            sorts = data['sortModel']
             for sort in sorts:
                 sortFieldKey: str = sort['field']
                 if (sortFieldKey.startswith('statistic.')):
