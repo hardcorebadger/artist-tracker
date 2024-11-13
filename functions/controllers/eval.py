@@ -1,4 +1,7 @@
-from lib import SpotifyClient, YoutubeClient, ErrorResponse
+from sqlalchemy import select
+from sqlalchemy.orm import joinedload
+
+from lib import SpotifyClient, YoutubeClient, ErrorResponse, Artist, Evaluation
 from datetime import datetime, timedelta
 import re
 from fuzzywuzzy import fuzz
@@ -38,10 +41,12 @@ SP_DIY_KEYWORDS = [
 ]
 
 class EvalController():
-  def __init__(self, spotify: SpotifyClient, youtube: YoutubeClient, db):
+  def __init__(self, spotify: SpotifyClient, youtube: YoutubeClient, db, sql, tracking_controller):
     self.spotify = spotify
     self.youtube = youtube
     self.db = db
+    self.sql = sql
+    self.tracking_controller = tracking_controller
 
   def evaluate_copyrights(self, spotify_id: str):
     # Get the record
@@ -50,6 +55,15 @@ class EvalController():
     # check the artist exists
     if not doc.exists:
         raise ErrorResponse('Artist not found', 404, 'Tracking')
+
+    sql_session = self.sql.get_session()
+    sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()
+    if sql_ref is None:
+        print('Artist needs migration; importing to SQL')
+        self.tracking_controller.import_sql(doc)
+    sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()
+    sql_session.close()
+
     # check the artist is ingested
     data = doc.to_dict()
 
@@ -114,6 +128,7 @@ class EvalController():
         })
 
     if len(sp_evals) == 0 and len(yt_evals) == 0:
+
         ref.update({
             "eval_status": "unknown",
             "eval_distro_type": "unknown",
@@ -122,6 +137,14 @@ class EvalController():
             "eval_prios": "unknown",
             "eval_as_of": datetime.now()
         })
+        sql_ref.evaluation = Evaluation(
+            distributor_type=3,
+            status=2
+        )
+        sql_session = self.sql.get_session()
+        sql_session.add(sql_ref)
+        sql_session.commit()
+        sql_session.close()
         return 'No evals found', 201
         
     # NEW
@@ -175,7 +198,20 @@ class EvalController():
         
     parse_evals(sp_evals)
     parse_evals(yt_evals)
+    sql_status = 1
+    if priors == 'dirty':
+        sql_status = 2
+    elif status == 'unsigned':
+        sql_status = 0
 
+    if main_eval['distribution_type'] == 'indie':
+        distributor_type = 1
+    elif main_eval['distribution_type'] == 'major':
+        distributor_type = 2
+    elif main_eval['distribution_type'] == 'diy':
+        distributor_type = 0
+    else:
+        distributor_type = 3
     ref.update({
         "eval_status": status,
         "eval_distro_type": main_eval['distribution_type'],
@@ -193,6 +229,16 @@ class EvalController():
         #   "as_of": datetime.now().strftime("%Y-%m-%d"),
         #   "eval_status": "success"
     })
+    sql_ref.evaluation = Evaluation(
+        distributor_type=distributor_type,
+        status=sql_status,
+        distributor=main_eval['distributor'] if main_eval['distributor'] != None else "",
+        label=main_eval['label'] if main_eval['label'] != None else "",
+    )
+    sql_session = self.sql.get_session()
+    sql_session.add_all([sql_ref])
+    sql_session.commit()
+    sql_session.close()
     # TODO save the full eval state to a subcollection
     return 'success', 200
   

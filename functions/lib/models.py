@@ -3,7 +3,8 @@ import uuid
 from typing import List
 
 from dataclasses import dataclass
-from sqlalchemy import Column, Integer, SmallInteger, JSON, Float, Boolean, Text, String, TIMESTAMP, create_engine, ForeignKey
+from sqlalchemy import Column, Integer, SmallInteger, JSON, Float, Boolean, Text, String, TIMESTAMP, create_engine, \
+    ForeignKey, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, relationship, mapped_column
@@ -39,7 +40,7 @@ class Artist(Base):
         back_populates = "artist", cascade = "all, delete-orphan"
     )
 
-    evaluation: Mapped["Evaluation"] = relationship()
+    evaluation: Mapped["Evaluation"] = relationship(back_populates='artist', foreign_keys=[evaluation_id])
 
     def as_dict(self):
         dict = {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -72,13 +73,13 @@ class Evaluation(Base):
     __tablename__ = 'evaluations'
 
     id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
-    artist_id = UUID(as_uuid=True)
-    status = Column(Integer, nullable=False, default=0)
-    distributor = Column(String(256), nullable=True)
-    distributor_type = Column(SmallInteger, nullable=True)
-    label = Column(String(256), nullable=True)
+    status = Column(Integer, nullable=False, default=2)
+    distributor = Column(String(256), nullable=True, default=None)
+    distributor_type = Column(SmallInteger, nullable=True, default=3)
+    label = Column(String(256), nullable=True, default=None)
     created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
+    artist: Mapped["Artist"] = relationship(back_populates="evaluation", foreign_keys=[Artist.evaluation_id])
 
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -97,7 +98,12 @@ class OrganizationArtist(Base):
     artist: Mapped["Artist"] = relationship(back_populates="organizations")
     added_by = Column(String(28),  nullable=False, primary_key=True)
     def as_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        return {
+            'organization_id': self.organization_id,
+            'favorite': self.favorite,
+            'created_at': self.created_at,
+            'added_by': self.added_by,
+            }
 
     def __repr__(self):
         return f"<OrganizationArtist({self.organization_id=}, {self.artist_id=}, {self.favorite=}, {self.created_at=})>"
@@ -111,7 +117,11 @@ class UserArtist(Base):
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     artist: Mapped["Artist"] = relationship(back_populates="users")
     def as_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        return {
+            'user_id': self.user_id,
+            'created_at': self.created_at,
+            'organization_id': self.organization_id,
+        }
 
     def __repr__(self):
         return f"<UserArtist({self.user_id=}, {self.organization_id=}, {self.artist_id=}, {self.created_at=})>"
@@ -134,8 +144,29 @@ class Statistic(Base):
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     artist: Mapped["Artist"] = relationship(back_populates="statistics")
     type: Mapped["StatisticType"] = relationship()
+    last_date = Column(DateTime)
+    @hybrid_property
+    def dates(self):
+        return list(map(lambda date: date.isoformat(), [self.last_date - datetime.timedelta(weeks=idx) for idx in range(8)]))
+
     def as_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+        return {
+            'latest': self.latest,
+            'previous': self.previous,
+            'week_over_week': self.week_over_week,
+            'month_over_month': self.month_over_month,
+            'min': self.min,
+            'max': self.max,
+            'avg': self.avg,
+            'data': self.data,
+            'statistic_type_id': self.statistic_type_id,
+            'updated_at': self.updated_at,
+            'last_date': self.last_date,
+            'dates': self.dates
+
+        }
+        # return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
     def __repr__(self):
         return f"<Statistic({self.artist_id=}-{self.statistic_type_id}, {self.latest}, {self.previous=}, {self.week_over_week=}, {self.month_over_month}, {self.min}, {self.max}, {self.avg}, {self.data})>"

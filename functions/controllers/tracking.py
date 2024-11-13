@@ -1,4 +1,9 @@
-from lib import SongstatsClient, ErrorResponse, SpotifyClient, get_user
+from google.cloud.firestore_v1.query_results import QueryResultsList
+from sqlalchemy import select
+from sqlalchemy.orm import joinedload
+
+from lib import SongstatsClient, ErrorResponse, SpotifyClient, get_user, ArtistLink, LinkSource, StatisticType, \
+    OrganizationArtist, Evaluation, Statistic, UserArtist
 from datetime import datetime, timedelta
 from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilter, StructuredQuery
 from google.cloud.firestore_v1.transforms import DELETE_FIELD
@@ -29,7 +34,23 @@ class TrackingController():
     self.songstats = songstats
     self.db = db
     self.sql = sql
-  
+    self.statistic_types = None
+    self.users = None
+
+  def get_statistic_type_from_field(self, field: str):
+      types = self.get_statistic_types()
+      for type in types:
+          if field.startswith(type.source + '__') and field.endswith('__'+ type.key):
+              return type
+      return None
+
+  def get_statistic_types(self):
+      if self.statistic_types is None:
+          sql_session = self.sql.get_session()
+          self.statistic_types = sql_session.query(StatisticType).all()
+          sql_session.close()
+      return self.statistic_types
+
   # #####################
   # Onboarding
   # #####################
@@ -45,7 +66,12 @@ class TrackingController():
 
 
   def add_artist(self, spotify_id, user_id, org_id):
+
+    sql_session = self.sql.get_session()
+    sqlRef = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id)).first()
+    sql_session.close()
     ref = self.db.collection("artists_v2").document(spotify_id)
+
     doc = ref.get()
     # if artist exists add the user/org to tracking
     if doc.exists:
@@ -73,7 +99,9 @@ class TrackingController():
           "found_by": data['found_by'],
           "found_by_details": data['found_by_details'],
       })
-
+      if sqlRef is None:
+        print('Artist needs migration; importing to SQL')
+        self.import_sql(doc)
       return 'Artist exists, added to tracking', 200
     
     # check if the ID is valid (this will raise a 400 if the artist is invalid)
@@ -131,16 +159,25 @@ class TrackingController():
     for s in HOT_TRACKING_FIELDS:
       new_schema[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = []
     ref.set(new_schema)
+    self.import_sql(ref.get())
     return 'success', 200
   
   def ingest_artist(self, spotify_id : str):
+
     ref = self.db.collection("artists_v2").document(spotify_id)
     doc = ref.get()
     print("[INGEST] has doc")
     # check the artist exists
     if not doc.exists:
       raise ErrorResponse('Artist not found', 404, 'Tracking')
-    
+
+    sql_session = self.sql.get_session()
+    sql_ref = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id)).first()
+    if sql_ref is None:
+        print('Artist needs migration; importing to SQL')
+        self.import_sql(doc)
+    sql_ref = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id)).first()
+    sql_session.close()
     data = doc.to_dict()
 
     # hit SS for the info
@@ -153,15 +190,19 @@ class TrackingController():
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(minutes=10)
           })
+          self.set_onboard_wait(sql_ref, datetime.now() + timedelta(minutes=10))
           return 'Waiting for data', 201
       elif e.status_code == 429:
           ref.update({
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(days=30)
           })
+          self.set_onboard_wait(sql_ref, datetime.now() + timedelta(minutes=10))
           return 'Waiting for data', 201
+      else:
+          self.set_onboard_wait(sql_ref, None)
       raise e
-      
+
     print("[INGEST] has info")
     
     # get the stats now that we know the artist is in SS
@@ -176,12 +217,19 @@ class TrackingController():
     print("[INGEST] info updated")
 
     return 'success', 200
-  
+
+  def set_onboard_wait(self, sql_ref, onboard_wait = None):
+      sql_session = self.sql.get_session()
+      sql_ref.onboard_wait_until = onboard_wait
+      sql_session.add_all([sql_ref])
+      sql_session.commit()
+      sql_session.close()
   # #####################
   # Stats
   # #####################
   
   def update_artist(self, spotify_id : str, is_ob=False):
+
     ref = self.db.collection("artists_v2").document(spotify_id)
     doc = ref.get()
     print("[INGEST] has update doc")
@@ -189,6 +237,15 @@ class TrackingController():
     # check the artist exists
     if not doc.exists:
       raise ErrorResponse('Artist not found', 404, 'Tracking')
+
+    sql_session = self.sql.get_session()
+    sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True)).where(Artist.spotify_id == spotify_id)).first()
+    if sql_ref is None:
+        print('Artist needs migration; importing to SQL')
+        self.import_sql(doc)
+
+    sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True)).where(Artist.spotify_id == spotify_id)).first()
+    sql_session.close()
     # check the artist is ingested - not needed
     # data = doc.to_dict()
     # if data['ob_status'] != 'ingested' and not is_ob:
@@ -202,13 +259,18 @@ class TrackingController():
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(minutes=10)
           })
+          self.set_onboard_wait(sql_ref, datetime.now() + timedelta(minutes=10))
+
           return 'Waiting for data', 201
       elif e.status_code == 429:
           ref.update({
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(days=30)
           })
+          self.set_onboard_wait(sql_ref, datetime.now() + timedelta(minutes=10))
           return 'Waiting for data', 201
+      else:
+          self.set_onboard_wait(sql_ref, None)
       raise e
     
 
@@ -218,13 +280,64 @@ class TrackingController():
     #  update the hot tracking stats on the artist
     update = {"stat_dates": stats['as_of'], "stats_as_of": datetime.now()}
     for s in HOT_TRACKING_FIELDS:
-      update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = stats['stats'][s] if s in stats['stats'] else []
+      sql_statistic_type = self.get_statistic_type_from_field(s)
+      values = stats['stats'][s] if s in stats['stats'] else []
+      update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = values
+      self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
+
     ref.update(update)
+    sql_session = self.sql.get_session()
+    sql_session.add_all([sql_ref])
+    sql_session.commit()
     print("[INGEST] stats updated")
 
     # TODO Add the deep stats subcollection
     return 'success', 200
-  
+
+  def add_or_update_sql_stat(self, artist: Artist, statistic_type: StatisticType, date, values):
+      if len(values) == 0:
+          return
+      if statistic_type.format == 'int':
+          valueSet = list(map(int, values))
+          latest: int = valueSet[len(valueSet) - 1]
+          previous: int = valueSet[len(valueSet) - 2]
+      else:
+          valueSet = list(map(float, values))
+          latest: float = valueSet[len(valueSet) - 1]
+          previous: float = valueSet[len(valueSet) - 2]
+
+      wow = 0 if previous <= 0 else (latest - previous) / previous
+      mom = 0 if valueSet[3] <= 0 else (valueSet[7] - valueSet[3]) / valueSet[3]
+      found_stat = None
+      for stat in artist.statistics:
+          if stat.statistic_type_id == statistic_type.id:
+              stat.latest = latest
+              stat.previous = previous
+              stat.max = max(valueSet)
+              stat.min = min(valueSet)
+              stat.avg = sum(valueSet) / len(valueSet)
+              stat.data = valueSet
+              stat.week_over_week = wow
+              stat.month_over_month = mom
+              stat.last_date = date
+              stat.updated_at = datetime.now()
+              found_stat = stat
+
+      if found_stat is None:
+          found_stat = Statistic(
+              type=statistic_type,
+              latest=latest,
+              previous=previous,
+              max=max(valueSet),
+              min=min(valueSet),
+              avg=sum(valueSet) / len(valueSet),
+              data=valueSet,
+              week_over_week=wow,
+              month_over_month=mom,
+              last_date=date,
+          )
+          artist.statistics.append(found_stat)
+
   # ######################
   # Cron Support
   # ######################
@@ -263,3 +376,173 @@ class TrackingController():
     ).limit(limit).get()
     ids = [d.id for d in docs]
     return ids
+
+  def convert_artist_link(self, link, sources):
+      sources = list(filter(lambda s: s.key == link.get('source'), sources))
+      if len(sources) == 0:
+          print("No valid source: " + link.get('source'))
+          exit(1)
+
+      source: LinkSource = sources[0]
+      source_parts = source.url_scheme.split('{identifier}')
+      scheme_part_one = (source_parts[0]
+                         .replace('https://', '')
+                         .replace('http://', '')
+                         .replace('www.', ''))
+      scheme_part_two = source_parts[1]
+
+      url_identifier = (link.get("url")
+                        .replace('https://', '')
+                        .replace('http://', '')
+                        .replace('www.', '')
+                        .replace(scheme_part_one, ''))
+      if len(scheme_part_two) > 0:
+          url_identifier = url_identifier.split(scheme_part_two)[0]
+      url_identifier = url_identifier.split("?")[0]
+
+      return ArtistLink(
+          link_source_id=sources[0].id,
+          path=url_identifier,
+      )
+
+  def import_sql(self, old_artists):
+      if not isinstance(old_artists, QueryResultsList):
+          old_artists = [old_artists]
+      link_sources = self.sql.load_all_for_model(LinkSource)
+      sql_session = self.sql.get_session()
+      stat_types = list(sql_session.scalars(select(StatisticType)).all())
+      userOrgs = dict()
+      if self.users is None:
+        self.users = self.db.collection('users').get()
+      for user in self.users:
+          id = user.id
+          user = user.to_dict()
+          userOrgs[id] = user.get('organization')
+
+      spotifys = list(map(lambda x: x.get('spotify_id'), old_artists))
+      existing = sql_session.scalars(select(Artist).where(Artist.spotify_id.in_(spotifys))).all()
+      for artist in old_artists:
+          spotify_id = artist.get('spotify_id')
+          add_batch = list()
+          existingMatches = list(filter(lambda x: x.spotify_id == spotify_id, existing))
+          if len(existingMatches) > 0:
+              print("Skipping existing artist: " + spotify_id + ' ' + str(existingMatches[0].id))
+              continue
+          else:
+              print("Adding artist: " + spotify_id)
+              orgs = list()
+              for orgId, watchDetails in artist.get('watching_details').items():
+                  added_by = watchDetails.get('added_by', None)
+                  if added_by is None:
+                      for user_id, found_details in artist.get('found_by_details').items():
+                            if userOrgs[user_id] == orgId or found_details.get('found_on') == watchDetails.get('added_on'):
+                                added_by = user_id
+
+                  orgs.append(OrganizationArtist(
+                      organization_id=orgId,
+                      added_by=added_by,
+                      favorite=watchDetails.get('favorite'),
+                      created_at=watchDetails.get('added_on'),
+                  ))
+              eval = None
+              if artist.get('eval_as_of') != None:
+                  status = 1
+                  if artist.get('eval_status') == 'dirty':
+                      status = 2
+                  elif artist.get('eval_status') == 'unsigned':
+                      status = 0
+
+                  if artist.get('eval_distro_type') == 'indie':
+                      distributor_type = 1
+                  elif artist.get('eval_distro_type') == 'major':
+                      distributor_type = 2
+                  elif artist.get('eval_distro_type') == 'diy':
+                      distributor_type = 0
+                  else:
+                      distributor_type = 3
+                  eval = Evaluation(
+                      distributor=artist.get('eval_distro'),
+                      distributor_type=distributor_type,
+                      label=artist.get('eval_label'),
+                      created_at=artist.get('eval_as_of'),
+                      status=status
+                  )
+              stats = list()
+              stat_dates = artist.get('stat_dates')
+              for key, value in artist.to_dict().items():
+                  keyStr: str = key
+
+                  if not keyStr.startswith('stat_'):
+                      continue
+                  if keyStr == 'stat_dates':
+                      continue
+                  statSource = keyStr.split('_')[1].split('__')[0]
+                  statName = keyStr.split('__')[1]
+                  newStatType = None
+                  for statType in stat_types:
+                      if statType.source == statSource and statType.key == statName:
+                          newStatType = statType
+                          break
+
+                  if newStatType == None:
+                      newStatType = StatisticType(
+                          name=statName,
+                          key=statName,
+                          source=statSource,
+                          format='int'
+                      )
+                      sql_session.add(newStatType)
+                      sql_session.commit()
+                      print("ADDING TYPE: " + statName)
+                      stat_types = list(sql_session.scalars(select(StatisticType)).all())
+
+                  if len(value) == 0:
+                      continue
+                  if newStatType.format == 'int':
+                      valueSet = list(map(int, value))
+                      latest: int = valueSet[len(valueSet) - 1]
+                      previous: int = valueSet[len(valueSet) - 2]
+                  else:
+                      valueSet = list(map(float, value))
+                      latest: float = valueSet[len(valueSet) - 1]
+                      previous: float = valueSet[len(valueSet) - 2]
+
+                  wow = 0 if previous <= 0 else (latest - previous) / previous
+                  mom = 0 if valueSet[3] <= 0 else (valueSet[7] - valueSet[3]) / valueSet[3]
+                  stats.append(Statistic(
+                      type=newStatType,
+                      latest=latest,
+                      previous=previous,
+                      max=max(valueSet),
+                      min=min(valueSet),
+                      avg=sum(valueSet) / len(valueSet),
+                      data=valueSet,
+                      week_over_week=wow,
+                      month_over_month=mom,
+                      last_date=stat_dates[len(stat_dates) - 1],
+                  ))
+              userArtists = list()
+              for user_id, found_details in artist.get('found_by_details').items():
+                  userArtists.append(UserArtist(
+                      user_id=user_id,
+                      organization_id=userOrgs[user_id],
+                      created_at=found_details.get('found_on')
+                  ))
+              add_batch.append(Artist(
+                  spotify_id=spotify_id,
+                  name=artist.get('name'),
+                  avatar=artist.get('avatar'),
+                  onboard_wait_until=None,
+                  links=list(map(lambda x: self.convert_artist_link(x, link_sources), artist.get('links'))),
+                  organizations=orgs,
+                  evaluation=eval,
+                  statistics=stats,
+                  users=userArtists
+              ))
+
+          if len(add_batch) > 0:
+              sql_session.add_all(add_batch)
+              sql_session.commit()
+              add_batch.clear()
+
+      sql_session.close()

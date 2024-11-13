@@ -46,7 +46,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     db = firestore.client(app)
     tracking_controller = TrackingController(spotify, songstats, sql, db)
-    eval_controller = EvalController(spotify, youtube, db)
+    eval_controller = EvalController(spotify, youtube, db, sql, tracking_controller)
     artist_controller = ArtistController(PROJECT_ID, LOCATION, sql)
 
     v2_api = flask.Flask(__name__)
@@ -63,10 +63,11 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/debug")
     def debug():
 
-        return artist_controller.get_artists_test(flask.request.get_json(), app)
+        # return artist_controller.get_artists_test(flask.request.get_json(), app)
 
-        # old_artists = db.collection("artists_v2").limit(15).get()
-        # import_sql(old_artists, db.collection('users').get())
+        old_artists = db.collection("artists_v2").limit(15).get()
+        tracking_controller.import_sql(old_artists)
+        return 'success'
         # dump_unclean(db)
         # migrate_add_favs_and_tags(db)
         # migrate_from_v1(airtable, spotify, tracking_controller)
@@ -187,176 +188,14 @@ def fn_v1_api(req: https_fn.Request) -> https_fn.Response:
 
 # Figures out how many artists to do per batch given an update interval and minimum SLA
 
-def convert_artist_link(link, sources):
-    sources = list(filter(lambda s: s.key == link.get('source'), sources))
-    if len(sources) == 0:
-        print("No valid source: " + link.get('source'))
-        exit(1)
 
-    source: LinkSource = sources[0]
-    source_parts = source.url_scheme.split('{identifier}')
-    scheme_part_one = (source_parts[0]
-                     .replace('https://', '')
-                     .replace('http://', '')
-                     .replace('www.', ''))
-    scheme_part_two = source_parts[1]
-
-
-    url_identifier = (link.get("url")
-                      .replace('https://', '')
-                     .replace('http://', '')
-                     .replace('www.', '')
-                      .replace(scheme_part_one, ''))
-    if len(scheme_part_two) > 0:
-        url_identifier = url_identifier.split(scheme_part_two)[0]
-    url_identifier = url_identifier.split("?")[0]
-
-    return ArtistLink(
-            link_source_id = sources[0].id,
-            path = url_identifier,
-        )
-
-def import_sql(old_artists, users):
-
-    link_sources = sql.load_all_for_model(LinkSource)
-    sql_session = sql.get_session()
-    stat_types = list(sql_session.scalars(select(StatisticType)).all())
-    userOrgs = dict()
-    for user in users:
-        id = user.id
-        user = user.to_dict()
-        userOrgs[id] = user.get('organization')
-
-    spotifys = list(map(lambda x: x.get('spotify_id'), old_artists))
-    existing = sql_session.scalars(select(Artist).where(Artist.spotify_id.in_(spotifys))).all()
-    for artist in old_artists:
-        spotify_id = artist.get('spotify_id')
-        add_batch = list()
-        existingMatches = list(filter(lambda x: x.spotify_id == spotify_id, existing))
-        if len(existingMatches) > 0:
-            print("Skipping existing artist: " + spotify_id + ' ' + str(existingMatches[0].id))
-            continue
-        else:
-            print("Adding artist: " + spotify_id)
-            orgs = list()
-            for orgId, watchDetails in artist.get('watching_details').items():
-                orgs.append(OrganizationArtist(
-                    organization_id = orgId,
-                    added_by = watchDetails.get('added_by'),
-                    favorite = watchDetails.get('favorite'),
-                    created_at = watchDetails.get('added_on'),
-                ))
-            eval = None
-            if artist.get('eval_as_of') != None:
-                status = 1
-                if artist.get('eval_status') == 'dirty':
-                    status = 2
-                elif artist.get('eval_status') == 'unsigned':
-                    status = 0
-
-                if artist.get('eval_distro_type') == 'indie':
-                    distributor_type = 1
-                elif artist.get('eval_distro_type') == 'major':
-                    distributor_type = 2
-                elif artist.get('eval_distro_type') == 'diy':
-                    distributor_type = 0
-                else:
-                    distributor_type = 3
-                eval = Evaluation(
-                    distributor = artist.get('eval_distro'),
-                    distributor_type = distributor_type,
-                    label = artist.get('eval_label'),
-                    created_at = artist.get('eval_as_of'),
-                    status = status
-                )
-            stats = list()
-            stat_dates = artist.get('stat_dates')
-            for key, value in artist.to_dict().items():
-                keyStr: str = key
-
-                if not keyStr.startswith('stat_'):
-                    continue
-                if keyStr == 'stat_dates':
-                    continue
-                statSource = keyStr.split('_')[1].split('__')[0]
-                statName = keyStr.split('__')[1]
-                newStatType = None
-                for statType in stat_types:
-                    if statType.source == statSource and statType.key == statName:
-                        newStatType = statType
-                        break
-
-                if newStatType == None:
-                    newStatType = StatisticType(
-                        name = statName,
-                        key = statName,
-                        source = statSource,
-                        format = 'int'
-                    )
-                    sql_session.add(newStatType)
-                    sql_session.commit()
-                    print("ADDING TYPE: " + statName)
-                    stat_types = list(sql_session.scalars(select(StatisticType)).all())
-
-                if len(value) == 0:
-                    continue
-                if newStatType.format == 'int':
-                    valueSet = list(map(int, value))
-                    latest: int = valueSet[len(valueSet) - 1]
-                    previous: int = valueSet[len(valueSet) - 2]
-                else:
-                    valueSet = list(map(float, value))
-                    latest: float = valueSet[len(valueSet) - 1]
-                    previous: float = valueSet[len(valueSet) - 2]
-
-                wow = 0 if previous <= 0 else (latest - previous) / previous
-                mom = 0 if valueSet[3] <= 0 else  (valueSet[7] - valueSet[3]) / valueSet[3]
-                stats.append(Statistic(
-                    type = newStatType,
-                    latest = latest,
-                    previous = previous,
-                    max = max(valueSet),
-                    min = min(valueSet),
-                    avg = sum(valueSet) / len(valueSet),
-                    data = valueSet,
-                    week_over_week = wow,
-                    month_over_month = mom,
-                    created_at = stat_dates[len(stat_dates) - 1],
-                ))
-            userArtists = list()
-            for user_id, found_details in artist.get('found_by_details').items():
-                userArtists.append(UserArtist(
-                    user_id = user_id,
-                    organization_id=userOrgs[user_id],
-                    created_at=found_details.get('found_on')
-                ))
-            add_batch.append(Artist(
-                spotify_id = spotify_id,
-                name = artist.get('name'),
-                avatar = artist.get('avatar'),
-                onboard_wait_until = None,
-                links = list(map(lambda x: convert_artist_link(x, link_sources), artist.get('links'))),
-                organizations = orgs,
-                evaluation = eval,
-                statistics = stats,
-                users = userArtists
-            ))
-
-
-        if len(add_batch) > 0:
-            sql_session.add_all(add_batch)
-            sql_session.commit()
-            add_batch.clear()
-
-
-    sql_session.close()
 
 
 @scheduler_fn.on_schedule(schedule=f"*/2 * * * *", memory=512)
 def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     db = firestore.client(app)
     tracking_controller = TrackingController(spotify, songstats, db)
-    eval_controller = EvalController(spotify, youtube, db)
+    eval_controller = EvalController(spotify, youtube, db, sql, tracking_controller)
     task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT)
 
     # does 300 evals per hours, doesn't care where they are in OB, TODO prios by oldest first so new artists go first
