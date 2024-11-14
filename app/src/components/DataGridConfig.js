@@ -53,7 +53,7 @@ import {functions} from "../firebase";
 
 export const defaultReportName = "New artist report"
 
-export const defaultColumnOrder = ['link_spotify', 'evaluation.status', 'evaluation.distributor', 'evaluation.back_catalog', 'statistic.spotify.monthly_listeners-latest']
+export const defaultColumnOrder = ['link_spotify', 'evaluation.status', 'evaluation.distributor', 'evaluation.back_catalog', 'statistic.30-latest']
 
 export const columnOptions = {
   "evaluation.distributor": {
@@ -226,7 +226,7 @@ export const buildColumnSelection = (columnOrder) => {
         // m = latest
         // let orderKey = c + "-" + m
         // let selected = columnOrder.includes(c + "-" + m)
-        columnSelection[c][m] = columnOrder.includes('statistic.'+columnOptions[c]['keyName'] + "-" + m)
+        columnSelection[c][m] = columnOrder.includes('statistic.'+columnOptions[c]['statTypeId'] + "-" + m)
       })
     }
   })

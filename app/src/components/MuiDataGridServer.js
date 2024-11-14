@@ -81,6 +81,7 @@ const applyColumnOrder = (currentOrder, selectedColumns) => {
           currentOrder = currentOrder.filter(element => element != key)
       }
     })
+    console.log(currentOrder)
     return currentOrder
   }
   

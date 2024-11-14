@@ -141,7 +141,6 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly) => {
           columns.push(columnOptions[key])
       }
     })
-    // console.log(selection)
     return columns
   }
 
@@ -188,7 +187,6 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     )
 
     const raw_data = artistsError || artistsLoading ? [] : artists.docs.map((d) => d.data())
-
     // const columns = [
     //     { field: 'col1', headerName: 'Column 1', width: 150 },
     //     { field: 'col2', headerName: 'Column 2', width: 150 },
@@ -201,7 +199,6 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     const [filterValue, setFilterValue] = useState(deepCopy(initialFilterValues))
 
     const applyColumnSelection = (selection) => {
-        console.log(selection)
         setColumnOrder(deepCopy(applyColumnOrder(columnOrder, selection)))
     }
 
