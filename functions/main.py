@@ -62,8 +62,11 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-
-        return artist_controller.get_artists_test(flask.request.get_json(), app)
+        if (flask.request.is_json):
+            data = flask.request.get_json()
+        else:
+            data = {}
+        return artist_controller.get_artists_test(data, app)
 
         # old_artists = db.collection("artists_v2").limit(15).get()
         # tracking_controller.import_sql(old_artists)
@@ -239,7 +242,9 @@ def add_artist(req: https_fn.CallableRequest):
         raise e.to_https_fn_error()
 
 
-@https_fn.on_call()
+@https_fn.on_call(cors=options.CorsOptions(
+        cors_origins="*",
+        cors_methods=["get", "post", "options"]))
 def get_statistic_types(req: https_fn.CallableRequest):
     sql_session = sql.get_session()
     types = sql_session.scalars(select(StatisticType)).all()
@@ -247,7 +252,9 @@ def get_statistic_types(req: https_fn.CallableRequest):
     return list(map(lambda type: type.as_dict(), types))
 
 
-@https_fn.on_call()
+@https_fn.on_call(cors=options.CorsOptions(
+        cors_origins="*",
+        cors_methods=["get", "post", "options"]))
 def get_artists(req: https_fn.CallableRequest):
 
     return artists.get_artists(req.auth.uid, req.data, app)

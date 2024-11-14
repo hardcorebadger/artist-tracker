@@ -478,6 +478,8 @@ class TrackingController():
                       continue
                   statSource = keyStr.split('_')[1].split('__')[0]
                   statName = keyStr.split('__')[1]
+                  if statName == 'monthly_listeners_current':
+                      statName = 'monthly_listeners'
                   newStatType = None
                   for statType in stat_types:
                       if statType.source == statSource and statType.key == statName:

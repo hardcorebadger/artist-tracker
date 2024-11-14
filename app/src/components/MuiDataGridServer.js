@@ -46,8 +46,15 @@ const compareState = (
 const metricColumnFactory = (metric, func) => ({
     field: metric + "-" + func,
     headerName: columnOptions[metric].headerName + " (" + metricFunctions[func].headerName + ")",
-    valueGetter: (value, row) => row['statistics'].filter((stat) => stat['statistic_type_id'] === columnOptions[metric].statTypeId)[0][func],
-
+    valueGetter: (value, row) => {
+        if (row && row['statistics']) {
+             const filtered = row['statistics'].filter((stat) => stat['statistic_type_id'] === columnOptions[metric]?.statTypeId)
+             if (filtered.length > 0 && func in filtered[0]) {
+                 return filtered[0][func]
+             }
+        }
+        return 'n/a'
+    },
     ...metricFunctions[func].options
 })
 
@@ -139,7 +146,6 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                 pageSize: paginationModel.pageSize,
                 sortModel,
                 filterModel});
-
             setRows({
                 rows: resp.data.rows,
                 rowCount: resp.data.rowCount
