@@ -194,7 +194,7 @@ def fn_v1_api(req: https_fn.Request) -> https_fn.Response:
 @scheduler_fn.on_schedule(schedule=f"*/2 * * * *", memory=512)
 def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     db = firestore.client(app)
-    tracking_controller = TrackingController(spotify, songstats, db)
+    tracking_controller = TrackingController(spotify, songstats, sql, db)
     eval_controller = EvalController(spotify, youtube, db, sql, tracking_controller)
     task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT)
 
@@ -214,7 +214,7 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
 @https_fn.on_call()
 def add_artist(req: https_fn.CallableRequest):
     db = firestore.client(app)
-    tracking_controller = TrackingController(spotify, songstats, db)
+    tracking_controller = TrackingController(spotify, songstats, sql, db)
     # Message text passed from the client.
     try:
         spotify_url = req.data["spotify_url"]

@@ -24,6 +24,7 @@ class ArtistController():
         # req.data = {'groupKeys': [], 'paginationModel': {'page': 0, 'pageSize': 10}, 'sortModel': [], 'filterModel': {'items': [], 'logicOperator': 'and', 'quickFilterValues': [], 'quickFilterLogicOperator': 'and'}, 'start': 0, 'end': 9}
         db = firestore.client(app)
         # How to get the user and the org IDs
+
         page = int(data.get('page', 0))
         page_size = int(data.get('pageSize', 10))
 
