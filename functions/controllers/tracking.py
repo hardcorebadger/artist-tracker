@@ -518,7 +518,10 @@ class TrackingController():
                           previous: float = valueSet[len(valueSet) - 2]
 
                       wow = 0 if previous <= 0 else (latest - previous) / previous
-                      mom = 0 if valueSet[3] <= 0 else (valueSet[7] - valueSet[3]) / valueSet[3]
+                      if len(valueSet) == 8:
+                          mom = 0 if valueSet[3] <= 0 else (valueSet[7] - valueSet[3]) / valueSet[3]
+                      else:
+                          mom = None
                       stats.append(Statistic(
                           type=newStatType,
                           latest=latest,
