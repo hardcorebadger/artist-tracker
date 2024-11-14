@@ -380,7 +380,7 @@ class TrackingController():
   def convert_artist_link(self, link, sources):
       sources = list(filter(lambda s: s.key == link.get('source'), sources))
       if len(sources) == 0:
-          print("No valid source: " + link.get('source'))
+          print("No valid source: " + link.get('source') + ' ' + link.get('url'))
           exit(1)
 
       source: LinkSource = sources[0]

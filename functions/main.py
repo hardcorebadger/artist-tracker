@@ -1,3 +1,4 @@
+import math
 from array import array
 
 from firebase_admin import initialize_app, firestore
@@ -68,8 +69,25 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
             data = {}
         return artist_controller.get_artists_test(data, app)
 
-        # old_artists = db.collection("artists_v2").limit(15).get()
-        # tracking_controller.import_sql(old_artists)
+    @v2_api.post("/import-artists")
+    def import_artists():
+        if (flask.request.is_json):
+            data = flask.request.get_json()
+        else:
+            data = {}
+
+        count = int(data.get('size', 50))
+        page = int(data.get('page', 0))
+        offset = page * count
+
+        old_artists = db.collection("artists_v2").limit(count).offset(offset).get()
+        tracking_controller.import_sql(old_artists)
+
+        return {
+            'totalPages': math.ceil(db.collection('artists_v2').count() / count),
+            'page': page,
+            'size': count
+        }, 200
         # return 'success'
         # dump_unclean(db)
         # migrate_add_favs_and_tags(db)
