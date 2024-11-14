@@ -1,3 +1,5 @@
+import time
+
 from google.cloud.firestore_v1.query_results import QueryResultsList
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -421,130 +423,145 @@ class TrackingController():
 
       spotifys = list(map(lambda x: x.get('spotify_id'), old_artists))
       existing = sql_session.scalars(select(Artist).where(Artist.spotify_id.in_(spotifys))).all()
+      imported = 0
+      skipped = 0
+      fails = {}
+      start = time.time()
       for artist in old_artists:
           spotify_id = artist.get('spotify_id')
           add_batch = list()
           existingMatches = list(filter(lambda x: x.spotify_id == spotify_id, existing))
           if len(existingMatches) > 0:
+              skipped += 1
               print("Skipping existing artist: " + spotify_id + ' ' + str(existingMatches[0].id))
               continue
           else:
               print("Adding artist: " + spotify_id)
-              orgs = list()
-              for orgId, watchDetails in artist.get('watching_details').items():
-                  added_by = watchDetails.get('added_by', None)
-                  if added_by is None:
-                      for user_id, found_details in artist.get('found_by_details').items():
-                            if userOrgs[user_id] == orgId or found_details.get('found_on') == watchDetails.get('added_on'):
-                                added_by = user_id
+              try:
+                  orgs = list()
+                  for orgId, watchDetails in artist.get('watching_details').items():
+                      added_by = watchDetails.get('added_by', None)
+                      if added_by is None:
+                          for user_id, found_details in artist.get('found_by_details').items():
+                                if userOrgs[user_id] == orgId or found_details.get('found_on') == watchDetails.get('added_on'):
+                                    added_by = user_id
 
-                  orgs.append(OrganizationArtist(
-                      organization_id=orgId,
-                      added_by=added_by,
-                      favorite=watchDetails.get('favorite'),
-                      created_at=watchDetails.get('added_on'),
-                  ))
-              eval = None
-              if artist.get('eval_as_of') != None:
-                  status = 1
-                  if artist.get('eval_status') == 'dirty':
-                      status = 2
-                  elif artist.get('eval_status') == 'unsigned':
-                      status = 0
+                      orgs.append(OrganizationArtist(
+                          organization_id=orgId,
+                          added_by=added_by,
+                          favorite=watchDetails.get('favorite'),
+                          created_at=watchDetails.get('added_on'),
+                      ))
+                  eval = None
+                  if artist.get('eval_as_of') != None:
+                      status = 1
+                      if artist.get('eval_status') == 'dirty':
+                          status = 2
+                      elif artist.get('eval_status') == 'unsigned':
+                          status = 0
 
-                  if artist.get('eval_distro_type') == 'indie':
-                      distributor_type = 1
-                  elif artist.get('eval_distro_type') == 'major':
-                      distributor_type = 2
-                  elif artist.get('eval_distro_type') == 'diy':
-                      distributor_type = 0
-                  else:
-                      distributor_type = 3
-                  eval = Evaluation(
-                      distributor=artist.get('eval_distro'),
-                      distributor_type=distributor_type,
-                      label=artist.get('eval_label'),
-                      created_at=artist.get('eval_as_of'),
-                      status=status
-                  )
-              stats = list()
-              stat_dates = artist.get('stat_dates')
-              for key, value in artist.to_dict().items():
-                  keyStr: str = key
-
-                  if not keyStr.startswith('stat_'):
-                      continue
-                  if keyStr == 'stat_dates':
-                      continue
-                  statSource = keyStr.split('_')[1].split('__')[0]
-                  statName = keyStr.split('__')[1]
-                  if statName == 'monthly_listeners_current':
-                      statName = 'monthly_listeners'
-                  newStatType = None
-                  for statType in stat_types:
-                      if statType.source == statSource and statType.key == statName:
-                          newStatType = statType
-                          break
-
-                  if newStatType == None:
-                      newStatType = StatisticType(
-                          name=statName,
-                          key=statName,
-                          source=statSource,
-                          format='int'
+                      if artist.get('eval_distro_type') == 'indie':
+                          distributor_type = 1
+                      elif artist.get('eval_distro_type') == 'major':
+                          distributor_type = 2
+                      elif artist.get('eval_distro_type') == 'diy':
+                          distributor_type = 0
+                      else:
+                          distributor_type = 3
+                      eval = Evaluation(
+                          distributor=artist.get('eval_distro'),
+                          distributor_type=distributor_type,
+                          label=artist.get('eval_label'),
+                          created_at=artist.get('eval_as_of'),
+                          status=status
                       )
-                      sql_session.add(newStatType)
+                  stats = list()
+                  stat_dates = artist.get('stat_dates')
+                  for key, value in artist.to_dict().items():
+                      keyStr: str = key
+
+                      if not keyStr.startswith('stat_'):
+                          continue
+                      if keyStr == 'stat_dates':
+                          continue
+                      statSource = keyStr.split('_')[1].split('__')[0]
+                      statName = keyStr.split('__')[1]
+                      if statName == 'monthly_listeners_current':
+                          statName = 'monthly_listeners'
+                      newStatType = None
+                      for statType in stat_types:
+                          if statType.source == statSource and statType.key == statName:
+                              newStatType = statType
+                              break
+
+                      if newStatType == None:
+                          newStatType = StatisticType(
+                              name=statName,
+                              key=statName,
+                              source=statSource,
+                              format='int'
+                          )
+                          sql_session.add(newStatType)
+                          sql_session.commit()
+                          print("ADDING TYPE: " + statName)
+                          stat_types = list(sql_session.scalars(select(StatisticType)).all())
+
+                      if len(value) == 0:
+                          continue
+                      if newStatType.format == 'int':
+                          valueSet = list(map(int, value))
+                          latest: int = valueSet[len(valueSet) - 1]
+                          previous: int = valueSet[len(valueSet) - 2]
+                      else:
+                          valueSet = list(map(float, value))
+                          latest: float = valueSet[len(valueSet) - 1]
+                          previous: float = valueSet[len(valueSet) - 2]
+
+                      wow = 0 if previous <= 0 else (latest - previous) / previous
+                      mom = 0 if valueSet[3] <= 0 else (valueSet[7] - valueSet[3]) / valueSet[3]
+                      stats.append(Statistic(
+                          type=newStatType,
+                          latest=latest,
+                          previous=previous,
+                          max=max(valueSet),
+                          min=min(valueSet),
+                          avg=sum(valueSet) / len(valueSet),
+                          data=valueSet,
+                          week_over_week=wow,
+                          month_over_month=mom,
+                          last_date=stat_dates[len(stat_dates) - 1],
+                      ))
+                  userArtists = list()
+                  for user_id, found_details in artist.get('found_by_details').items():
+                      userArtists.append(UserArtist(
+                          user_id=user_id,
+                          organization_id=userOrgs[user_id],
+                          created_at=found_details.get('found_on')
+                      ))
+                  add_batch.append(Artist(
+                      spotify_id=spotify_id,
+                      name=artist.get('name'),
+                      avatar=artist.get('avatar'),
+                      onboard_wait_until=None,
+                      links=list(map(lambda x: self.convert_artist_link(x, link_sources), artist.get('links'))),
+                      organizations=orgs,
+                      evaluation=eval,
+                      statistics=stats,
+                      users=userArtists
+                  ))
+
+                  if len(add_batch) > 0:
+                      sql_session.add_all(add_batch)
                       sql_session.commit()
-                      print("ADDING TYPE: " + statName)
-                      stat_types = list(sql_session.scalars(select(StatisticType)).all())
+                      add_batch.clear()
+                      imported += 1
+              except Exception as e:
+                  fails[artist.get('spotify_id')] = repr(e)
 
-                  if len(value) == 0:
-                      continue
-                  if newStatType.format == 'int':
-                      valueSet = list(map(int, value))
-                      latest: int = valueSet[len(valueSet) - 1]
-                      previous: int = valueSet[len(valueSet) - 2]
-                  else:
-                      valueSet = list(map(float, value))
-                      latest: float = valueSet[len(valueSet) - 1]
-                      previous: float = valueSet[len(valueSet) - 2]
-
-                  wow = 0 if previous <= 0 else (latest - previous) / previous
-                  mom = 0 if valueSet[3] <= 0 else (valueSet[7] - valueSet[3]) / valueSet[3]
-                  stats.append(Statistic(
-                      type=newStatType,
-                      latest=latest,
-                      previous=previous,
-                      max=max(valueSet),
-                      min=min(valueSet),
-                      avg=sum(valueSet) / len(valueSet),
-                      data=valueSet,
-                      week_over_week=wow,
-                      month_over_month=mom,
-                      last_date=stat_dates[len(stat_dates) - 1],
-                  ))
-              userArtists = list()
-              for user_id, found_details in artist.get('found_by_details').items():
-                  userArtists.append(UserArtist(
-                      user_id=user_id,
-                      organization_id=userOrgs[user_id],
-                      created_at=found_details.get('found_on')
-                  ))
-              add_batch.append(Artist(
-                  spotify_id=spotify_id,
-                  name=artist.get('name'),
-                  avatar=artist.get('avatar'),
-                  onboard_wait_until=None,
-                  links=list(map(lambda x: self.convert_artist_link(x, link_sources), artist.get('links'))),
-                  organizations=orgs,
-                  evaluation=eval,
-                  statistics=stats,
-                  users=userArtists
-              ))
-
-          if len(add_batch) > 0:
-              sql_session.add_all(add_batch)
-              sql_session.commit()
-              add_batch.clear()
 
       sql_session.close()
+      end = time.time()
+      avg = 0
+      if imported > 0:
+        avg = (end-start) / imported
+      return imported, skipped, avg, fails

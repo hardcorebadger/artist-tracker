@@ -79,14 +79,18 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         count = int(data.get('size', 50))
         page = int(data.get('page', 0))
         offset = page * count
-
+        total = int(db.collection('artists_v2').count().get()[0][0].value)
         old_artists = db.collection("artists_v2").limit(count).offset(offset).get()
-        tracking_controller.import_sql(old_artists)
+        imported, skipped, avg, fails = tracking_controller.import_sql(old_artists)
 
         return {
-            'totalPages': math.ceil(db.collection('artists_v2').count() / count),
+            'totalPages': math.ceil(total / count),
             'page': page,
-            'size': count
+            'size': count,
+            'imported': imported,
+            'skipped': skipped,
+            'avgTime': avg,
+            'errors': fails
         }, 200
         # return 'success'
         # dump_unclean(db)
