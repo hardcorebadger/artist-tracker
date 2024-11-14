@@ -380,12 +380,18 @@ class TrackingController():
     return ids
 
   def convert_artist_link(self, link, sources):
+
       sources = list(filter(lambda s: s.key == link.get('source'), sources))
+
       if len(sources) == 0:
           print("No valid source: " + link.get('source') + ' ' + link.get('url'))
           exit(1)
 
+      url: str = link.get('url')
       source: LinkSource = sources[0]
+      if source.key == 'twitter' and 'x.com' in url:
+          source = list(filter(lambda s: s.key == 'x', sources))[0]
+
       source_parts = source.url_scheme.split('{identifier}')
       scheme_part_one = (source_parts[0]
                          .replace('https://', '')
@@ -403,7 +409,7 @@ class TrackingController():
       url_identifier = url_identifier.split("?")[0]
 
       return ArtistLink(
-          link_source_id=sources[0].id,
+          link_source_id=source.id,
           path=url_identifier,
       )
 
@@ -518,10 +524,10 @@ class TrackingController():
                           previous: float = valueSet[len(valueSet) - 2]
 
                       wow = 0 if previous <= 0 else (latest - previous) / previous
+
+                      mom = None
                       if len(valueSet) == 8:
                           mom = 0 if valueSet[3] <= 0 else (valueSet[7] - valueSet[3]) / valueSet[3]
-                      else:
-                          mom = None
                       stats.append(Statistic(
                           type=newStatType,
                           latest=latest,
@@ -553,7 +559,7 @@ class TrackingController():
                       users=userArtists
                   ))
 
-                  if len(add_batch) > 0:
+                  if len(add_batch) > 5:
                       sql_session.add_all(add_batch)
                       sql_session.commit()
                       add_batch.clear()

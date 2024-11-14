@@ -135,7 +135,7 @@ class Statistic(Base):
     latest = Column(Float, nullable=False)
     previous = Column(Float, nullable=False)
     week_over_week = Column(Float, nullable=False)
-    month_over_month = Column(Float, nullable=False)
+    month_over_month = Column(Float, nullable=True)
     min = Column(Float, nullable=False)
     max = Column(Float, nullable=False)
     avg = Column(Float, nullable=False)
