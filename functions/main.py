@@ -63,11 +63,11 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/debug")
     def debug():
 
-        # return artist_controller.get_artists_test(flask.request.get_json(), app)
+        return artist_controller.get_artists_test(flask.request.get_json(), app)
 
-        old_artists = db.collection("artists_v2").limit(15).get()
-        tracking_controller.import_sql(old_artists)
-        return 'success'
+        # old_artists = db.collection("artists_v2").limit(15).get()
+        # tracking_controller.import_sql(old_artists)
+        # return 'success'
         # dump_unclean(db)
         # migrate_add_favs_and_tags(db)
         # migrate_from_v1(airtable, spotify, tracking_controller)
