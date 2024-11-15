@@ -381,14 +381,14 @@ class TrackingController():
 
   def convert_artist_link(self, link, sources):
 
-      sources = list(filter(lambda s: s.key == link.get('source'), sources))
+      filtered_sources = list(filter(lambda s: s.key == link.get('source'), sources))
 
       if len(sources) == 0:
           print("No valid source: " + link.get('source') + ' ' + link.get('url'))
           exit(1)
 
       url: str = link.get('url')
-      source: LinkSource = sources[0]
+      source: LinkSource = filtered_sources[0]
       if source.key == 'twitter' and 'x.com' in url:
           source = list(filter(lambda s: s.key == 'x', sources))[0]
 
@@ -547,19 +547,25 @@ class TrackingController():
                           organization_id=userOrgs[user_id],
                           created_at=found_details.get('found_on')
                       ))
+                  links = list(map(lambda x: self.convert_artist_link(x, link_sources), artist.get('links')))
+                  filtered_links = list()
+                  for link in links:
+                      if len(list(filter(lambda x: x.path == link.path and x.link_source_id == link.link_source_id, filtered_links))) > 0:
+                          continue
+                      filtered_links.append(link)
                   add_batch.append(Artist(
                       spotify_id=spotify_id,
                       name=artist.get('name'),
                       avatar=artist.get('avatar'),
                       onboard_wait_until=None,
-                      links=list(map(lambda x: self.convert_artist_link(x, link_sources), artist.get('links'))),
+                      links=filtered_links,
                       organizations=orgs,
                       evaluation=eval,
                       statistics=stats,
                       users=userArtists
                   ))
 
-                  if len(add_batch) > 5:
+                  if len(add_batch) > 0:
                       sql_session.add_all(add_batch)
                       sql_session.commit()
                       add_batch.clear()
