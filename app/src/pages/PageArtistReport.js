@@ -11,7 +11,7 @@ import { Box, Button, HStack, Heading, Skeleton, Text, VStack } from '@chakra-ui
 import {useContext, useEffect, useState} from 'react';
 import ArtistDetail from '../components/ArtistDetail';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
-import {StatisticTypeContext} from "../App";
+import {ColumnDataContext} from "../App";
 import {httpsCallable} from "firebase/functions";
 
 function PageArtistReport() {
@@ -24,14 +24,20 @@ function PageArtistReport() {
       snapshotListenOptions: { includeMetadataChanges: true },
     }
   )
-  const { statisticTypes, setStatisticTypes } = useContext(StatisticTypeContext);
-
+  const { statisticTypes, setStatisticTypes, linkSources, setLinkSources } = useContext(ColumnDataContext);
   useEffect(() => {
     if (statisticTypes == null || statisticTypes?.length === 0) {
       const getTypes = httpsCallable(functions, 'get_statistic_types')
       getTypes().then((response) => {
         setStatisticTypes(response.data)
       });
+    }
+
+    if (linkSources == null || linkSources?.length === 0) {
+      const getSources = httpsCallable(functions, 'get_link_sources')
+      getSources().then((response) => {
+        setLinkSources(response.data)
+      })
     }
   }, []);
 

@@ -70,36 +70,25 @@ export const columnOptions = {
   "evaluation.status": {
     field: 'evaluation.status',
     headerName: 'Status',
-    valueGetter: (value, row) =>  (row.evaluation ? (row.evaluation?.status === 0 ? 'unsigned' : 'signed') : 'unknown'),
     isMetric: false,
-    filterEditor: SelectFilter,
-    filterEditorProps: {
-      placeholder: 'All',
-      dataSource: [{id:'signed', label: 'Signed'}, {id:'unsigned', label: 'Unsigned'}]
-    },
-    render: row => <Badge colorScheme={row.value === 'signed' ? 'red' : 'green'}>{row.value}</Badge>,
-    defaultFilter: {
-      type: 'string',
-      operator: 'startsWith',
-      value: ''
-    }
+    valueGetter: (value, row) => row?.evaluation?.status,
+    valueOptions: [
+      {value: 1, label: 'Signed'}, {value: 0, label: 'Unsigned'}, {value: 2, label: 'Unknown'}
+    ],
+    // render: row => <Badge colorScheme={row.value === 'signed' ? 'red' : 'green'}>{row.value}</Badge>,
+    type: 'singleSelect',
+
   },
   "evaluation.distributor_type": {
     field: 'evaluation.distributor_type',
+    type: 'singleSelect',
     headerName: 'Distributor Type',
-    valueGetter: (value, row) => row.evaluation?.distributor_type === 1 ? 'indie' : (row.evaluation?.distributor_type === 2) ? 'major' : ('diy'),
+    valueGetter: (value, row) => row.evaluation?.distributor_type,
     isMetric: false,
-    filterEditor: SelectFilter,
-    render: row => <Badge colorScheme={row.value == 'diy' ? 'green' : row.value == 'indie' ? 'yellow' : 'red'}>{row.value}</Badge>,
-    filterEditorProps: {
-      placeholder: 'All',
-      dataSource: [{id:'diy', label: 'diy'}, {id:'major', label: 'major'}, {id:'indie', label: 'indie'}]
-    },
-    defaultFilter: {
-      type: 'string',
-      operator: 'startsWith',
-      value: ''
-    }
+    valueOptions: [
+      {value: 0, label: 'DIY'}, {value: 2, label: 'Major'}, {value: 1, label: 'Indie'}
+    ],
+
   },
   "evaluation.back_catalog": {
     field: 'evaluation.back_catalog',
@@ -107,22 +96,10 @@ export const columnOptions = {
     valueGetter: (value, row) => (row.evaluation?.status === 2 ? 'dirty' : 'clean'),
     isMetric: false,
     filterEditor: SelectFilter,
-    render: row => <Badge colorScheme={row.value == 'clean' ? 'green' : 'red'}>{row.value}</Badge>,
-    filterEditorProps: {
-      placeholder: 'All',
-      dataSource: [{id:'clean', label: 'clean'}, {id:'dirty', label: 'dirty'}]
-    },
-    defaultFilter: {
-      type: 'string',
-      operator: 'startsWith',
-      value: ''
-    }
-  },
-  "link_spotify": {
-    field: 'link_spotify',
-    headerName: 'Spotify URL',
-    render: row => <Link color='primary.500' href={row.value} isExternal>Spotify <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></Link>,
-    isMetric: false
+    valueOptions: [
+       {value:'clean', label: 'Clean'}, {value: 'dirty', label: 'Dirty'}
+    ],
+    type: 'singleSelect',
   },
   "genres": {
     field: 'genres',

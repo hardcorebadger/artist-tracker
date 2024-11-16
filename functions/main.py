@@ -273,6 +273,13 @@ def get_statistic_types(req: https_fn.CallableRequest):
     sql_session.close()
     return list(map(lambda type: type.as_dict(), types))
 
+@https_fn.on_call()
+def get_link_sources(req: https_fn.CallableRequest):
+    sql_session = sql.get_session()
+    types = sql_session.scalars(select(LinkSource)).all()
+    sql_session.close()
+    return list(map(lambda type: type.as_dict(), types))
+
 
 @https_fn.on_call(cors=options.CorsOptions(
         cors_origins="*",

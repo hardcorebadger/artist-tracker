@@ -1,4 +1,4 @@
-import { HStack, Text, VStack, IconButton, Button } from "@chakra-ui/react";
+import {HStack, Text, VStack, IconButton, Button, Link} from "@chakra-ui/react";
 import { DataGridPro } from '@mui/x-data-grid-pro';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
@@ -13,7 +13,7 @@ import { buildColumnSelection, columnOptions, metricFunctions } from "./DataGrid
 import { deepCompare, deepCopy } from "../util/objectUtil";
 import { httpsCallable } from "firebase/functions";
 import { functions } from '../firebase';
-import {StatisticTypeContext} from "../App";
+import {ColumnDataContext} from "../App";
 
 // MUI theme for the data grid
 const theme = createTheme({
@@ -86,7 +86,7 @@ const applyColumnOrder = (currentOrder, selectedColumns) => {
   }
   
 // given a column selection from available columns, build the columns for MUI format
-const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTypes) => {
+const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTypes, linkSources) => {
   let columns = [
     {
       field: 'name',
@@ -104,6 +104,19 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
           headerName:  sourceName +' ' + type['name'],
           statTypeId: type['id'],
           isMetric: true
+      }
+  }
+  for (let typeIndex in linkSources) {
+      const type = linkSources[typeIndex];
+      const key = 'link_' + type['key']
+      columnOptions[key] = {
+          field: key,
+          keyName: key,
+          filterable: false,
+          sortable: false,
+          headerName: type['display_name'] + ' Link',
+          render: row => <Link color='primary.500' href={row.value} isExternal>{type['display_name']} <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></Link>,
+          isMetric: false
       }
   }
   Object.keys(selection).forEach(key => {
@@ -128,7 +141,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     const [statTypes, setStatTypes] = useState(null)
     const [currentParams, setCurrentParams] = useState(null)
     const [currentRows, setCurrentRows] = useState(null)
-    const { statisticTypes, setStatisticTypes } = useContext(StatisticTypeContext);
+    const { statisticTypes, setStatisticTypes, linkSources } = useContext(ColumnDataContext);
 
     // Server side data source for the table
     const getArtists = httpsCallable(functions, 'get_artists')
@@ -202,7 +215,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     }
     
     // bake the columns for MUI based on current column order object
-    const columns = bakeColumns(buildColumnSelection(columnOrder), null, null, null, statisticTypes)
+    const columns = bakeColumns(buildColumnSelection(columnOrder), null, null, null, statisticTypes, linkSources)
 
     // check current state vs saved report config to see if we should show save button
     const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterValue)

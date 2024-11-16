@@ -474,10 +474,17 @@ class TrackingController():
                           distributor_type = 0
                       else:
                           distributor_type = 3
+
+                      distro = artist.get('eval_distro')
+                      label = artist.get('eval_label')
+                      if len(distro) == 0:
+                          distro = None
+                      if len(label) == 0:
+                          label = None
                       eval = Evaluation(
-                          distributor=artist.get('eval_distro'),
+                          distributor=distro,
                           distributor_type=distributor_type,
-                          label=artist.get('eval_label'),
+                          label=label,
                           created_at=artist.get('eval_as_of'),
                           status=status
                       )

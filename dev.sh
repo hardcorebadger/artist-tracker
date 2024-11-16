@@ -9,6 +9,8 @@ fi
 # deploy functions
 if [ "$1" = "functions" ] 
 then
+  export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
+  export no_proxy=*
   echo "[Indiestack] Running emulators for functions...";
   firebase emulators:start --only functions;
 fi
