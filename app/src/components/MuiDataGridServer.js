@@ -1,5 +1,5 @@
 import {HStack, Text, VStack, IconButton, Button, Link, Badge, chakra, Box} from "@chakra-ui/react";
-import { DataGridPro } from '@mui/x-data-grid-pro';
+import {DataGridPro, useGridApiContext, useGridApiRef} from '@mui/x-data-grid-pro';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
 import { red } from '@mui/material/colors';
@@ -85,7 +85,6 @@ const applyColumnOrder = (currentOrder, selectedColumns) => {
           currentOrder = currentOrder.filter(element => element != key)
       }
     })
-    console.log(currentOrder)
     return currentOrder
   }
   
@@ -96,6 +95,7 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
       field: 'name',
       headerName: "Artist",
       disableReorder: true,
+      order: 0,
       flex: 1,
       minWidth: 150,
       renderCell: (params) => (<strong>{params.value}</strong>)
@@ -126,23 +126,43 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
           isMetric: false
       }
   }
+
+
+
   Object.keys(selection).forEach(key => {
     if (columnOptions[key].isMetric) {
       Object.keys(selection[key]).forEach(subkey => {
-        if (selection[key][subkey]) {
-          columns.push(metricColumnFactory(key, subkey))
+        if (selection[key][subkey] !== -1) {
+            const colDef = metricColumnFactory(key, subkey)
+            colDef.order = selection[key][subkey] + 1
+          columns.push(colDef)
         }
       })
     } else {
-      if (selection[key])
-        columns.push(columnOptions[key])
+      if (selection[key] !== -1) {
+          const colDef = columnOptions[key];
+          colDef.order = selection[key] + 1
+          columns.push(colDef)
+      }
     }
   })
-  // console.log(selection)
-  return columns
+
+    columns = columns.sort(function(a,b){
+        return a.order > b.order ? 1: -1
+    })
+  return columns;
 }
 
-
+function array_move(arr, old_index, new_index) {
+    if (new_index >= arr.length) {
+        var k = new_index - arr.length + 1;
+        while (k--) {
+            arr.push(undefined);
+        }
+    }
+    arr.splice(new_index, 0, arr.splice(old_index, 1)[0]);
+    return arr; // for testing
+}
 
 export default function MuiDataGridController({initialReportName, initialColumnOrder, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
     const [statTypes, setStatTypes] = useState(null)
@@ -157,9 +177,14 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         page: 0,
         pageSize: 10,
     });
-    const [filterModel, setFilterModel] = useState({ items: [] });
     const [sortModel, setSortModel] = useState([]);
     const [dataIsLoading, setDataIsLoading] = useState(false)
+    const [columnOrder, setColumnOrder] = useState(deepCopy(initialColumnOrder))
+    if (!initialFilterValues.hasOwnProperty('items')) {
+        initialFilterValues = {items:[]}
+    }
+    const [filterModel, setFilterModel] = useState(deepCopy(initialFilterValues))
+    const apiRef = useGridApiRef();
 
     useEffect(() => {
         const fetcher = async () => {
@@ -207,9 +232,10 @@ export default function MuiDataGridController({initialReportName, initialColumnO
 
     const [reportName, setReportName] = useState(initialReportName)
 
-    const [columnOrder, setColumnOrder] = useState(deepCopy(initialColumnOrder))
 
-    const [filterValue, setFilterValue] = useState(deepCopy(initialFilterValues))
+    useEffect(() => {
+
+    }, [columnOrder, initialFilterValues]);
 
     // callback from the column menu to the grid to set the columns
     const applyColumnSelection = (selection) => {
@@ -220,21 +246,22 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     // reset to the saved version of the report
     const revertState = () => {
         setColumnOrder(deepCopy(initialColumnOrder))
-        setFilterValue(deepCopy(initialFilterValues))
+        setFilterModel(deepCopy(initialFilterValues))
         setReportName(initialReportName)
     }
 
     const handleColumnOrderChange = (change) => {
-      // console.log(change)
       const column = change.column.field
+      setColumnOrder( array_move(deepCopy(columnOrder), change.oldIndex -1, change.targetIndex -1))
+
       console.log(column + " moved from " + change.oldIndex + " to " + change.targetIndex)
     }
     
     // bake the columns for MUI based on current column order object
-    const columns = bakeColumns(buildColumnSelection(columnOrder), null, null, null, statisticTypes, linkSources)
+    const columns = bakeColumns(buildColumnSelection(columnOrder, true), null, null, null, statisticTypes, linkSources)
 
     // check current state vs saved report config to see if we should show save button
-    const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterValue)
+    const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterModel)
 
     return (
         
@@ -255,8 +282,8 @@ export default function MuiDataGridController({initialReportName, initialColumnO
           }
           <DataGridColumnMenu currentSelection={buildColumnSelection(columnOrder)} applySelection={applyColumnSelection} />
           {(hasBeenEdited && onSaveNew)&& <Button colorScheme='primary' variant='outline' onClick={revertState}>Revert</Button>}
-          {hasBeenEdited&& <Button colorScheme='primary' onClick={() => onSave(columnOrder, filterValue, reportName)}>Save</Button> }
-          {(hasBeenEdited && onSaveNew) && <Button colorScheme='primary' onClick={() => onSaveNew(columnOrder, filterValue, reportName)}>Save as New</Button>}
+          {hasBeenEdited&& <Button colorScheme='primary' onClick={() => onSave(columnOrder, filterModel, reportName)}>Save</Button> }
+          {(hasBeenEdited && onSaveNew) && <Button colorScheme='primary' onClick={() => onSaveNew(columnOrder, filterModel, reportName)}>Save as New</Button>}
         </HStack>
         
         </HStack>
@@ -287,17 +314,14 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                   onFilterModelChange={setFilterModel}
                   onColumnOrderChange={handleColumnOrderChange}
                   pagination
+                  ref={apiRef}
                   rowCount={rows?.rowCount ?? 0}
+                  filterModel={filterModel}
+                  sortModel={sortModel}
                   initialState={{
                     pagination: {
                       paginationModel: { pageSize: 20, page: 0 },
                       rowCount: 0,
-                    },
-                    filter: {
-                      filterModel: filterModel,
-                    },
-                    sort: {
-                      filterModel: sortModel,
                     },
                   }}
                   

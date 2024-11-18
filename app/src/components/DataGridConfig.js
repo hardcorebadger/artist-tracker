@@ -202,12 +202,13 @@ export const metricFunctions = {
 
 }
 
-export const buildColumnSelection = (columnOrder) => {
+export const buildColumnSelection = (columnOrder, withIndexes = false) => {
   let columnSelection = {}
   Object.keys(columnOptions).forEach(c => {
     let col = columnOptions[c]
     if (!col.isMetric) {
-      columnSelection[c] = columnOrder.includes(c)
+      const index = columnOrder.indexOf(c)
+      columnSelection[c] =  withIndexes ? (index) : (index !== -1)
     } else {
       columnSelection[c] = {}
       Object.keys(metricFunctions).forEach(m => {
@@ -215,7 +216,8 @@ export const buildColumnSelection = (columnOrder) => {
         // m = latest
         // let orderKey = c + "-" + m
         // let selected = columnOrder.includes(c + "-" + m)
-        columnSelection[c][m] = columnOrder.includes('statistic.'+columnOptions[c]['statTypeId'] + "-" + m)
+        const index =  columnOrder.indexOf('statistic.'+columnOptions[c]['statTypeId'] + "-" + m)
+        columnSelection[c][m] = withIndexes ? (index) : (index !== -1)
       })
     }
   })
@@ -235,5 +237,5 @@ export const buildDefaultFilters = () => {
         defaultFilters.push({field:option, ...columnOptions[option].defaultFilter})
     }
   })
-  return defaultFilters
+  return {items:defaultFilters}
 }
