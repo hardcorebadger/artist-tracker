@@ -3,6 +3,7 @@ import SelectFilter from '@inovua/reactdatagrid-community/SelectFilter'
 
 import {
   Badge,
+  Button,
   Link
 } from '@chakra-ui/react';
 import Iconify from '../components/Iconify';
@@ -12,7 +13,7 @@ import { Sparklines, SparklinesLine } from 'react-sparklines';
 import {useState} from "react";
 import {httpsCallable} from "firebase/functions";
 import {functions} from "../firebase";
-
+import {Chip} from '@mui/material';
 
 // const miniBarChartOptions = {
 //   chart: {
@@ -61,6 +62,7 @@ export const columnOptions = {
     valueGetter: (value, row) => row.evaluation?.distributor ?? 'N/A',
     headerName: 'Distributor',
     isMetric: false,
+    minWidth: 150,
     defaultFilter: {
       type: 'string',
       operator: 'startsWith',
@@ -71,11 +73,13 @@ export const columnOptions = {
     field: 'evaluation.status',
     headerName: 'Status',
     isMetric: false,
-    valueGetter: (value, row) => row?.evaluation?.status,
+    valueGetter: (value, row) => row.evaluation?.status === 0 ? 'Unsigned' :  row.evaluation?.status === 1 ? 'Signed' : 'Unknown' ,
     valueOptions: [
-      {value: 1, label: 'Signed'}, {value: 0, label: 'Unsigned'}, {value: 2, label: 'Unknown'}
+      {value: "Signed", label: 'Signed'}, {value: 'Unsigned', label: 'Unsigned'}, {value: 'Unknown', label: 'Unknown'}
     ],
-    // render: row => <Badge colorScheme={row.value === 'signed' ? 'red' : 'green'}>{row.value}</Badge>,
+    renderCell: (params) => (
+      <Chip variant="outlined" size='small' color={params.value == "Signed" ? "error" : params.value == "Unsigned" ? "primary" : "warning"} label={params.value} />
+    ),
     type: 'singleSelect',
 
   },
@@ -83,21 +87,27 @@ export const columnOptions = {
     field: 'evaluation.distributor_type',
     type: 'singleSelect',
     headerName: 'Distributor Type',
-    valueGetter: (value, row) => row.evaluation?.distributor_type,
+    valueGetter: (value, row) => row.evaluation?.distributor_type === 0 ? "DIY" : row.evaluation?.distributor_type === 1 ? "Indie" : "Major",
     isMetric: false,
     valueOptions: [
-      {value: 0, label: 'DIY'}, {value: 2, label: 'Major'}, {value: 1, label: 'Indie'}
+      {value: "DIY", label: 'DIY'}, {value: "Major", label: 'Major'}, {value: "Indie", label: 'Indie'}
     ],
+    renderCell: (params) => (
+      <Chip variant="outlined" size='small' color={params.value == "Major" ? "error" : params.value == "Indie" ? "warning" : "primary"} label={params.value} />
+    ),
 
   },
   "evaluation.back_catalog": {
     field: 'evaluation.back_catalog',
     headerName: 'Backcatalog Status',
-    valueGetter: (value, row) => (row.evaluation?.status === 2 ? 'dirty' : 'clean'),
+    valueGetter: (value, row) => (row.evaluation?.status === 2 ? 'Dirty' : 'Clean'),
+    renderCell: (params) => (
+      <Chip variant="outlined" size='small' color={params.value == "Dirty" ? "warning" : "primary"} label={params.value} />
+    ),
     isMetric: false,
     filterEditor: SelectFilter,
     valueOptions: [
-       {value:'clean', label: 'Clean'}, {value: 'dirty', label: 'Dirty'}
+       {value:'Clean', label: 'Clean'}, {value: 'Dirty', label: 'Dirty'}
     ],
     type: 'singleSelect',
   },
@@ -127,7 +137,7 @@ export const metricFunctions = {
       type: 'number',
       sortable: true,
       filterEditor: NumberFilter,
-      render: row => <span>{numeral(row.value).format('0.0a')}</span>
+      renderCell: (params) => <span>{numeral(params.value).format('0.0 a')}</span>
     }
   },
   "previous": {
@@ -141,7 +151,7 @@ export const metricFunctions = {
       type: 'number',
       sortable: true,
       filterEditor: NumberFilter,
-      render: row => <span>{numeral(row.value).format('0.0a')}</span>
+      renderCell: (params) => row => <span>{numeral(params.value).format('0.0a')}</span>
     }
   },
   "week_over_week": {
@@ -155,7 +165,7 @@ export const metricFunctions = {
       type: 'number',
       sortable: true,
       filterEditor: NumberFilter,
-      render: row => <span>{numeral(row.value).format('0.00%')}</span>
+      renderCell: (params) => <span>{numeral(params.value).format('0.00%')}</span>
     }
   },
   "month_over_month": {
@@ -169,7 +179,7 @@ export const metricFunctions = {
       type: 'number',
       sortable: true,
       filterEditor: NumberFilter,
-      render: row => <span>{numeral(row.value).format('0.00%')}</span>
+      renderCell: (params) => <span>{numeral(params.value).format('0.00%')}</span>
     }
   },
   "data": {
@@ -178,13 +188,15 @@ export const metricFunctions = {
     options: {
       type: 'number',
       sortable: false,
-      render: row => {
+      renderCell: (params) => {
+        // console.log(params)
         return (
-        <Sparklines data={row.value} min={0}>
+        <div style={{width:"100%", paddingTop: "5px"}}>
+        <Sparklines data={params.value} min={0} height={50} width={params.colDef.width}>
           <SparklinesLine color="#329795" />
         </Sparklines>
-        )
-      }
+        </div>
+      )},
     }
   }
 

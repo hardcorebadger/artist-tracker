@@ -1,4 +1,4 @@
-import {HStack, Text, VStack, IconButton, Button, Link} from "@chakra-ui/react";
+import {HStack, Text, VStack, IconButton, Button, Link, Badge, chakra, Box} from "@chakra-ui/react";
 import { DataGridPro } from '@mui/x-data-grid-pro';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
@@ -14,6 +14,10 @@ import { deepCompare, deepCopy } from "../util/objectUtil";
 import { httpsCallable } from "firebase/functions";
 import { functions } from '../firebase';
 import {ColumnDataContext} from "../App";
+import {Link as MUILink} from '@mui/material'
+import { Link as RouterLink } from "react-router-dom";
+
+// const ChakraDataGrid = chakra(DataGrid);
 
 // MUI theme for the data grid
 const theme = createTheme({
@@ -91,7 +95,10 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
     {
       field: 'name',
       headerName: "Artist",
-      disableReorder: true
+      disableReorder: true,
+      flex: 1,
+      minWidth: 150,
+      renderCell: (params) => (<strong>{params.value}</strong>)
     }
   ]
   for (let typeIndex in statTypes) {
@@ -115,7 +122,7 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
           filterable: false,
           sortable: false,
           headerName: type['display_name'] + ' Link',
-          render: row => <Link color='primary.500' href={row.value} isExternal>{type['display_name']} <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></Link>,
+          renderCell: (params) => ( <MUILink color='primary' href={params.value}>{type['display_name']} <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></MUILink> ),
           isMetric: false
       }
   }
@@ -152,14 +159,17 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     });
     const [filterModel, setFilterModel] = useState({ items: [] });
     const [sortModel, setSortModel] = useState([]);
+    const [dataIsLoading, setDataIsLoading] = useState(false)
 
     useEffect(() => {
         const fetcher = async () => {
+            setDataIsLoading(true)
             // fetch data from server
             const resp = await getArtists({page: paginationModel.page,
                 pageSize: paginationModel.pageSize,
                 sortModel,
                 filterModel});
+            setDataIsLoading(false)
             setRows({
                 rows: resp.data.rows,
                 rowCount: resp.data.rowCount
@@ -213,6 +223,12 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         setFilterValue(deepCopy(initialFilterValues))
         setReportName(initialReportName)
     }
+
+    const handleColumnOrderChange = (change) => {
+      // console.log(change)
+      const column = change.column.field
+      console.log(column + " moved from " + change.oldIndex + " to " + change.targetIndex)
+    }
     
     // bake the columns for MUI based on current column order object
     const columns = bakeColumns(buildColumnSelection(columnOrder), null, null, null, statisticTypes, linkSources)
@@ -244,19 +260,24 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         </HStack>
         
         </HStack>
+        <Box width="calc(100vw - 300px)">
         {/* This is MUI */}
+        <div
+          style={{
+              display: 'flex',
+              flexDirection: 'column',
+              height: 'calc(100vh - 175px)',
+
+          }}
+          >
         <ThemeProvider theme={theme}>
             {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
-            <CssBaseline />
-                <div
-                style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    minHeight: 'calc(100vh - 175px)',
-                }}
-                >
+            {/* <CssBaseline /> */}
+            
+               
                 <DataGridPro
                   columns={columns}
+                  loading={dataIsLoading}
                   rows={rows?.rows ?? []}
                   sortingMode="server"
                   filterMode="server"
@@ -264,18 +285,28 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                   onPaginationModelChange={setPaginationModel}
                   onSortModelChange={setSortModel}
                   onFilterModelChange={setFilterModel}
+                  onColumnOrderChange={handleColumnOrderChange}
                   pagination
                   rowCount={rows?.rowCount ?? 0}
                   initialState={{
                     pagination: {
-                      paginationModel: { pageSize: 10, page: 0 },
+                      paginationModel: { pageSize: 20, page: 0 },
                       rowCount: 0,
-                    }
+                    },
+                    filter: {
+                      filterModel: filterModel,
+                    },
+                    sort: {
+                      filterModel: sortModel,
+                    },
                   }}
+                  
                   pageSizeOptions={[10, 20, 50]}
                  />
-                </div>
+                
         </ThemeProvider>
+        </div>
+        </Box>
         {/* End MUI */}
       </VStack>
     )
