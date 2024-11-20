@@ -155,7 +155,7 @@ class ArtistController():
 
                     if sort['sort'] == 'desc':
                         column = getattr(dynamic_sort, statisticFunc).desc()
-                    query = query.join(dynamic_sort, Artist.id == dynamic_sort.artist_id).where(dynamic_sort.statistic_type_id == statisticId).order_by(column)
+                    query = query.outerjoin(dynamic_sort, Artist.id == dynamic_sort.artist_id).where(dynamic_sort.statistic_type_id == statisticId).order_by(column)
                     # query = query.filter(Artist.statistics.any(Statistic.statistic_type_id == statisticId & Statistic[statisticFunc] ))
                 elif sortFieldKey.startswith('evaluation'):
                     evalKey = sortFieldKey.split('.')
@@ -167,7 +167,7 @@ class ArtistController():
 
                     if sort['sort'] == 'desc':
                         column = getattr(tableAliased, evalKey).desc()
-                    query = query.join(tableAliased, Artist.evaluation_id == tableAliased.id).order_by(column)
+                    query = query.outerjoin(tableAliased, Artist.evaluation_id == tableAliased.id).order_by(column)
 
                 elif sortFieldKey.startswith('user'):
                     userKey = sortFieldKey.split('.')
@@ -177,7 +177,7 @@ class ArtistController():
 
                     if sort['sort'] == 'desc':
                         column = getattr(tableAliased, userKey).desc()
-                    query = query.join(tableAliased, Artist.id == tableAliased.artist_id).where(tableAliased.organization_id == user_data['organization']).order_by(column)
+                    query = query.outerjoin(tableAliased, Artist.id == tableAliased.artist_id).where(tableAliased.organization_id == user_data['organization']).order_by(column)
                 else:
                     column = Artist.__table__.columns[sortFieldKey].asc()
 
