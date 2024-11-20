@@ -1,5 +1,5 @@
-import NumberFilter from '@inovua/reactdatagrid-community/NumberFilter'
-import SelectFilter from '@inovua/reactdatagrid-community/SelectFilter'
+// import NumberFilter from '@inovua/reactdatagrid-community/NumberFilter'
+// import SelectFilter from '@inovua/reactdatagrid-community/SelectFilter'
 
 import {
   Badge,
@@ -59,7 +59,7 @@ export const defaultColumnOrder = ['link_spotify', 'evaluation.status', 'evaluat
 export const columnOptions = {
   "evaluation.distributor": {
     field: 'evaluation.distributor',
-    valueGetter: (value, row) => row.evaluation?.distributor ?? 'N/A',
+    valueGetter: (data) => data.row?.evaluation?.distributor ?? 'N/A',
     headerName: 'Distributor',
     isMetric: false,
     minWidth: 150,
@@ -72,7 +72,7 @@ export const columnOptions = {
     field: 'evaluation.status',
     headerName: 'Status',
     isMetric: false,
-    valueGetter: (value, row) => row.evaluation?.status === 0 ? 'Unsigned' :  row.evaluation?.status === 1 ? 'Signed' : 'Unknown' ,
+    valueGetter: (data) => data.row?.evaluation?.status === 0 ? 'Unsigned' :  data.row?.evaluation?.status === 1 ? 'Signed' : 'Unknown' ,
     valueOptions: [
       {value: "Signed", label: 'Signed'}, {value: 'Unsigned', label: 'Unsigned'}, {value: 'Unknown', label: 'Unknown'}
     ],
@@ -86,7 +86,7 @@ export const columnOptions = {
     field: 'evaluation.distributor_type',
     type: 'singleSelect',
     headerName: 'Distributor Type',
-    valueGetter: (value, row) => row.evaluation?.distributor_type === 0 ? "DIY" : row.evaluation?.distributor_type === 1 ? "Indie" : "Major",
+    valueGetter: (data) => data.row?.evaluation?.distributor_type === 0 ? "DIY" : data.row?.evaluation?.distributor_type === 1 ? "Indie" : "Major",
     isMetric: false,
     valueOptions: [
       {value: "DIY", label: 'DIY'}, {value: "Major", label: 'Major'}, {value: "Indie", label: 'Indie'}
@@ -99,12 +99,12 @@ export const columnOptions = {
   "evaluation.back_catalog": {
     field: 'evaluation.back_catalog',
     headerName: 'Backcatalog Status',
-    valueGetter: (value, row) => (row.evaluation?.status === 2 ? 'Dirty' : 'Clean'),
+    valueGetter: (data) => (data.row?.evaluation?.status === 2 ? 'Dirty' : 'Clean'),
     renderCell: (params) => (
       <Chip variant="outlined" size='small' color={params.value == "Dirty" ? "warning" : "primary"} label={params.value} />
     ),
     isMetric: false,
-    filterEditor: SelectFilter,
+    // filterEditor: SelectFilter,
     valueOptions: [
        {value:'Clean', label: 'Clean'}, {value: 'Dirty', label: 'Dirty'}
     ],
@@ -135,7 +135,7 @@ export const metricFunctions = {
     options: {
       type: 'number',
       sortable: true,
-      filterEditor: NumberFilter,
+      // filterEditor: NumberFilter,
       renderCell: (params) => <span>{numeral(params.value).format('0.0 a')}</span>
     }
   },
@@ -149,7 +149,7 @@ export const metricFunctions = {
     options: {
       type: 'number',
       sortable: true,
-      filterEditor: NumberFilter,
+      // filterEditor: NumberFilter,
       renderCell: (params) => row => <span>{numeral(params.value).format('0.0a')}</span>
     }
   },
@@ -163,7 +163,7 @@ export const metricFunctions = {
     options: {
       type: 'number',
       sortable: true,
-      filterEditor: NumberFilter,
+      // filterEditor: NumberFilter,
       renderCell: (params) => <span>{numeral(params.value).format('0.00%')}</span>
     }
   },
@@ -177,7 +177,7 @@ export const metricFunctions = {
     options: {
       type: 'number',
       sortable: true,
-      filterEditor: NumberFilter,
+      // filterEditor: NumberFilter,
       renderCell: (params) => <span>{numeral(params.value).format('0.00%')}</span>
     }
   },
@@ -188,10 +188,9 @@ export const metricFunctions = {
       type: 'number',
       sortable: false,
       renderCell: (params) => {
-        // console.log(params)
         return (
         <div style={{width:"100%", paddingTop: "5px"}}>
-        <Sparklines data={params.value} min={0} height={50} width={params.colDef.width}>
+        <Sparklines data={params.value ? params.value : []} min={0} height={50} width={params.colDef.width}>
           <SparklinesLine color="#329795" />
         </Sparklines>
         </div>
@@ -203,11 +202,16 @@ export const metricFunctions = {
 
 export const buildColumnSelection = (columnOrder, withIndexes = false) => {
   let columnSelection = {}
+  columnSelection['link'] = {};
   Object.keys(columnOptions).forEach(c => {
     let col = columnOptions[c]
     if (!col.isMetric) {
       const index = columnOrder.indexOf(c)
-      columnSelection[c] =  withIndexes ? (index) : (index !== -1)
+      if (c.startsWith('link_')) {
+        columnSelection['link'][c.split('link_')[1]] =  withIndexes ? (index) : (index !== -1)
+      } else {
+        columnSelection[c] = withIndexes ? (index) : (index !== -1)
+      }
     } else {
       columnSelection[c] = {}
       Object.keys(metricFunctions).forEach(m => {

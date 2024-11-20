@@ -27,9 +27,16 @@ import { columnOptions, metricFunctions } from './DataGridConfig';
 const countColumns = (selection) => {
   let count = 0
   Object.keys(selection).forEach(key => {
+    if (key === 'link') {
+      Object.keys(selection[key]).forEach(linkSource => {
+        if (selection[key][linkSource] !== -1 && selection[key][linkSource] !== false) {
+          count++
+        }
+      })
+    } else
     if (columnOptions[key].isMetric) {
       Object.keys(selection[key]).forEach(subkey => {
-        if (selection[key][subkey]) {
+        if (selection[key][subkey] !== false && selection[key][subkey] !== -1) {
           count++
         }
       })

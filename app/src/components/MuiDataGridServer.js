@@ -50,12 +50,15 @@ const compareState = (
 const metricColumnFactory = (metric, func) => ({
     field: metric + "-" + func,
     headerName: columnOptions[metric].headerName + " (" + metricFunctions[func].headerName + ")",
-    valueGetter: (value, row) => {
-        if (row && row['statistics']) {
-             const filtered = row['statistics'].filter((stat) => stat['statistic_type_id'] === columnOptions[metric]?.statTypeId)
+    valueGetter: (data) => {
+        if (data?.row && data.row['statistics']) {
+             const filtered = data.row['statistics'].filter((stat) => stat['statistic_type_id'] === columnOptions[metric]?.statTypeId)
              if (filtered.length > 0 && func in filtered[0]) {
                  return filtered[0][func]
              }
+        }
+        if (func === 'data') {
+            return null
         }
         return 'n/a'
     },
@@ -65,6 +68,20 @@ const metricColumnFactory = (metric, func) => ({
 // given a new column selection from the selector menu, build a new column order based on current ordering
 const applyColumnOrder = (currentOrder, selectedColumns) => {
     Object.keys(selectedColumns).forEach(key => {
+      if (key === 'link') {
+          Object.keys(selectedColumns[key]).forEach(linkSource => {
+              const col = key+"_"+linkSource
+              if (selectedColumns[key][linkSource]) {
+                  if (!currentOrder.includes(col)) {
+                      currentOrder.push(col)
+                  }
+              } else {
+                  if (currentOrder.includes(col)) {
+                      currentOrder = currentOrder.filter(element => element != col)
+                  }
+              }
+          })
+      } else
       if (columnOptions[key].isMetric) {
         Object.keys(selectedColumns[key]).forEach(subkey => {
           const col = key+"-"+subkey
@@ -98,6 +115,7 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
       order: 0,
       flex: 1,
       minWidth: 150,
+      cellClassName: 'hover-cell',
       renderCell: (params) => (<strong>{params.value}</strong>)
     }
   ]
@@ -130,7 +148,16 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
 
 
   Object.keys(selection).forEach(key => {
-    if (columnOptions[key].isMetric) {
+      if (key === 'link') {
+          Object.keys(selection[key]).forEach(linkSource => {
+              if (selection[key][linkSource] !== -1) {
+                  let colDef = columnOptions['link_' + linkSource]
+                  colDef['source'] = linkSource
+                  colDef['order'] = selection[key][linkSource] + 1
+                  columns.push(colDef)
+              }
+          })
+      } else if (columnOptions[key].isMetric) {
       Object.keys(selection[key]).forEach(subkey => {
         if (selection[key][subkey] !== -1) {
             const colDef = metricColumnFactory(key, subkey)
@@ -240,7 +267,6 @@ export default function MuiDataGridController({initialReportName, initialColumnO
 
     // callback from the column menu to the grid to set the columns
     const applyColumnSelection = (selection) => {
-        console.log(selection)
         setColumnOrder(deepCopy(applyColumnOrder(columnOrder, selection)))
     }
 
@@ -255,7 +281,6 @@ export default function MuiDataGridController({initialReportName, initialColumnO
       const column = change.column.field
       setColumnOrder( array_move(deepCopy(columnOrder), change.oldIndex -1, change.targetIndex -1))
 
-      console.log(column + " moved from " + change.oldIndex + " to " + change.targetIndex)
     }
     
     // bake the columns for MUI based on current column order object
@@ -316,10 +341,11 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                   onColumnOrderChange={handleColumnOrderChange}
                   pagination
                   ref={apiRef}
-                  onRowClick={(e) => {
-                      console.log(rows?.rows)
-                      const artist = rows?.rows?.filter((row) => row?.id == e.id).pop()
-                      onOpenArtist(artist)
+                  onCellClick={(e) => {
+                      if (e.field === 'name') {
+                          const artist = rows?.rows?.filter((row) => row?.id == e.id).pop()
+                          onOpenArtist(artist)
+                      }
                   }}
                   rowCount={rows?.rowCount ?? 0}
                   filterModel={filterModel}

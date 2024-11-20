@@ -1,6 +1,5 @@
 // import DataGrid2 from '../components/DataGrid2';
 import MuiDataGridController from '../components/MuiDataGridServer'
-// import { defaultColumnOrder, defaultColumnSelection, buildDefaultFilters } from '../components/DataGridConfig';
 import { setDoc, doc, getDoc, addDoc, collection, deleteDoc } from 'firebase/firestore';
 import {db, functions} from '../firebase';
 import { useUser } from '../routing/AuthGuard';

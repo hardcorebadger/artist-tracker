@@ -4,7 +4,11 @@ import * as ReactDOM from 'react-dom/client';
 import App from './App';
 import reportWebVitals from './chakra/reportWebVitals';
 import * as serviceWorker from './chakra/serviceWorker';
-import { LicenseInfo } from '@mui/x-license';
+import {LicenseInfo} from "@mui/x-data-grid-pro";
+import curry from "@inovua/reactdatagrid-community/packages/select-parent/curry";
+
+import './style/styles.css'
+
 
 const container = document.getElementById('root');
 const root = ReactDOM.createRoot(container);
