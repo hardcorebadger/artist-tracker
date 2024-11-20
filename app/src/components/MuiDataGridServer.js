@@ -133,10 +133,12 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
   }
   for (let typeIndex in linkSources) {
       const type = linkSources[typeIndex];
+
       const key = 'link_' + type['key']
       columnOptions[key] = {
           field: key,
           keyName: key,
+          social: type['social'],
           filterable: false,
           sortable: false,
           headerName: type['display_name'] + ' Link',

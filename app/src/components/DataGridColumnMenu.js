@@ -56,7 +56,7 @@ export default function DatGridColumnMenu({currentSelection, applySelection}) {
   const [columnSelection, setColumnSelection] = useState({'link': {}})
 
   const setColumn = (val, col, sub) => {
-    if (col.startsWith('link')) {
+    if (col === 'link') {
        columnSelection['link'][sub] = val
     } else
     if (columnOptions[col].isMetric)
@@ -80,10 +80,16 @@ export default function DatGridColumnMenu({currentSelection, applySelection}) {
     setColumnSelection({...currentSelection})
     onClose()
   }
+  let total_social_links_enabled = 0;
   let total_links_enabled = 0
   Object.keys(columnSelection['link']).forEach(subkey => {
-    if (columnSelection['link'][subkey])
-      total_links_enabled++
+    if (columnSelection['link'][subkey]) {
+      if (!columnOptions['link_' + subkey].social) {
+        total_links_enabled++
+      } else {
+        total_social_links_enabled ++;
+      }
+    }
   })
 
   return (
@@ -120,11 +126,43 @@ export default function DatGridColumnMenu({currentSelection, applySelection}) {
                     {total_links_enabled > 0 ? total_links_enabled : "-"}
                   </MenuButton>
                   <MenuList>
-                    {Object.entries(currentSelection['link']).map(([lk,lv]) => (
-                        <MenuItem key={"link_"+lk}>
-                          <HStack w="100%" justifyContent="space-between"><Text fontSize="sm">{columnOptions["link_"+lk].headerName}</Text><Checkbox colorScheme='primary' isChecked={columnSelection["link"][lk]} onChange={e => setColumn(e.target.checked, 'link', lk)}></Checkbox></HStack>
-                        </MenuItem>
-                    ))}
+                    {Object.entries(currentSelection['link']).map(([lk,lv]) => {
+                      if (columnOptions["link_" + lk].social) {
+                        return null;
+                      }
+                      return (
+                      <MenuItem key={"link_" + lk}>
+                        <HStack w="100%" justifyContent="space-between"><Text
+                            fontSize="sm">{columnOptions["link_" + lk].headerName}</Text><Checkbox colorScheme='primary'
+                                                                                                   isChecked={columnSelection["link"][lk]}
+                                                                                                   onChange={e => setColumn(e.target.checked, 'link', lk)}></Checkbox></HStack>
+                      </MenuItem>
+                      )
+                    })}
+                  </MenuList>
+                </Menu>
+              </HStack>
+            </Box>
+            <Box w="100%" p={2} borderRadius="md" key={'social_link'}>
+              <HStack justifyContent="space-between"><Text fontSize="sm">Social Links</Text>
+                <Menu>
+                  <MenuButton colorScheme={total_social_links_enabled > 0 ? 'primary' : 'gray'} size="xs" as={Button} rightIcon={<Iconify icon="mdi:caret-down" />}>
+                    {total_social_links_enabled > 0 ? total_social_links_enabled : "-"}
+                  </MenuButton>
+                  <MenuList>
+                    {Object.entries(currentSelection['link']).map(([lk,lv]) => {
+                      if (!columnOptions["link_" + lk].social) {
+                        return null;
+                      }
+                      return (
+                          <MenuItem key={"link_" + lk}>
+                            <HStack w="100%" justifyContent="space-between"><Text
+                                fontSize="sm">{columnOptions["link_" + lk].headerName}</Text><Checkbox colorScheme='primary'
+                                                                                                       isChecked={columnSelection["link"][lk]}
+                                                                                                       onChange={e => setColumn(e.target.checked, 'link', lk)}></Checkbox></HStack>
+                          </MenuItem>
+                      )
+                    })}
                   </MenuList>
                 </Menu>
               </HStack>
