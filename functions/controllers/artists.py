@@ -69,6 +69,7 @@ class ArtistController():
 
     def build_filters(self, user_data, data, query):
         filter_model = data.get('filterModel', False)
+#         print(filter_model)
         if not filter_model or len(filter_model) == 0:
             return query
         filter_model = filter_model.get('items', list())
@@ -76,7 +77,7 @@ class ArtistController():
             field = filter_field.get('field')
             operator = filter_field.get('operator')
             value = filter_field.get('value', None)
-            if value is None:
+            if value is None and operator != 'isEmpty' and operator != 'isNotEmpty':
                 continue
             if (field.startswith('statistic.')):
                 key_parts = field.split('.')
@@ -150,31 +151,33 @@ class ArtistController():
                     statisticFunc = statisticId[1]
                     statisticId = int(statisticId[0])
                     dynamic_sort = aliased(Statistic)
-                    column = dynamic_sort.__table__.columns[statisticFunc].asc()
+                    column = getattr(dynamic_sort, statisticFunc).asc()
 
                     if sort['sort'] == 'desc':
-                        column = dynamic_sort.__table__.columns[statisticFunc].desc()
-                    query = query.join(dynamic_sort, Artist.statistics).where(dynamic_sort.statistic_type_id == statisticId).order_by(column)
+                        column = getattr(dynamic_sort, statisticFunc).desc()
+                    query = query.join(dynamic_sort, Artist.id == dynamic_sort.artist_id).where(dynamic_sort.statistic_type_id == statisticId).order_by(column)
                     # query = query.filter(Artist.statistics.any(Statistic.statistic_type_id == statisticId & Statistic[statisticFunc] ))
                 elif sortFieldKey.startswith('evaluation'):
                     evalKey = sortFieldKey.split('.')
                     evalKey = evalKey[1]
                     if evalKey == 'back_catalog':
                         evalKey = 'distributor_type'
-                    column = Evaluation.__table__.columns[evalKey].asc()
+                    tableAliased = aliased(Evaluation)
+                    column = getattr(tableAliased, evalKey).asc()
 
                     if sort['sort'] == 'desc':
-                        column = Evaluation.__table__.columns[evalKey].desc()
-                    query = query.join(Evaluation, Artist.evaluation).order_by(column)
+                        column = getattr(tableAliased, evalKey).desc()
+                    query = query.join(tableAliased, Artist.evaluation_id == tableAliased.id).order_by(column)
 
                 elif sortFieldKey.startswith('user'):
                     userKey = sortFieldKey.split('.')
                     userKey = userKey[1]
-                    column = Evaluation.__table__.columns[userKey].asc()
+                    tableAliased = aliased(OrganizationArtist)
+                    column = getattr(tableAliased, userKey).asc()
 
                     if sort['sort'] == 'desc':
-                        column = Evaluation.__table__.columns[userKey].desc()
-                    query = query.join(OrganizationArtist, Artist.organizations).where(OrganizationArtist.organization_id == user_data['organization']).order_by(column)
+                        column = getattr(tableAliased, userKey).desc()
+                    query = query.join(tableAliased, Artist.id == tableAliased.artist_id).where(tableAliased.organization_id == user_data['organization']).order_by(column)
                 else:
                     column = Artist.__table__.columns[sortFieldKey].asc()
 
