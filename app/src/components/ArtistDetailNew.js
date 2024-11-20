@@ -126,7 +126,7 @@ export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
               <Tab>Youtube Views</Tab> */}
             </TabList>
             <Card variant="outline" p={2} mt={5}>
-              <Heading size={'md'}>{stats[tabIndex].headerName}</Heading>
+              <Heading size={'md'}>{stats[tabIndex].headerName}{(filteredData && filteredData.length > 0 ? '' : ' - (No Data Available)')}</Heading>
               <Chart
                 options={chartOptions}
                 series={[{
