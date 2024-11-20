@@ -170,22 +170,21 @@ export default function DatGridColumnMenu({currentSelection, applySelection}) {
                     total_enabled++
                 })
                 return (
-                  <Box w="100%" p={2} borderRadius="md" key={k}>
-                    <HStack justifyContent="space-between"><Text fontSize="sm">{v.headerName}</Text>
-                    <Menu>
-                      <MenuButton colorScheme={total_enabled > 0 ? 'primary' : 'gray'} size="xs" as={Button} rightIcon={<Iconify icon="mdi:caret-down" />}>
-                        {total_enabled > 0 ? total_enabled : "-"}
-                      </MenuButton>
-                      <MenuList>
-                        {Object.entries(metricFunctions).map(([mk,mv]) => (
-                          <MenuItem key={mk}>
-                          <HStack w="100%" justifyContent="space-between"><Text fontSize="sm">{mv.headerName}</Text><Checkbox colorScheme='primary' isChecked={columnSelection[k][mk]} onChange={e => setColumn(e.target.checked, k, mk)}></Checkbox></HStack>
-                          </MenuItem>
-                        ))}
-                      </MenuList>
-                    </Menu>
-                    </HStack>
-                  </Box>
+                  <MenuMiniList
+                    key={k}
+                    title={v.headerName}
+                    totalEnabled={total_enabled}
+                    items={Object.entries(metricFunctions).map(([mk,mv]) => (
+                        <MenuMiniListItem
+                          key={k+"-"+mk}
+                          parentKey={k}
+                          subKey={mk}
+                          title={mv.headerName}
+                          columnSelection={columnSelection}
+                          setColumn={setColumn}
+                        />
+                    ))}
+                  />
                 )
               }
 
