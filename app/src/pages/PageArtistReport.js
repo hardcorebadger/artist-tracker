@@ -13,6 +13,7 @@ import { PageLayoutContained } from '../layouts/DashboardLayout';
 import {ColumnDataContext} from "../App";
 import {httpsCallable} from "firebase/functions";
 import ArtistDetailNew from "../components/ArtistDetailNew";
+import LoadingScreen from "../routing/LoadingScreen";
 
 function PageArtistReport() {
   const user = useUser()
@@ -111,6 +112,11 @@ function PageArtistReport() {
   const onReportDelete = async() => {
     await deleteDoc(doc(db, 'reports', id))
     navigate('/app/reports/all')
+  }
+  if (statisticTypes === null || linkSources === null) {
+    return (
+        <LoadingScreen/>
+    )
   }
   return (
     <>
