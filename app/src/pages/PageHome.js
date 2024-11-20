@@ -1,4 +1,4 @@
-import {useState, useContext} from 'react';
+import {useState, useContext, useEffect} from 'react';
 import {
   Box,
   Text,
@@ -82,16 +82,16 @@ function AddLinkCard() {
 
 function PageDefault() {
   const user = useUser()
-  const [artists, artistsLoading, artistsError] = useCollection(
-    query(collection(db, 'artists_v2'), 
-      where("ob_status", "==", "onboarded"),
-      where("watching", "array-contains", user.org.id)
-    ),
-    {
-      snapshotListenOptions: { includeMetadataChanges: true },
+  const [artistCount, setArtistCount] = useState(null)
+  const getArtists = httpsCallable(functions, 'get_artists')
+  useEffect( () => {
+    const loadArtists = async () => {
+      const resp = await getArtists({page: 0});
+      console.log(resp)
+      setArtistCount(resp?.data?.rowCount ?? null)
     }
-  )
-  const artist_list = artistsError || artistsLoading ? null : artists.docs.map((d) => d.data())
+    loadArtists()
+  }, []);
 
   return (
       <PageLayoutContained size="lg">
@@ -105,7 +105,7 @@ function PageDefault() {
           </GridItem>
           <GridItem colSpan={1}>
             <Stack>
-            <StatCard title="Total Artists" value={artist_list ? artist_list.length : "-"}></StatCard>
+            <StatCard title="Total Artists" value={artistCount ? artistCount : "-"}></StatCard>
             {/* <StatCard title="Total Unsigned" value={3813}></StatCard>
             <StatCard title="Total Tracked" value={3813}></StatCard> */}
             <AddLinkCard/>

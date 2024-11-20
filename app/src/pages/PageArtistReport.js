@@ -13,6 +13,7 @@ import ArtistDetail from '../components/ArtistDetail';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import {ColumnDataContext} from "../App";
 import {httpsCallable} from "firebase/functions";
+import ArtistDetailNew from "../components/ArtistDetailNew";
 
 function PageArtistReport() {
   const user = useUser()
@@ -41,10 +42,10 @@ function PageArtistReport() {
     }
   }, []);
 
-  const [activeArtist, setActiveArtist] = useState(0)
+  const [activeArtist, setActiveArtist] = useState(null)
 
-  const onOpenArtist = (id) => {
-    setActiveArtist(id)
+  const onOpenArtist = (artist) => {
+    setActiveArtist(artist)
   }
 
   if (reportLoading || reportError) {
@@ -114,12 +115,12 @@ function PageArtistReport() {
   }
   return (
     <>
-    {activeArtist != 0 && 
+    {activeArtist != null &&
     <PageLayoutContained size="lg">
-      <ArtistDetail artistId={activeArtist} onNavigateBack={()=>setActiveArtist(0)}/>
+      <ArtistDetailNew artist={activeArtist} onNavigateBack={()=>setActiveArtist(null)}/>
       </PageLayoutContained>
     }
-    <Box sx={{opacity:activeArtist!=0?0:1,height:activeArtist!=0?0:'auto'}} >
+    <Box sx={{opacity:activeArtist!=null?0:1,height:activeArtist!=null?0:'auto'}} >
     <MuiDataGridController
     initialReportName={reportData?.name}
     initialColumnOrder={reportData?.columnOrder}

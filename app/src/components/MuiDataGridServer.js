@@ -134,6 +134,7 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
       Object.keys(selection[key]).forEach(subkey => {
         if (selection[key][subkey] !== -1) {
             const colDef = metricColumnFactory(key, subkey)
+            colDef.function = subkey;
             colDef.order = selection[key][subkey] + 1
           columns.push(colDef)
         }
@@ -180,7 +181,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     const [sortModel, setSortModel] = useState([]);
     const [dataIsLoading, setDataIsLoading] = useState(false)
     const [columnOrder, setColumnOrder] = useState(deepCopy(initialColumnOrder))
-    if (!initialFilterValues.hasOwnProperty('items')) {
+    if (!initialFilterValues?.hasOwnProperty('items')) {
         initialFilterValues = {items:[]}
     }
     const [filterModel, setFilterModel] = useState(deepCopy(initialFilterValues))
@@ -315,6 +316,11 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                   onColumnOrderChange={handleColumnOrderChange}
                   pagination
                   ref={apiRef}
+                  onRowClick={(e) => {
+                      console.log(rows?.rows)
+                      const artist = rows?.rows?.filter((row) => row?.id == e.id).pop()
+                      onOpenArtist(artist)
+                  }}
                   rowCount={rows?.rowCount ?? 0}
                   filterModel={filterModel}
                   sortModel={sortModel}
