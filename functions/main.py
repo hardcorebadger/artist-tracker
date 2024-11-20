@@ -264,6 +264,9 @@ def add_artist(req: https_fn.CallableRequest):
         raise e.to_https_fn_error()
 
 
+def sort_ordered(l):
+    return l.get('order', 0)
+
 @https_fn.on_call(cors=options.CorsOptions(
         cors_origins="*",
         cors_methods=["get", "post", "options"]))
@@ -271,10 +274,9 @@ def get_statistic_types(req: https_fn.CallableRequest):
     sql_session = sql.get_session()
     types = sql_session.scalars(select(StatisticType)).all()
     sql_session.close()
-    return list(map(lambda type: type.as_dict(), types))
-
-def sort_link_sources(l):
-    return l.get('order', 0)
+    list_sorted = list(map(lambda type: type.as_dict(), types))
+    list_sorted.sort(key=sort_ordered)
+    return list_sorted
 
 @https_fn.on_call()
 def get_link_sources(req: https_fn.CallableRequest):
@@ -282,7 +284,7 @@ def get_link_sources(req: https_fn.CallableRequest):
     types = sql_session.scalars(select(LinkSource)).all()
     sql_session.close()
     list_sorted = list(map(lambda type: type.as_dict(), types))
-    list_sorted.sort(key=sort_link_sources)
+    list_sorted.sort(key=sort_ordered)
     return list_sorted
 
 

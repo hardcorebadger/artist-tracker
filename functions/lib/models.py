@@ -178,6 +178,7 @@ class StatisticType(Base):
     key = Column(String(128), nullable=False)
     source = Column(String(256), nullable=False)
     format = Column(String(8), nullable=False,default="float")
+    order = Column(Integer, nullable=False)
     created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     def as_dict(self):
