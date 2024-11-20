@@ -1,10 +1,8 @@
 import {Checkbox, HStack, MenuItem, Text} from "@chakra-ui/react";
-import {columnOptions} from "./DataGridConfig";
 
-
-export default function MenuMiniListItem({parentKey, subKey, columnSelection, key, title, setColumn}) {
+export default function MenuMiniListItem({parentKey, subKey, columnSelection, title, setColumn}) {
     return (
-        <MenuItem key={key}>
+        <MenuItem>
             <HStack w="100%" justifyContent="space-between">
                 <Text fontSize="sm">
                     {title}

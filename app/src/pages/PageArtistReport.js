@@ -8,7 +8,6 @@ import { useDocument } from 'react-firebase-hooks/firestore';
 import { useNavigate } from 'react-router-dom';
 import { Box, Button, HStack, Heading, Skeleton, Text, VStack } from '@chakra-ui/react';
 import {useContext, useEffect, useState} from 'react';
-import ArtistDetail from '../components/ArtistDetail';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import {ColumnDataContext} from "../App";
 import {httpsCallable} from "firebase/functions";

@@ -218,6 +218,7 @@ class LinkSource(Base):
     url_scheme = Column(Text, nullable=False)
     display_name = Column(Text, nullable=True)
     social = Column(Boolean, nullable=False)
+    order = Column(Integer, nullable=False)
     links: Mapped["ArtistLink"] = relationship(back_populates="source")
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
