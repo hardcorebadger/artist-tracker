@@ -20,7 +20,7 @@ import { Link as RouterLink } from "react-router-dom";
 // const ChakraDataGrid = chakra(DataGrid);
 
 // MUI theme for the data grid
-const theme = createTheme({
+export const theme = createTheme({
   cssVariables: true,
   palette: {
     primary: {

@@ -35,6 +35,9 @@ import Chart from "react-apexcharts";
 import { columnOptions } from './DataGridConfig'
 import {useContext, useState} from 'react';
 import {ColumnDataContext} from "../App";
+import {Box, Link as MUILink} from "@mui/material";
+import {theme} from "./MuiDataGridServer";
+import {ThemeProvider} from "@mui/material/styles";
 
 const chartOptions = {
   chart: {
@@ -72,7 +75,7 @@ const bakeStats = (linkSources) => {
   return stats
 }
 
-function CopyrightCard({artist}) {
+function CopyrightCard({artist, linkSources}) {
   const status =  artist.evaluation?.status === 0 ? 'Unsigned' :  artist.evaluation?.status === 1 ? 'Signed' : 'Unknown';
   const type = artist.evaluation?.distributor_type === 0 ? "DIY" : artist.evaluation?.distributor_type === 1 ? "Indie" : "Major";
   const prios = (artist.evaluation?.status === 2 ? 'Dirty' : 'Clean')
@@ -80,7 +83,9 @@ function CopyrightCard({artist}) {
   const typeColor = artist.evaluation?.distributor_type == 2 ? 'red' : (artist.evaluation?.distributor_type == 1 ? 'yellow' : 'green')
   const priorsColor = artist.evaluation?.status == 2 ? 'yellow' : 'green'
   return (
-    <Card p={25} variant="outline" mt={10}>
+
+      <Box>
+    <Card p={25} variant="outline" mt={0}>
       <Stack w="100%" spacing={3}>
         <Heading size="xs">Copyright Evaluation</Heading>
         <Wrap><Badge colorScheme={statusColor}>{status}</Badge><Badge colorScheme={typeColor}>{type}</Badge><Badge colorScheme={priorsColor}>{prios}</Badge></Wrap>
@@ -88,9 +93,30 @@ function CopyrightCard({artist}) {
         <Text >{artist.evaluation?.distributor}</Text>
         <Text fontSize="xs" fontWeight="bold" textDecor="uppercase">Label</Text>
         <Text >{artist.evaluation?.label}</Text>
-        <Button isDisabled={true}>See Details</Button>
+        {/*<Button isDisabled={true}>See Details</Button>*/}
       </Stack>
     </Card>
+    <Card p={25} variant="outline" mt={5}>
+        <Stack w="100%" spacing={3}>
+          <Heading size="xs">Links</Heading>
+          {Object.entries(artist).map(([key, value]) => {
+            if (!key.startsWith('link_')) {
+              return null;
+            }
+            const source = linkSources.filter((s) => s.key === (key.split("link_")[1])).pop()
+            return (
+                <ThemeProvider theme={theme}>
+                 <MUILink color='primary' href={value}>
+                   <Wrap align={'center'}>
+                     <Iconify icon={source?.logo}/> {source?.display_name} <Iconify icon="mdi:external-link" />
+                   </Wrap>
+                 </MUILink>
+                </ThemeProvider>
+            )
+          })}
+        </Stack>
+      </Card>
+    </Box>
   )
 }
 
@@ -139,7 +165,7 @@ export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
           </Tabs>
         </GridItem>
         <GridItem colSpan={1}>
-          {artist && <CopyrightCard artist={artist}/> }
+          {artist && <CopyrightCard artist={artist} linkSources={linkSources}/> }
         </GridItem>
         </Grid>
     </VStack>
