@@ -53,10 +53,13 @@ export default function DatGridColumnMenu({currentSelection, applySelection}) {
   const { isOpen, onOpen, onClose } = useDisclosure()
   const btnRef = useRef()
   
-  const [columnSelection, setColumnSelection] = useState({})
+  const [columnSelection, setColumnSelection] = useState({'link': {}})
 
   const setColumn = (val, col, sub) => {
-    if (columnOptions[col].isMetric) 
+    if (col.startsWith('link')) {
+       columnSelection['link'][sub] = val
+    } else
+    if (columnOptions[col].isMetric)
       columnSelection[col][sub] = val
     else 
       columnSelection[col] = val
@@ -77,6 +80,11 @@ export default function DatGridColumnMenu({currentSelection, applySelection}) {
     setColumnSelection({...currentSelection})
     onClose()
   }
+  let total_links_enabled = 0
+  Object.keys(columnSelection['link']).forEach(subkey => {
+    if (columnSelection['link'][subkey])
+      total_links_enabled++
+  })
 
   return (
     <>
@@ -95,6 +103,34 @@ export default function DatGridColumnMenu({currentSelection, applySelection}) {
           <DrawerBody  p={4}>
           <VStack spacing={2} textAlign="left">
             {Object.entries(columnOptions).map(([k, v]) => {
+              if (!columnOptions[k].isMetric && !v.field?.startsWith('link')) {
+                return (
+                    <Box w="100%" p={2} borderRadius="md" key={k}>
+                      <HStack justifyContent="space-between"><Text fontSize="sm">{v.headerName}</Text><Checkbox
+                          colorScheme='primary' isChecked={columnSelection[k]}
+                          onChange={(e) => setColumn(e.target.checked, k, null)}></Checkbox></HStack>
+                    </Box>
+                )
+              }
+            })}
+            <Box w="100%" p={2} borderRadius="md" key={'link'}>
+              <HStack justifyContent="space-between"><Text fontSize="sm">Links</Text>
+                <Menu>
+                  <MenuButton colorScheme={total_links_enabled > 0 ? 'primary' : 'gray'} size="xs" as={Button} rightIcon={<Iconify icon="mdi:caret-down" />}>
+                    {total_links_enabled > 0 ? total_links_enabled : "-"}
+                  </MenuButton>
+                  <MenuList>
+                    {Object.entries(currentSelection['link']).map(([lk,lv]) => (
+                        <MenuItem key={"link_"+lk}>
+                          <HStack w="100%" justifyContent="space-between"><Text fontSize="sm">{columnOptions["link_"+lk].headerName}</Text><Checkbox colorScheme='primary' isChecked={columnSelection["link"][lk]} onChange={e => setColumn(e.target.checked, 'link', lk)}></Checkbox></HStack>
+                        </MenuItem>
+                    ))}
+                  </MenuList>
+                </Menu>
+              </HStack>
+            </Box>
+            {Object.entries(columnOptions).map(([k, v]) => {
+
               if (v.isMetric) {
                 let total_enabled = 0
                 Object.keys(columnSelection[k]).forEach(subkey => {
@@ -119,14 +155,10 @@ export default function DatGridColumnMenu({currentSelection, applySelection}) {
                     </HStack>
                   </Box>
                 )
-              } else {
-                return (
-                <Box w="100%" p={2} borderRadius="md" key={k}>
-                  <HStack justifyContent="space-between"><Text fontSize="sm">{v.headerName}</Text><Checkbox colorScheme='primary' isChecked={columnSelection[k]} onChange={(e) => setColumn(e.target.checked, k, null)}></Checkbox></HStack>
-                </Box>
-                )
               }
+
             })}
+
           </VStack>
           </DrawerBody>
           }
