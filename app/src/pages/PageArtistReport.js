@@ -121,7 +121,7 @@ function PageArtistReport() {
     <>
     {activeArtist != null &&
     <PageLayoutContained size="lg">
-      <ArtistDetailNew artist={activeArtist} onNavigateBack={()=>setActiveArtist(null)}/>
+      <ArtistDetailNew artist={activeArtist} linkSources={linkSources} onNavigateBack={()=>setActiveArtist(null)}/>
       </PageLayoutContained>
     }
     <Box sx={{opacity:activeArtist!=null?0:1,height:activeArtist!=null?0:'auto'}} >

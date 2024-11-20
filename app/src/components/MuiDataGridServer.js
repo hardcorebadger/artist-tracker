@@ -127,7 +127,9 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
           field: key,
           keyName: type['source'] + "." + type['key'],
           headerName:  sourceName +' ' + type['name'],
+          statName: type['name'],
           statTypeId: type['id'],
+          source: type['source'],
           isMetric: true
       }
   }

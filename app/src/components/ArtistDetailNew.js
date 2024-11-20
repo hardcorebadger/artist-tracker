@@ -33,7 +33,8 @@ import { PageLayoutContained } from '../layouts/DashboardLayout';
 import Iconify from './Iconify';
 import Chart from "react-apexcharts";
 import { columnOptions } from './DataGridConfig'
-import { useState } from 'react';
+import {useContext, useState} from 'react';
+import {ColumnDataContext} from "../App";
 
 const chartOptions = {
   chart: {
@@ -60,11 +61,12 @@ const chartOptions = {
   }
 }
 
-const bakeStats = () => {
+const bakeStats = (linkSources) => {
   const stats = []
   Object.keys(columnOptions).forEach(key => {
     const col = columnOptions[key]
     if (!col.isMetric) {return}
+    col.sourceLogo = linkSources.filter((s) => s.key === col.source).pop()?.logo
     stats.push(col)
   })
   return stats
@@ -92,10 +94,10 @@ function CopyrightCard({artist}) {
   )
 }
 
-export default function ArtistDetailNew({artist, onNavigateBack}) {
+export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
 
   const [tabIndex, setTabIndex] = useState(0)
-  const stats = bakeStats()
+  const stats = bakeStats(linkSources)
   const filteredStat = artist['statistics'].filter((stat) => stat['statistic_type_id'] === stats[tabIndex]?.statTypeId).pop()
   const filteredData = (filteredStat && 'data' in filteredStat) ? filteredStat['data'] : []
   return (
@@ -112,21 +114,27 @@ export default function ArtistDetailNew({artist, onNavigateBack}) {
         <GridItem colSpan={3}>
           <Tabs onChange={(index) => setTabIndex(index)}>
             <TabList>
-              {stats.map((s, i) => <Tab key={i}>{s.headerName}</Tab>)}
+              {stats.map((s, i) => (
+                  <Tab key={i} sx={{fontSize: '12px'}}>
+                    <Iconify icon={s.sourceLogo} size={20}/>
+                    {s.statName}
+                  </Tab>
+              ))}
               {/* <Tab>Global Streams</Tab>
               <Tab>Spotify Streams</Tab>
               <Tab>Tiktok Views</Tab>
               <Tab>Youtube Views</Tab> */}
             </TabList>
             <Card variant="outline" p={2} mt={5}>
-            <Chart
-              options={chartOptions}
-              series={[{
-                name: stats[tabIndex].headerName,
-                data: filteredData
-              }]}
-              type="area"
-            />
+              <Heading size={'md'}>{stats[tabIndex].headerName}</Heading>
+              <Chart
+                options={chartOptions}
+                series={[{
+                  name: stats[tabIndex].headerName,
+                  data: filteredData
+                }]}
+                type="area"
+              />
             </Card>
           </Tabs>
         </GridItem>
