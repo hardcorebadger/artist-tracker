@@ -176,7 +176,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     const [rows, setRows] = useState([]);
     const [paginationModel, setPaginationModel] = useState({
         page: 0,
-        pageSize: 10,
+        pageSize: 20,
     });
     const [sortModel, setSortModel] = useState([]);
     const [dataIsLoading, setDataIsLoading] = useState(false)

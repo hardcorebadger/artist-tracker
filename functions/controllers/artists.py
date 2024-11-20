@@ -26,7 +26,7 @@ class ArtistController():
         # How to get the user and the org IDs
 
         page = int(data.get('page', 0))
-        page_size = int(data.get('pageSize', 10))
+        page_size = int(data.get('pageSize', 20))
 
         sql_session = self.sql.get_session()
         count = self.build_query(uid, data, db, sql_session, True).count()
@@ -72,18 +72,18 @@ class ArtistController():
         if not filter_model or len(filter_model) == 0:
             return query
         filter_model = filter_model.get('items', list())
-        print(filter_model)
         for filter_field in filter_model:
             field = filter_field.get('field')
             operator = filter_field.get('operator')
             value = filter_field.get('value', None)
+            if value is None:
+                continue
             if (field.startswith('statistic.')):
                 key_parts = field.split('.')
                 statistic_id = key_parts[1].split('-')
                 statistic_func = statistic_id[1]
                 statistic_id = int(statistic_id[0])
                 dynamic = aliased(Statistic)
-                print(field, operator, value, statistic_id, statistic_func)
                 query = query.outerjoin(dynamic, and_(Artist.id == dynamic.artist_id,
                       dynamic.statistic_type_id == statistic_id))
                 if value is not None:

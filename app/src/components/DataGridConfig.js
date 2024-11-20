@@ -66,7 +66,6 @@ export const columnOptions = {
     defaultFilter: {
       type: 'string',
       operator: 'startsWith',
-      value: ''
     }
   },
   "evaluation.status": {
@@ -111,17 +110,17 @@ export const columnOptions = {
     ],
     type: 'singleSelect',
   },
-  "genres": {
-    field: 'genres',
-    op: input => input.length > 0 ? input[0] : "",
-    headerName: 'Genre',
-    isMetric: false,
-    defaultFilter: {
-      type: 'string',
-      operator: 'startsWith',
-      value: ''
-    }
-  },
+  // "genres": {
+  //   field: 'genres',
+  //   op: input => input.length > 0 ? input[0] : "",
+  //   headerName: 'Genre',
+  //   isMetric: false,
+  //   defaultFilter: {
+  //     type: 'string',
+  //     operator: 'startsWith',
+  //     value: ''
+  //   }
+  // },
 }
 
 export const metricFunctions = {
