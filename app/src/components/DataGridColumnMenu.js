@@ -23,6 +23,8 @@ import Iconify from '../components/Iconify';
 import Chart from "react-apexcharts";
 import numeral from 'numeral'
 import { columnOptions, metricFunctions } from './DataGridConfig';
+import MenuMiniList from "./MenuMiniList";
+import MenuMiniListItem from "./MenuMiniListItem";
 
 const countColumns = (selection) => {
   let count = 0
@@ -119,54 +121,46 @@ export default function DatGridColumnMenu({currentSelection, applySelection}) {
                 )
               }
             })}
-            <Box w="100%" p={2} borderRadius="md" key={'link'}>
-              <HStack justifyContent="space-between"><Text fontSize="sm">Links</Text>
-                <Menu>
-                  <MenuButton colorScheme={total_links_enabled > 0 ? 'primary' : 'gray'} size="xs" as={Button} rightIcon={<Iconify icon="mdi:caret-down" />}>
-                    {total_links_enabled > 0 ? total_links_enabled : "-"}
-                  </MenuButton>
-                  <MenuList>
-                    {Object.entries(currentSelection['link']).map(([lk,lv]) => {
-                      if (columnOptions["link_" + lk].social) {
-                        return null;
-                      }
-                      return (
-                      <MenuItem key={"link_" + lk}>
-                        <HStack w="100%" justifyContent="space-between"><Text
-                            fontSize="sm">{columnOptions["link_" + lk].headerName}</Text><Checkbox colorScheme='primary'
-                                                                                                   isChecked={columnSelection["link"][lk]}
-                                                                                                   onChange={e => setColumn(e.target.checked, 'link', lk)}></Checkbox></HStack>
-                      </MenuItem>
-                      )
-                    })}
-                  </MenuList>
-                </Menu>
-              </HStack>
-            </Box>
-            <Box w="100%" p={2} borderRadius="md" key={'social_link'}>
-              <HStack justifyContent="space-between"><Text fontSize="sm">Social Links</Text>
-                <Menu>
-                  <MenuButton colorScheme={total_social_links_enabled > 0 ? 'primary' : 'gray'} size="xs" as={Button} rightIcon={<Iconify icon="mdi:caret-down" />}>
-                    {total_social_links_enabled > 0 ? total_social_links_enabled : "-"}
-                  </MenuButton>
-                  <MenuList>
-                    {Object.entries(currentSelection['link']).map(([lk,lv]) => {
-                      if (!columnOptions["link_" + lk].social) {
-                        return null;
-                      }
-                      return (
-                          <MenuItem key={"link_" + lk}>
-                            <HStack w="100%" justifyContent="space-between"><Text
-                                fontSize="sm">{columnOptions["link_" + lk].headerName}</Text><Checkbox colorScheme='primary'
-                                                                                                       isChecked={columnSelection["link"][lk]}
-                                                                                                       onChange={e => setColumn(e.target.checked, 'link', lk)}></Checkbox></HStack>
-                          </MenuItem>
-                      )
-                    })}
-                  </MenuList>
-                </Menu>
-              </HStack>
-            </Box>
+            <MenuMiniList
+                key={'link'}
+                title={'Links'}
+                totalEnabled={total_links_enabled}
+                items={Object.entries(currentSelection['link']).map(([lk,lv]) => {
+                  if (columnOptions["link_" + lk].social) {
+                    return null;
+                  }
+                  return (
+                      <MenuMiniListItem
+                          key={"link_"+lk}
+                          parentKey={"link"}
+                          subKey={lk}
+                          title={columnOptions["link_" + lk].headerName}
+                          columnSelection={columnSelection}
+                          setColumn={setColumn}
+                      />
+                  )
+                })}
+            />
+            <MenuMiniList
+              key={'social_link'}
+              title={'Social Links'}
+              totalEnabled={total_social_links_enabled}
+              items={Object.entries(currentSelection['link']).map(([lk,lv]) => {
+                if (!columnOptions["link_" + lk].social) {
+                  return null;
+                }
+                return (
+                    <MenuMiniListItem
+                        key={"link_"+lk}
+                        parentKey={"link"}
+                        subKey={lk}
+                        title={columnOptions["link_" + lk].headerName}
+                        columnSelection={columnSelection}
+                        setColumn={setColumn}
+                    />
+                )
+              })}
+            />
             {Object.entries(columnOptions).map(([k, v]) => {
 
               if (v.isMetric) {
