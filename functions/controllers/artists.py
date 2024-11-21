@@ -30,20 +30,15 @@ class ArtistController():
         page_size = int(data.get('pageSize', 20))
         start = time.time()
 
-        print(start, 'count')
         sql_session = self.sql.get_session()
         count = self.build_query(uid, copy.deepcopy(data), db, sql_session, True).count()
-        print(start, 'finished count')
 
-        print(start, 'query')
         query = self.build_query(uid, copy.deepcopy(dict(data)), db, sql_session).limit(page_size).offset(page * page_size)
-        print(start, 'finish query')
 
         artists_set = sql_session.scalars(query).unique()
 
         end = time.time()
         length = end-start
-        print("It took", length, "seconds!")
 
         artists = list(map(lambda artist: artist.as_dict(), artists_set))
 
