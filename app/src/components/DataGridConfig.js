@@ -74,7 +74,7 @@ export const columnOptions = {
     isMetric: false,
     valueGetter: (data) => data.row?.evaluation?.status === 0 ? 'Unsigned' :  data.row?.evaluation?.status === 1 ? 'Signed' : 'Unknown' ,
     valueOptions: [
-      {value: "Signed", label: 'Signed'}, {value: 'Unsigned', label: 'Unsigned'}, {value: 'Unknown', label: 'Unknown'}
+      {value: 1, label: 'Signed'}, {value: 0, label: 'Unsigned'}, {value: 'unknown', label: 'Unknown'}
     ],
     renderCell: (params) => (
       <Chip variant="outlined" size='small' color={params.value == "Signed" ? "error" : params.value == "Unsigned" ? "primary" : "warning"} label={params.value} />
@@ -89,11 +89,16 @@ export const columnOptions = {
     valueGetter: (data) => data.row?.evaluation?.distributor_type === 0 ? "DIY" : data.row?.evaluation?.distributor_type === 1 ? "Indie" : "Major",
     isMetric: false,
     valueOptions: [
-      {value: "DIY", label: 'DIY'}, {value: "Major", label: 'Major'}, {value: "Indie", label: 'Indie'}
+      {value: 0, label: 'DIY'}, {value: 2, label: 'Major'}, {value: 1, label: 'Indie'}
     ],
-    renderCell: (params) => (
-      <Chip variant="outlined" size='small' color={params.value == "Major" ? "error" : params.value == "Indie" ? "warning" : "primary"} label={params.value} />
-    ),
+    renderCell: (params) => {
+      return (
+      <Chip variant="outlined" size='small'
+            color={params.value == "Major" ? "error" : params.value == "Indie" ? "warning" : "primary"}
+            label={params.value}/>
+
+      )
+    },
 
   },
   "evaluation.back_catalog": {

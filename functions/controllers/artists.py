@@ -101,7 +101,11 @@ class ArtistController():
                 eval_key = field.split('.')
                 eval_key = eval_key[1]
                 newValue = value
-                if eval_key == 'back_catalog':
+                if eval_key == 'status':
+                    if value == 'unknown':
+                        newValue = list([2, 3, 4])
+                        operator = 'isAnyOf'
+                elif eval_key == 'back_catalog':
                     eval_key = 'status'
                     if operator == 'isAnyOf':
                         if len(newValue) == 1:
