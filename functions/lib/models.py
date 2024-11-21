@@ -42,6 +42,8 @@ class Artist(Base):
 
     evaluation: Mapped["Evaluation"] = relationship(back_populates='artist', foreign_keys=[evaluation_id])
 
+    tags: Mapped[List["ArtistTag"]] = relationship(back_populates='artist')
+
     def as_dict(self):
         dict = {c.name: getattr(self, c.name) for c in self.__table__.columns}
         dict['evaluation'] = None
@@ -54,6 +56,7 @@ class Artist(Base):
         dict['users'] = list(map(lambda user: user.as_dict(), self.users))
         dict['organization'] = list(map(lambda org: org.as_dict(), self.organizations))
         dict['statistics'] = list(map(lambda stat: stat.as_dict(), self.statistics))
+        dict['tags'] = list(map(lambda tag: tag.as_dict(), self.tags))
         # for stat in self.statistics:
         #     dict['stat_' + stat.type.source + '__' + stat.type.key + '-latest'] = stat.latest
         #     dict['stat_' + stat.type.source + '__' + stat.type.key + '-last'] = stat.previous
@@ -189,6 +192,36 @@ class StatisticType(Base):
 
     def __repr__(self):
         return f"<StatisticType({self.id=}, {self.name=}, {self.key=}, {self.source=}, {self.format})>"
+
+class ArtistTagType(Base):
+    __tablename__ = 'artist_tag_types'
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
+    tags: Mapped[List["ArtistTag"]] = relationship(back_populates="type")
+    name = Column(Text, nullable=False)
+    created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
+
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+class ArtistTag(Base):
+    __tablename__ = 'artist_tags'
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
+    artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
+    organization_id = Column(String(28), nullable=True)
+    tag_type_id: Mapped[int] = mapped_column(Integer, ForeignKey('artist_tag_types.id'), nullable=False)
+    tag = Column(String(36), nullable=False)
+    created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
+
+    artist: Mapped["Artist"] = relationship(back_populates="tags")
+    type: Mapped["ArtistTagType"] = relationship(back_populates="tags")
+    def as_dict(self):
+        return {
+            "tag": self.tag,
+            "id": self.id,
+            "organization_id": self.organization_id,
+            "type": self.type.as_dict(),
+            "created_at": self.created_at
+        }
 
 class ArtistLink(Base):
     __tablename__ = 'artist_links'

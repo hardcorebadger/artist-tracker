@@ -57,11 +57,11 @@ class ArtistController():
             query = (select(Artist).options(
                 joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True).defer(StatisticType.created_at).defer(StatisticType.updated_at),
                 joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True).defer(LinkSource.logo),
-                joinedload(Artist.users, innerjoin=True),
-                joinedload(Artist.organizations, innerjoin=True),
+                joinedload(Artist.users, innerjoin=True).where(UserArtist.organization_id == user_data.get('organization')),
+                joinedload(Artist.organizations, innerjoin=True).where(OrganizationArtist.organization_id == user_data.get('organization')),
                 joinedload(Artist.evaluation, innerjoin=False),
             ))
-
+        query = query.where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization')))
         query = self.build_filters(user_data, data, query)
 
         # .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
