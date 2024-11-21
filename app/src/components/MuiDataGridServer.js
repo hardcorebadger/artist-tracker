@@ -226,7 +226,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
 
     // Server side data source for the table
     const getArtists = httpsCallable(functions, 'get_artists')
-    const [rows, setRows] = useState([]);
+    const [rowRequests, setRowRequests] = useState({});
     const [paginationModel, setPaginationModel] = useState({
         page: 0,
         pageSize: 20,
@@ -238,21 +238,30 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         initialFilterValues = {items:[]}
     }
     const [filterModel, setFilterModel] = useState(deepCopy(initialFilterValues))
+    const [currentReqTime, setCurrentReqTime] = useState(null)
     const apiRef = useGridApiRef();
 
     useEffect(() => {
         const fetcher = async () => {
             setDataIsLoading(true)
+            const startTime = Date.now()
+            setCurrentReqTime(startTime)
             // fetch data from server
             const resp = await getArtists({page: paginationModel.page,
                 pageSize: paginationModel.pageSize,
                 sortModel,
                 filterModel});
-            setDataIsLoading(false)
-            setRows({
-                rows: resp.data.rows,
-                rowCount: resp.data.rowCount
-            });
+                // setDataIsLoading(false)
+                const newReq = {}
+                newReq[startTime] = {
+                    time: startTime,
+                    rows: resp.data.rows,
+                    rowCount: resp.data.rowCount
+                }
+                setRowRequests({
+                    ...newReq,
+                    ...rowRequests
+                });
         };
         fetcher();
     }, [paginationModel, sortModel, filterModel]);
@@ -301,6 +310,19 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         setColumnOrder(deepCopy(initialColumnOrder))
         setFilterModel(deepCopy(initialFilterValues))
         setReportName(initialReportName)
+    }
+
+    const rows = rowRequests[currentReqTime] ?? {}
+
+    if (rows && rows.hasOwnProperty('time') && rows['time'] === currentReqTime) {
+        if (dataIsLoading) {
+            setDataIsLoading(false)
+        }
+        if (Object.keys(rowRequests).length > 1) {
+            const newReq = {};
+            newReq[currentReqTime] = rows
+            setRowRequests(newReq)
+        }
     }
 
     const handleColumnOrderChange = (change) => {

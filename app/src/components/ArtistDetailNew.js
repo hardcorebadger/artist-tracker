@@ -143,7 +143,7 @@ export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
               {stats.map((s, i) => (
                   <Tab key={i} sx={{fontSize: '12px'}}>
                     <Iconify icon={s.sourceLogo} size={20}/>
-                    {s.statName}
+                    &nbsp;{s.statName}
                   </Tab>
               ))}
               {/* <Tab>Global Streams</Tab>
