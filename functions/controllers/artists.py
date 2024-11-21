@@ -1,4 +1,5 @@
 import time
+import copy
 
 from firebase_admin import firestore, initialize_app
 from firebase_functions import https_fn
@@ -27,11 +28,17 @@ class ArtistController():
 
         page = int(data.get('page', 0))
         page_size = int(data.get('pageSize', 20))
-
-        sql_session = self.sql.get_session()
-        count = self.build_query(uid, data, db, sql_session, True).count()
         start = time.time()
-        query = self.build_query(uid, data, db, sql_session).limit(page_size).offset(page * page_size)
+
+        print(start, 'count')
+        sql_session = self.sql.get_session()
+        count = self.build_query(uid, copy.deepcopy(data), db, sql_session, True).count()
+        print(start, 'finished count')
+
+        print(start, 'query')
+        query = self.build_query(uid, copy.deepcopy(dict(data)), db, sql_session).limit(page_size).offset(page * page_size)
+        print(start, 'finish query')
+
         artists_set = sql_session.scalars(query).unique()
 
         end = time.time()
@@ -93,12 +100,29 @@ class ArtistController():
             elif field.startswith('evaluation.'):
                 eval_key = field.split('.')
                 eval_key = eval_key[1]
+                newValue = value
                 if eval_key == 'back_catalog':
-                    eval_key = 'distributor_type'
+                    eval_key = 'status'
+                    if operator == 'isAnyOf':
+                        if len(newValue) == 1:
+                            if newValue[0] == 'dirty':
+                                newValue[0] = 2
+                            else:
+                                newValue = list([0, 1])
+                        else:
+                            continue
+                    elif newValue != 'dirty':
+                        if operator != 'not' and operator != '!=':
+                            operator = '<'
+                        else:
+                            operator = '=='
+
+                    if operator != 'isAnyOf':
+                        newValue = 2
                 dynamic = aliased(Evaluation)
                 column = getattr(dynamic, eval_key)
                 query = query.outerjoin(dynamic, Artist.evaluation_id == dynamic.id)
-                query = self.build_condition(query, column, operator, value)
+                query = self.build_condition(query, column, operator, newValue)
             else:
                 column = Artist.__table__.columns[field]
                 query = self.build_condition(query, column, operator, value)
@@ -132,9 +156,9 @@ class ArtistController():
             return query.filter(column.contains(value))
         elif operator == 'doesNotContain':
             return query.filter(not_(column.contains(value)))
-        elif operator == '==' or operator == 'equals':
+        elif operator == '==' or operator == 'equals' or operator == 'is':
             return query.filter(column == value)
-        elif operator == '!=' or operator == '<>' or operator == 'doesNotEqual':
+        elif operator == '!=' or operator == '<>' or operator == 'doesNotEqual' or operator == 'not':
             return query.filter(column != value)
         return query
 
@@ -161,7 +185,7 @@ class ArtistController():
                     evalKey = sortFieldKey.split('.')
                     evalKey = evalKey[1]
                     if evalKey == 'back_catalog':
-                        evalKey = 'distributor_type'
+                        evalKey = 'status'
                     tableAliased = aliased(Evaluation)
                     column = getattr(tableAliased, evalKey).asc()
 

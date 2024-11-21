@@ -99,14 +99,14 @@ export const columnOptions = {
   "evaluation.back_catalog": {
     field: 'evaluation.back_catalog',
     headerName: 'Backcatalog Status',
-    valueGetter: (data) => (data.row?.evaluation?.status === 2 ? 'Dirty' : 'Clean'),
+    valueGetter: (data) => (data.row?.evaluation?.status === 2 ? 'dirty' : 'clean'),
     renderCell: (params) => (
-      <Chip variant="outlined" size='small' color={params.value == "Dirty" ? "warning" : "primary"} label={params.value} />
+      <Chip variant="outlined" size='small' color={params.value == "dirty" ? "warning" : "primary"} label={String(params.value).charAt(0).toUpperCase() + String(params.value).slice(1)} />
     ),
     isMetric: false,
     // filterEditor: SelectFilter,
     valueOptions: [
-       {value:'Clean', label: 'Clean'}, {value: 'Dirty', label: 'Dirty'}
+       {value:'clean', label: 'Clean'}, {value: 'dirty', label: 'Dirty'}
     ],
     type: 'singleSelect',
   },
