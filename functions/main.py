@@ -6,7 +6,7 @@ from firebase_functions import https_fn, scheduler_fn, tasks_fn, params, logger,
 from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter
 from openai import organization
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import joinedload, subqueryload
 
 from controllers.artists import ArtistController
@@ -69,6 +69,73 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
             data = {}
         return artist_controller.get_artists_test(data, app)
 
+    @v2_api.post("/reimport-artists")
+    def reimport_artists():
+        if (flask.request.is_json):
+            data = flask.request.get_json()
+        else:
+            data = {}
+
+        count = int(data.get('size', 50))
+        page = int(data.get('page', 0))
+        offset = page * count
+        total = int(db.collection('artists_v2').count().get()[0][0].value)
+        old_artists = db.collection("artists_v2").limit(count).offset(offset).get()
+        spotifys = list(map(lambda x: x.get('spotify_id'), old_artists))
+
+        sql_session = sql.get_session()
+        found = 0
+        dirty = 0
+        new = 0
+        existing = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation)).where(Artist.spotify_id.in_(spotifys))).all()
+        evalIds = list()
+        for artist in old_artists:
+            spotify_id = artist.get('spotify_id')
+            add_batch = list()
+            existingMatches = list(filter(lambda x: x.spotify_id == spotify_id, existing))
+
+            if len(existingMatches) > 0:
+                found += 1
+                existingMatch = existingMatches[0]
+                if artist.get('eval_prios') != 'dirty':
+                    continue
+                if existingMatch.evaluation and existingMatch.evaluation.status == 2:
+                    continue
+                dirty += 1
+                if existingMatch.evaluation:
+                    evalIds.append({"id": existingMatch.evaluation.id, "status": 2})
+                    if len(evalIds) > 100:
+                        sql_session.execute(
+                            update(Evaluation),
+                            evalIds,
+                        )
+                        evalIds = list()
+                    continue
+                eval = tracking_controller.convert_eval(artist, existingMatch.id)
+                existingMatch.evaluation = eval
+                sql_session.add(existingMatch)
+                continue
+            else:
+                new += 1
+                print("Adding artist: " + spotify_id)
+                tracking_controller.import_sql(artist)
+        if len(evalIds) > 0:
+            sql_session.execute(
+                update(Evaluation),
+                evalIds,
+            )
+        sql_session.commit()
+        sql_session.close()
+
+        return {
+            "page": page,
+            "new": new,
+            "found": found,
+            "dirty": dirty,
+            'totalPages': math.ceil(total / count),
+
+        }
+
     @v2_api.post("/import-artists")
     def import_artists():
         if (flask.request.is_json):
@@ -81,6 +148,9 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         offset = page * count
         total = int(db.collection('artists_v2').count().get()[0][0].value)
         old_artists = db.collection("artists_v2").limit(count).offset(offset).get()
+
+
+
         imported, skipped, avg, fails = tracking_controller.import_sql(old_artists)
 
         return {

@@ -137,9 +137,11 @@ class EvalController():
             "eval_prios": "unknown",
             "eval_as_of": datetime.now()
         })
+
         sql_ref.evaluation = Evaluation(
             distributor_type=3,
-            status=2
+            status=2,
+            artist_id=sql_ref.id
         )
         sql_session = self.sql.get_session()
         sql_session.add(sql_ref)
@@ -230,6 +232,7 @@ class EvalController():
         #   "eval_status": "success"
     })
     sql_ref.evaluation = Evaluation(
+        artist_id=sql_ref.id,
         distributor_type=distributor_type,
         status=sql_status,
         distributor=main_eval['distributor'] if main_eval['distributor'] != None else "",

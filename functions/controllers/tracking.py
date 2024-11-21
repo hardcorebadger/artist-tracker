@@ -413,6 +413,39 @@ class TrackingController():
           path=url_identifier,
       )
 
+  def convert_eval(self, artist, existingId = None):
+    if artist.get('eval_as_of') != None:
+        status = 1
+        if artist.get('eval_prios') == 'dirty':
+            status = 2
+        elif artist.get('eval_status') == 'unsigned':
+            status = 0
+
+        if artist.get('eval_distro_type') == 'indie':
+            distributor_type = 1
+        elif artist.get('eval_distro_type') == 'major':
+            distributor_type = 2
+        elif artist.get('eval_distro_type') == 'diy':
+            distributor_type = 0
+        else:
+            distributor_type = 3
+
+        distro = artist.get('eval_distro')
+        label = artist.get('eval_label')
+        if len(distro) == 0:
+            distro = None
+        if len(label) == 0:
+            label = None
+        eval = Evaluation(
+            distributor=distro,
+            distributor_type=distributor_type,
+            label=label,
+            created_at=artist.get('eval_as_of'),
+            status=status
+        )
+        if existingId is not None:
+            eval.artist_id = existingId
+    return eval
   def import_sql(self, old_artists):
       if not isinstance(old_artists, QueryResultsList):
           old_artists = [old_artists]
@@ -458,36 +491,7 @@ class TrackingController():
                           favorite=watchDetails.get('favorite'),
                           created_at=watchDetails.get('added_on'),
                       ))
-                  eval = None
-                  if artist.get('eval_as_of') != None:
-                      status = 1
-                      if artist.get('eval_status') == 'dirty':
-                          status = 2
-                      elif artist.get('eval_status') == 'unsigned':
-                          status = 0
-
-                      if artist.get('eval_distro_type') == 'indie':
-                          distributor_type = 1
-                      elif artist.get('eval_distro_type') == 'major':
-                          distributor_type = 2
-                      elif artist.get('eval_distro_type') == 'diy':
-                          distributor_type = 0
-                      else:
-                          distributor_type = 3
-
-                      distro = artist.get('eval_distro')
-                      label = artist.get('eval_label')
-                      if len(distro) == 0:
-                          distro = None
-                      if len(label) == 0:
-                          label = None
-                      eval = Evaluation(
-                          distributor=distro,
-                          distributor_type=distributor_type,
-                          label=label,
-                          created_at=artist.get('eval_as_of'),
-                          status=status
-                      )
+                  eval = self.convert_eval(artist)
                   stats = list()
                   stat_dates = artist.get('stat_dates')
                   for key, value in artist.to_dict().items():

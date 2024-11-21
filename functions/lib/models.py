@@ -79,6 +79,7 @@ class Evaluation(Base):
     label = Column(String(256), nullable=True, default=None)
     created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
+    artist_id = Column(UUID, nullable=True)
     artist: Mapped["Artist"] = relationship(back_populates="evaluation", foreign_keys=[Artist.evaluation_id])
 
     def as_dict(self):
