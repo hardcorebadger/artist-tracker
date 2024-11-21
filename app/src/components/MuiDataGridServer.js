@@ -1,9 +1,10 @@
-import {HStack, Text, VStack, IconButton, Button, Link, Badge, chakra, Box} from "@chakra-ui/react";
-import {DataGridPro, useGridApiContext, useGridApiRef} from '@mui/x-data-grid-pro';
+import {HStack, Text, VStack, IconButton, Button, Link, Badge, chakra, Box, Wrap} from "@chakra-ui/react";
+import {DataGridPro, GridColumnHeaderItem, GridHeader, useGridApiContext, useGridApiRef} from '@mui/x-data-grid-pro';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
 import { red } from '@mui/material/colors';
 import { createTheme } from '@mui/material/styles';
+
 import EditableTitle from "./EditableTitle";
 import ConfirmButton from "./ConfirmButton";
 import DataGridColumnMenu from './DataGridColumnMenu'
@@ -14,7 +15,7 @@ import { deepCompare, deepCopy } from "../util/objectUtil";
 import { httpsCallable } from "firebase/functions";
 import { functions } from '../firebase';
 import {ColumnDataContext} from "../App";
-import {Link as MUILink} from '@mui/material'
+import {Link as MUILink, Tooltip} from '@mui/material'
 import { Link as RouterLink } from "react-router-dom";
 
 // const ChakraDataGrid = chakra(DataGrid);
@@ -62,6 +63,8 @@ const metricColumnFactory = (metric, func) => ({
         }
         return 'n/a'
     },
+    renderHeader: columnOptions[metric].renderHeader,
+    description: columnOptions[metric].description,
     ...metricFunctions[func].options
 })
 
@@ -123,6 +126,7 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
       const type = statTypes[typeIndex];
       const key = 'statistic.' + type['id']
       const sourceName = type['source'].charAt(0).toUpperCase() + type['source'].slice(1);
+      const linkSource = linkSources.filter((s) => s.key === type['source']).pop()
       columnOptions[key] = {
           field: key,
           keyName: type['source'] + "." + type['key'],
@@ -130,6 +134,15 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
           statName: type['name'],
           statTypeId: type['id'],
           source: type['source'],
+          description: sourceName +' ' + type['name'],
+          renderHeader: (params) => (
+              <Tooltip title={linkSource['display_name'] + ' ' + type['name']}>
+                  <Box flex align={'center'} flexWrap={"nowrap"}>
+                      {linkSource && linkSource['logo'] ? <Iconify sx={{display: 'inline-block'}} icon={linkSource['logo']}></Iconify> : null}
+                      <Text display={'inline-block'}>&nbsp;{type['name']}</Text>
+                  </Box>
+              </Tooltip>
+          ),
           isMetric: true
       }
   }
@@ -144,6 +157,15 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
           filterable: false,
           sortable: false,
           headerName: type['display_name'] + ' Link',
+          description:  type['display_name'] + ' Link',
+          renderHeader: (params) => (
+              <Tooltip title={type['display_name'] + ' Link'}>
+                  <Wrap align={'center'}>
+                      {type['logo'] ? <Iconify sx={{display: 'inline-block'}} icon={type['logo']}></Iconify> : null}
+                      Link
+                  </Wrap>
+              </Tooltip>
+          ),
           renderCell: (params) => ( <MUILink color='primary' href={params.value}>{type['display_name']} <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></MUILink> ),
           isMetric: false
       }
