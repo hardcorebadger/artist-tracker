@@ -251,16 +251,17 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                 pageSize: paginationModel.pageSize,
                 sortModel,
                 filterModel});
-                // setDataIsLoading(false)
-                const newReq = {}
-                newReq[startTime] = {
+                setDataIsLoading(false)
+                // const newReq = {}
+                // newReq[startTime] = {
+                //     time: startTime,
+                //     rows: resp.data.rows,
+                //     rowCount: resp.data.rowCount
+                // }
+                setRowRequests({
                     time: startTime,
                     rows: resp.data.rows,
                     rowCount: resp.data.rowCount
-                }
-                setRowRequests({
-                    ...newReq,
-                    ...rowRequests
                 });
         };
         fetcher();
@@ -312,18 +313,18 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         setReportName(initialReportName)
     }
 
-    const rows = rowRequests[currentReqTime] ?? {}
+    const rows = rowRequests ?? {}
 
-    if (rows && rows.hasOwnProperty('time') && rows['time'] === currentReqTime) {
-        if (dataIsLoading) {
-            setDataIsLoading(false)
-        }
-        if (Object.keys(rowRequests).length > 1) {
-            const newReq = {};
-            newReq[currentReqTime] = rows
-            setRowRequests(newReq)
-        }
-    }
+    // if (rows && rows.hasOwnProperty('time') && rows['time'] === currentReqTime) {
+    //     if (dataIsLoading) {
+    //         setDataIsLoading(false)
+    //     }
+    //     if (Object.keys(rowRequests).length > 1) {
+    //         const newReq = {};
+    //         newReq[currentReqTime] = rows
+    //         setRowRequests(newReq)
+    //     }
+    // }
 
     const handleColumnOrderChange = (change) => {
       const column = change.column.field

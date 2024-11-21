@@ -5,10 +5,10 @@ from firebase_admin import firestore, initialize_app
 from firebase_functions import https_fn
 from sqlalchemy import select, func, and_, not_
 from sqlalchemy.dialects.mssql.information_schema import columns
-from sqlalchemy.orm import subqueryload, joinedload, defer, aliased
+from sqlalchemy.orm import subqueryload, joinedload, contains_eager, defer, aliased
 
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
-    CloudSQLClient, LinkSource, ArtistLink, OrganizationArtist, Evaluation, StatisticType, Statistic, UserArtist
+    CloudSQLClient, LinkSource, ArtistLink, ArtistTag, OrganizationArtist, Evaluation, StatisticType, Statistic, UserArtist
 
 class ArtistController():
 
@@ -57,11 +57,15 @@ class ArtistController():
             query = (select(Artist).options(
                 joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True).defer(StatisticType.created_at).defer(StatisticType.updated_at),
                 joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True).defer(LinkSource.logo),
-                joinedload(Artist.users, innerjoin=True),
                 joinedload(Artist.organizations, innerjoin=True),
-                joinedload(Artist.evaluation, innerjoin=False),
+                contains_eager(Artist.evaluation),
+                contains_eager(Artist.users),
+                contains_eager(Artist.tags)
             ))
+        query = query.outerjoin(Evaluation, Artist.evaluation).outerjoin(UserArtist, Artist.users).outerjoin(ArtistTag, Artist.tags)
         query = query.where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization')))
+        query = query.filter(UserArtist.organization_id == user_data.get('organization'))
+        query = query.filter(ArtistTag.organization_id == user_data.get('organization') or ArtistTag.organization_id == None)
         query = self.build_filters(user_data, data, query)
 
         # .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
