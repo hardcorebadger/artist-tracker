@@ -38,6 +38,8 @@ songstats = SongstatsClient(SONGSTATS_API_KEY)
 sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD, SQL_DB)
 artists = ArtistController(PROJECT_ID, LOCATION, sql)
 
+stat_types = None
+link_sources = None
 # ##############################
 # V2 API
 # ##############################
@@ -354,19 +356,19 @@ def load_stat_types():
     return list_sorted
 
 
-sorted_statistic_types = load_stat_types()
-sorted_link_sources = load_link_sources()
-
-@https_fn.on_call(cors=options.CorsOptions(
-        cors_origins="*",
-        cors_methods=["get", "post", "options"]))
+@https_fn.on_call()
 def get_statistic_types(req: https_fn.CallableRequest):
-    return sorted_statistic_types
+    global stat_types
+    if stat_types is None:
+        stat_types = load_stat_types()
+    return stat_types
 
 @https_fn.on_call()
 def get_link_sources(req: https_fn.CallableRequest):
-
-    return sorted_link_sources
+    global link_sources
+    if link_sources is None:
+        link_sources = load_link_sources()
+    return link_sources
 
 
 @https_fn.on_call(cors=options.CorsOptions(
