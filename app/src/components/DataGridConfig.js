@@ -4,7 +4,7 @@
 import {
   Badge,
   Button,
-  Link
+  Link, Wrap
 } from '@chakra-ui/react';
 import Iconify from '../components/Iconify';
 // import Chart from "react-apexcharts";
@@ -68,6 +68,17 @@ export const columnOptions = {
       operator: 'startsWith',
     }
   },
+  "evaluation.label": {
+    field: 'evaluation.label',
+    valueGetter: (data) => data.row?.evaluation?.label ?? 'N/A',
+    headerName: 'Label',
+    isMetric: false,
+    minWidth: 150,
+    defaultFilter: {
+      type: 'string',
+      operator: 'startsWith',
+    }
+  },
   "evaluation.status": {
     field: 'evaluation.status',
     headerName: 'Status',
@@ -115,6 +126,28 @@ export const columnOptions = {
     ],
     type: 'singleSelect',
   },
+  // "genres": {
+  //   field: 'tags',
+  //   type: 'multiSelect',
+  //   headerName: 'Genres',
+  //   valueGetter: (data) => data.row?.tags ?? [],
+  //   isMetric: false,
+  //
+  //   renderCell: (params) => {
+  //     console.log(params)
+  //     return (
+  //         <Wrap>
+  //
+  //           {params.value.map((item) => {
+  //             return <Chip variant="outlined" size='small'
+  //                   color={"info"}
+  //                   label={item.tag}/>
+  //           })}
+  //         </Wrap>
+  //
+  //     )
+  //   }
+  // }
   // "genres": {
   //   field: 'genres',
   //   op: input => input.length > 0 ? input[0] : "",

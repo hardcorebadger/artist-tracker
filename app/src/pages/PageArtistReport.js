@@ -28,21 +28,16 @@ function PageArtistReport() {
   useEffect(() => {
     if (statisticTypes == null || statisticTypes?.length === 0) {
       const getTypes = httpsCallable(functions, 'get_statistic_types')
-      console.log("A")
       getTypes().then((response) => {
         setStatisticTypes(response.data)
-        console.log("C")
       });
-      console.log("B")
     }
 
     if (linkSources == null || linkSources?.length === 0) {
       const getSources = httpsCallable(functions, 'get_link_sources')
-      console.log("B+")
       getSources().then((response) => {
         setLinkSources(response.data)
       })
-      console.log("B++")
     }
   }, []);
 

@@ -105,7 +105,7 @@ function CopyrightCard({artist, linkSources}) {
             }
             const source = linkSources.filter((s) => s.key === (key.split("link_")[1])).pop()
             return (
-                <ThemeProvider theme={theme}>
+                <ThemeProvider theme={theme} key={"detail_" + key}>
                  <MUILink color='primary' href={value}>
                    <Wrap align={'center'}>
                      <Iconify icon={source?.logo}/> {source?.display_name} <Iconify icon="mdi:external-link" />

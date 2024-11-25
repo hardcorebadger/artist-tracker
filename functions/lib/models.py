@@ -57,6 +57,7 @@ class Artist(Base):
         dict['organization'] = list(map(lambda org: org.as_dict(), self.organizations))
         dict['statistics'] = list(map(lambda stat: stat.as_dict(), self.statistics))
         dict['tags'] = list(map(lambda tag: tag.as_dict(), self.tags))
+
         # for stat in self.statistics:
         #     dict['stat_' + stat.type.source + '__' + stat.type.key + '-latest'] = stat.latest
         #     dict['stat_' + stat.type.source + '__' + stat.type.key + '-last'] = stat.previous
@@ -218,6 +219,7 @@ class ArtistTag(Base):
         return {
             "tag": self.tag,
             "id": self.id,
+            "tag_type_id": self.tag_type_id,
             "organization_id": self.organization_id,
             "type": self.type.as_dict(),
             "created_at": self.created_at

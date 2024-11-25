@@ -283,9 +283,6 @@ def fn_v1_api(req: https_fn.Request) -> https_fn.Response:
 #   task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT)
 #   airtable_v1_cron(task_controller, v1_controller)
 
-# Figures out how many artists to do per batch given an update interval and minimum SLA
-
-
 
 
 @scheduler_fn.on_schedule(schedule=f"*/2 * * * *", memory=512)
@@ -373,7 +370,7 @@ def get_link_sources(req: https_fn.CallableRequest):
 
 @https_fn.on_call(cors=options.CorsOptions(
         cors_origins="*",
-        cors_methods=["get", "post", "options"]))
+            cors_methods=["get", "post", "options"]))
 def get_artists(req: https_fn.CallableRequest):
 
     return artists.get_artists(req.auth.uid, req.data, app)

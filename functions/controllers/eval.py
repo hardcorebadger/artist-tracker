@@ -235,8 +235,8 @@ class EvalController():
         artist_id=sql_ref.id,
         distributor_type=distributor_type,
         status=sql_status,
-        distributor=main_eval['distributor'] if main_eval['distributor'] != None else "",
-        label=main_eval['label'] if main_eval['label'] != None else "",
+        distributor=main_eval['distributor'] if main_eval['distributor'] != "" else None,
+        label=main_eval['label'] if main_eval['label'] != "" else None,
     )
     sql_session = self.sql.get_session()
     sql_session.add_all([sql_ref])
