@@ -337,16 +337,25 @@ def add_artist(req: https_fn.CallableRequest):
 def sort_ordered(l):
     return l.get('order', 0)
 
-sql_session = sql.get_session()
-types = sql_session.scalars(select(StatisticType)).all()
-list_sorted = list(map(lambda type: type.as_dict(), types))
-sources = sql_session.scalars(select(LinkSource)).all()
-list_sorted_sources = list(map(lambda type: type.as_dict(), sources))
-sql_session.close()
-list_sorted.sort(key=sort_ordered)
-sorted_statistic_types = list_sorted
-list_sorted_sources.sort(key=sort_ordered)
-sorted_link_sources = list_sorted_sources
+def load_link_sources():
+    sql_session = sql.get_session()
+    sources = sql_session.scalars(select(LinkSource)).all()
+    list_sorted_sources = list(map(lambda type: type.as_dict(), sources))
+    sql_session.close()
+    list_sorted_sources.sort(key=sort_ordered)
+    return list_sorted_sources
+
+def load_stat_types():
+    sql_session = sql.get_session()
+    types = sql_session.scalars(select(StatisticType)).all()
+    list_sorted = list(map(lambda type: type.as_dict(), types))
+    sql_session.close()
+    list_sorted.sort(key=sort_ordered)
+    return list_sorted
+
+
+sorted_statistic_types = load_stat_types()
+sorted_link_sources = load_link_sources()
 
 @https_fn.on_call(cors=options.CorsOptions(
         cors_origins="*",

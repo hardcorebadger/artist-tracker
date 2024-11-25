@@ -1,4 +1,4 @@
-python3 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate
 pip3 install --upgrade pip
-python -m pip install -r requirements.txt
+python3.12 -m pip install -r requirements.txt
