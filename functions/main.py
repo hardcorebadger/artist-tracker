@@ -81,31 +81,25 @@ def reimport_artists_eval(page = 0, page_size = 50):
             back_catalog = 0
             if artist.get('eval_prios') == 'dirty':
                 back_catalog = 1
-            if existingMatch.evaluation and (
-                    existingMatch.evaluation.status != status or existingMatch.evaluation.back_catalog != back_catalog):
+            if existingMatch.evaluation and (existingMatch.evaluation.status != status or existingMatch.evaluation.back_catalog != back_catalog):
                 updated += 1
-                evalIds.append({"id": existingMatch.evaluation.id, "status": status, "back_catalog": back_catalog})
-                if len(evalIds) > 100:
-                    sql_session.execute(
-                        update(Evaluation),
-                        evalIds,
-                    )
+                existingMatch.evaluation.status = status
+                existingMatch.evaluation.back_catalog = back_catalog
+                evalIds.append(existingMatch.evaluation.id)
+                sql_session.add(existingMatch.evaluation)
+                if len(evalIds) > 50:
+                    sql_session.commit()
                     evalIds = list()
                 continue
-            eval = tracking_controller.convert_eval(artist, existingMatch.id)
-            existingMatch.evaluation = eval
-            sql_session.add(existingMatch)
-            continue
+            else:
+                continue
         else:
             new += 1
             print("Adding artist: " + spotify_id)
             tracking_controller.import_sql(artist)
     if len(evalIds) > 0:
-        sql_session.execute(
-            update(Evaluation),
-            evalIds,
-        )
-    sql_session.commit()
+        sql_session.commit()
+
     sql_session.close()
     return page, updated, found, new
 #############################
