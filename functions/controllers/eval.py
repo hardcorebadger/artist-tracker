@@ -202,7 +202,7 @@ class EvalController():
     parse_evals(yt_evals)
     sql_status = 0
     if status == 'signed':
-        sql_status = 0
+        sql_status = 1
     sql_back_catalog = 0
     if priors == 'dirty':
         sql_back_catalog = 1
