@@ -340,7 +340,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
 
     return (
         
-        <VStack spacing={5} align="left">
+        <VStack spacing={5} align="left" >
         <HStack px={6} justifyContent='space-between'>
         <VStack spacing={3} align="left">
         <EditableTitle value={reportName} setValue={setReportName} />
@@ -362,13 +362,14 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         </HStack>
         
         </HStack>
-        <Box width="calc(100vw - 300px)">
+        <Box width="calc(100vw - 301px)" maxWidth={'100%'}>
         {/* This is MUI */}
         <div
           style={{
               display: 'flex',
               flexDirection: 'column',
               height: 'calc(100vh - 175px)',
+              minHeight: '750px'
 
           }}
           >

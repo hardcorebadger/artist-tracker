@@ -308,8 +308,9 @@ export default function DashboardLayout() {
                   "nav main"`}
       gridTemplateRows={'85px 1fr'}
       gridTemplateColumns={'300px 1fr'}
-      h={vh100}
+      h={'calc(100vh - 10px'}
       w='100vw'
+      maxW={'100%'}
       gap='0'>
         <GridItem area={'header'}>
           <Header navItems={navItems}/>

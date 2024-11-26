@@ -124,7 +124,7 @@ function PageArtistReport() {
       <ArtistDetailNew artist={activeArtist} linkSources={linkSources} onNavigateBack={()=>setActiveArtist(null)}/>
       </PageLayoutContained>
     }
-    <Box sx={{opacity:activeArtist!=null?0:1,height:activeArtist!=null?0:'auto'}} >
+    <Box sx={{opacity:activeArtist!=null?0:1,height:activeArtist!=null?0:'auto', maxWidth: '100%'}} >
     <MuiDataGridController
     initialReportName={reportData?.name}
     initialColumnOrder={reportData?.columnOrder}
