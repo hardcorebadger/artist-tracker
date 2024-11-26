@@ -1,8 +1,9 @@
 import math
 from array import array
 
-from firebase_admin import initialize_app, firestore
+from firebase_admin import initialize_app, firestore, functions
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, params, logger, options
+from firebase_functions.options import RetryConfig, RateLimits
 from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter
 from openai import organization
@@ -11,6 +12,7 @@ from sqlalchemy.orm import joinedload, subqueryload
 
 from controllers.artists import ArtistController
 from cron_jobs import airtable_v1_cron, eval_cron, stats_cron, onboarding_cron
+from lib.utils import get_function_url
 from tmp_keys import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
     CloudSQLClient, LinkSource, ArtistLink, OrganizationArtist, Evaluation, StatisticType, Statistic, UserArtist
@@ -40,7 +42,69 @@ artists = ArtistController(PROJECT_ID, LOCATION, sql)
 
 stat_types = None
 link_sources = None
-# ##############################
+
+@tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, min_backoff_seconds=60),
+                             rate_limits=RateLimits(max_concurrent_dispatches=10))
+def reimportsql(req: tasks_fn.CallableRequest) -> str:
+    db = firestore.client(app)
+    tracking_controller = TrackingController(spotify, songstats, sql, db)
+
+    count = int(req.data.get('size', 50))
+    page = int(req.data.get('page', 0))
+    offset = page * count
+    old_artists = db.collection("artists_v2").limit(count).offset(offset).get()
+    spotifys = list(map(lambda x: x.get('spotify_id'), old_artists))
+
+    sql_session = sql.get_session()
+    found = 0
+    updated = 0
+    new = 0
+    existing = sql_session.scalars(
+        select(Artist).options(joinedload(Artist.evaluation)).where(Artist.spotify_id.in_(spotifys))).all()
+    evalIds = list()
+    for artist in old_artists:
+        spotify_id = artist.get('spotify_id')
+        add_batch = list()
+        existingMatches = list(filter(lambda x: x.spotify_id == spotify_id, existing))
+
+        if len(existingMatches) > 0:
+            found += 1
+            existingMatch = existingMatches[0]
+            status = 1
+            if artist.get('eval_status') == 'unsigned':
+                status = 0
+            back_catalog = 0
+            if artist.get('eval_prios') == 'dirty':
+                back_catalog = 1
+            if existingMatch.evaluation and (
+                    existingMatch.evaluation.status != status or existingMatch.evaluation.back_catalog != back_catalog):
+                updated += 1
+                evalIds.append({"id": existingMatch.evaluation.id, "status": status, "back_catalog": back_catalog})
+                if len(evalIds) > 100:
+                    sql_session.execute(
+                        update(Evaluation),
+                        evalIds,
+                    )
+                    evalIds = list()
+                continue
+            eval = tracking_controller.convert_eval(artist, existingMatch.id)
+            existingMatch.evaluation = eval
+            sql_session.add(existingMatch)
+            continue
+        else:
+            new += 1
+            print("Adding artist: " + spotify_id)
+            tracking_controller.import_sql(artist)
+    if len(evalIds) > 0:
+        sql_session.execute(
+            update(Evaluation),
+            evalIds,
+        )
+    sql_session.commit()
+    sql_session.close()
+
+    return "Page: " + page + " Found: " + found + " Updated: " + updated + " new: " + new
+#############################
 # V2 API
 # ##############################
 
@@ -77,66 +141,18 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
             data = flask.request.get_json()
         else:
             data = {}
-
-        count = int(data.get('size', 50))
-        page = int(data.get('page', 0))
-        offset = page * count
+        task_queue = functions.task_queue("reimportsql")
+        target_uri = get_function_url("reimportsql")
         total = int(db.collection('artists_v2').count().get()[0][0].value)
-        old_artists = db.collection("artists_v2").limit(count).offset(offset).get()
-        spotifys = list(map(lambda x: x.get('spotify_id'), old_artists))
+        count = data.get('pageSize', 500)
+        total_pages = math.ceil(total / count)
+        for i in range(total_pages + 1):
+            body = {"data": {"page": i, "size": count}}
+            task_options = functions.TaskOptions(schedule_time=datetime.now(),
+                                                 uri=target_uri)
+            task_queue.enqueue(body, task_options)
+        return https_fn.Response(status=200, response=f"Enqueued {total_pages + 1} tasks")
 
-        sql_session = sql.get_session()
-        found = 0
-        dirty = 0
-        new = 0
-        existing = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation)).where(Artist.spotify_id.in_(spotifys))).all()
-        evalIds = list()
-        for artist in old_artists:
-            spotify_id = artist.get('spotify_id')
-            add_batch = list()
-            existingMatches = list(filter(lambda x: x.spotify_id == spotify_id, existing))
-
-            if len(existingMatches) > 0:
-                found += 1
-                existingMatch = existingMatches[0]
-                if artist.get('eval_prios') != 'dirty':
-                    continue
-                if existingMatch.evaluation and existingMatch.evaluation.status == 2:
-                    continue
-                dirty += 1
-                if existingMatch.evaluation:
-                    evalIds.append({"id": existingMatch.evaluation.id, "status": 2})
-                    if len(evalIds) > 100:
-                        sql_session.execute(
-                            update(Evaluation),
-                            evalIds,
-                        )
-                        evalIds = list()
-                    continue
-                eval = tracking_controller.convert_eval(artist, existingMatch.id)
-                existingMatch.evaluation = eval
-                sql_session.add(existingMatch)
-                continue
-            else:
-                new += 1
-                print("Adding artist: " + spotify_id)
-                tracking_controller.import_sql(artist)
-        if len(evalIds) > 0:
-            sql_session.execute(
-                update(Evaluation),
-                evalIds,
-            )
-        sql_session.commit()
-        sql_session.close()
-
-        return {
-            "page": page,
-            "new": new,
-            "found": found,
-            "dirty": dirty,
-            'totalPages': math.ceil(total / count),
-
-        }
 
     @v2_api.post("/import-artists")
     def import_artists():

@@ -77,7 +77,8 @@ class Evaluation(Base):
     __tablename__ = 'evaluations'
 
     id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
-    status = Column(Integer, nullable=False, default=2)
+    status = Column(Integer, nullable=False, default=0)
+    back_catalog = Column(Integer, nullable=False, default=0)
     distributor = Column(String(256), nullable=True, default=None)
     distributor_type = Column(SmallInteger, nullable=True, default=3)
     label = Column(String(256), nullable=True, default=None)

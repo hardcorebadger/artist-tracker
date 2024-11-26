@@ -200,9 +200,12 @@ class EvalController():
         
     parse_evals(sp_evals)
     parse_evals(yt_evals)
-    sql_status = 1
-    if status == 'unsigned':
+    sql_status = 0
+    if status == 'signed':
         sql_status = 0
+    sql_back_catalog = 0
+    if priors == 'dirty':
+        sql_back_catalog = 1
 
     if main_eval['distribution_type'] == 'indie':
         distributor_type = 1
@@ -233,6 +236,7 @@ class EvalController():
         artist_id=sql_ref.id,
         distributor_type=distributor_type,
         status=sql_status,
+        back_catalog=sql_back_catalog,
         distributor=main_eval['distributor'] if main_eval['distributor'] != "" else None,
         label=main_eval['label'] if main_eval['label'] != "" else None,
     )

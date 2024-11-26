@@ -102,26 +102,30 @@ class ArtistController():
                 newValue = value
                 if eval_key == 'status':
                     if value == 'unknown':
-                        newValue = list([2, 3, 4])
+                        newValue = list([0, 1, 2, 3])
+                        operator = 'isNotOf'
+                    elif value == 'signed':
+                        newValue = list([1, 3])
+                        operator = 'isAnyOf'
+                    elif value == 'unsigned':
+                        newValue = list([0, 2])
                         operator = 'isAnyOf'
                 elif eval_key == 'back_catalog':
                     eval_key = 'status'
                     if operator == 'isAnyOf':
                         if len(newValue) == 1:
                             if newValue[0] == 'dirty':
-                                newValue[0] = 2
+                                newValue[0] = list([2, 3])
                             else:
                                 newValue = list([0, 1])
                         else:
                             continue
                     elif newValue != 'dirty':
-                        if operator != 'not' and operator != '!=':
-                            operator = '<'
-                        else:
-                            operator = '=='
-
-                    if operator != 'isAnyOf':
-                        newValue = 2
+                        operator = 'isAnyOf'
+                        newValue = list([0,1])
+                    else:
+                        operator = 'isAnyOf'
+                        newValue = list([2, 3])
                 dynamic = aliased(Evaluation)
                 column = getattr(dynamic, eval_key)
                 query = query.outerjoin(dynamic, Artist.evaluation_id == dynamic.id)
@@ -141,7 +145,9 @@ class ArtistController():
                 return query
         if operator == 'isAnyOf':
             return query.filter(column.in_(value))
-        if operator == '>':
+        elif operator == 'isNotOf':
+            return query.filter(not_(column.in_(value)))
+        elif operator == '>':
             return query.filter(column > value)
         elif operator == '<':
             return query.filter(column < value)

@@ -419,6 +419,9 @@ class TrackingController():
         if artist.get('eval_status') == 'unsigned':
             status = 0
 
+        back_catalog = 0
+        if artist.get('eval_prios') == 'dirty':
+            back_catalog = 1
         if artist.get('eval_distro_type') == 'indie':
             distributor_type = 1
         elif artist.get('eval_distro_type') == 'major':
@@ -439,7 +442,8 @@ class TrackingController():
             distributor_type=distributor_type,
             label=label,
             created_at=artist.get('eval_as_of'),
-            status=status
+            status=status,
+            back_catalog=back_catalog,
         )
         if existingId is not None:
             eval.artist_id = existingId

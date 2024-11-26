@@ -83,12 +83,12 @@ export const columnOptions = {
     field: 'evaluation.status',
     headerName: 'Status',
     isMetric: false,
-    valueGetter: (data) => data.row?.evaluation?.status === 0 ? 'Unsigned' :  data.row?.evaluation?.status === 1 ? 'Signed' : 'Unknown' ,
+    valueGetter: (data) => (data?.row?.evaluation?.status ?? null),
     valueOptions: [
-      {value: 1, label: 'Signed'}, {value: 0, label: 'Unsigned'}, {value: 'unknown', label: 'Unknown'}
+      {value: 1, label: 'Signed'}, {value: 0, label: 'Unsigned'}, {value: null, label: 'Unknown'}
     ],
     renderCell: (params) => (
-      <Chip variant="outlined" size='small' color={params.value == "Signed" ? "error" : params.value == "Unsigned" ? "primary" : "warning"} label={params.value} />
+      <Chip variant="outlined" size='small' color={params.value == 1 ? "error" : params.value == 0 ? "primary" : "warning"} label={params.value == 0 ? 'Unsigned' : (params.value == 1 ? 'Signed' : 'Unknown')} />
     ),
     type: 'singleSelect',
 
@@ -115,14 +115,14 @@ export const columnOptions = {
   "evaluation.back_catalog": {
     field: 'evaluation.back_catalog',
     headerName: 'Backcatalog Status',
-    valueGetter: (data) => (data.row?.evaluation?.status === 2 ? 'dirty' : 'clean'),
+    valueGetter: (data) => (data.row?.evaluation?.back_catalog ?? null),
     renderCell: (params) => (
-      <Chip variant="outlined" size='small' color={params.value == "dirty" ? "warning" : "primary"} label={String(params.value).charAt(0).toUpperCase() + String(params.value).slice(1)} />
+      <Chip variant="outlined" size='small' color={params.value == 1 ? "warning" : "primary"} label={(params.value == null ? 'Unknown' : (params.value == 0 ? 'Clean' : 'Dirty'))} />
     ),
     isMetric: false,
     // filterEditor: SelectFilter,
     valueOptions: [
-       {value:'clean', label: 'Clean'}, {value: 'dirty', label: 'Dirty'}
+       {value: 0, label: 'Clean'}, {value: 1, label: 'Dirty'}
     ],
     type: 'singleSelect',
   },
