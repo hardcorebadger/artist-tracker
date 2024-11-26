@@ -100,32 +100,7 @@ class ArtistController():
                 eval_key = field.split('.')
                 eval_key = eval_key[1]
                 newValue = value
-                if eval_key == 'status':
-                    if value == 'unknown':
-                        newValue = list([0, 1, 2, 3])
-                        operator = 'isNotOf'
-                    elif value == 'signed':
-                        newValue = list([1, 3])
-                        operator = 'isAnyOf'
-                    elif value == 'unsigned':
-                        newValue = list([0, 2])
-                        operator = 'isAnyOf'
-                elif eval_key == 'back_catalog':
-                    eval_key = 'status'
-                    if operator == 'isAnyOf':
-                        if len(newValue) == 1:
-                            if newValue[0] == 'dirty':
-                                newValue[0] = list([2, 3])
-                            else:
-                                newValue = list([0, 1])
-                        else:
-                            continue
-                    elif newValue != 'dirty':
-                        operator = 'isAnyOf'
-                        newValue = list([0,1])
-                    else:
-                        operator = 'isAnyOf'
-                        newValue = list([2, 3])
+
                 dynamic = aliased(Evaluation)
                 column = getattr(dynamic, eval_key)
                 query = query.outerjoin(dynamic, Artist.evaluation_id == dynamic.id)
@@ -193,8 +168,6 @@ class ArtistController():
                 elif sortFieldKey.startswith('evaluation'):
                     evalKey = sortFieldKey.split('.')
                     evalKey = evalKey[1]
-                    if evalKey == 'back_catalog':
-                        evalKey = 'status'
                     tableAliased = aliased(Evaluation)
                     column = getattr(tableAliased, evalKey).asc()
 

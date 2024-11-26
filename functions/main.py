@@ -3,7 +3,7 @@ from array import array
 
 from firebase_admin import initialize_app, firestore, functions
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, params, logger, options
-from firebase_functions.options import RetryConfig, RateLimits
+from firebase_functions.options import RetryConfig, RateLimits, MemoryOption
 from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter
 from openai import organization
@@ -43,16 +43,21 @@ artists = ArtistController(PROJECT_ID, LOCATION, sql)
 stat_types = None
 link_sources = None
 
-@tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, min_backoff_seconds=60),
-                             rate_limits=RateLimits(max_concurrent_dispatches=10))
+@tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, min_backoff_seconds=60), memory=MemoryOption.MB_512)
 def reimportsql(req: tasks_fn.CallableRequest) -> str:
-    db = firestore.client(app)
-    tracking_controller = TrackingController(spotify, songstats, sql, db)
 
     count = int(req.data.get('size', 50))
     page = int(req.data.get('page', 0))
-    offset = page * count
-    old_artists = db.collection("artists_v2").limit(count).offset(offset).get()
+
+    page, updated, found, new = reimport_artists_eval(page, count)
+    print("Page: " + str(page) + " Found: " + str(found) + " Updated: " + str(updated) + " new: " + str(new))
+    return "Page: " + str(page) + " Found: " + str(found) + " Updated: " + str(updated) + " new: " + str(new)
+
+def reimport_artists_eval(page = 0, page_size = 50):
+    db = firestore.client(app)
+    tracking_controller = TrackingController(spotify, songstats, sql, db)
+    offset = page * page_size
+    old_artists = db.collection("artists_v2").limit(page_size).offset(offset).get()
     spotifys = list(map(lambda x: x.get('spotify_id'), old_artists))
 
     sql_session = sql.get_session()
@@ -102,8 +107,7 @@ def reimportsql(req: tasks_fn.CallableRequest) -> str:
         )
     sql_session.commit()
     sql_session.close()
-
-    return "Page: " + page + " Found: " + found + " Updated: " + updated + " new: " + new
+    return page, updated, found, new
 #############################
 # V2 API
 # ##############################
@@ -141,11 +145,21 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
             data = flask.request.get_json()
         else:
             data = {}
-        task_queue = functions.task_queue("reimportsql")
-        target_uri = get_function_url("reimportsql")
         total = int(db.collection('artists_v2').count().get()[0][0].value)
         count = data.get('pageSize', 500)
         total_pages = math.ceil(total / count)
+        if data.get('page', None) is not None:
+            page, updated, found, new = reimport_artists_eval(page = data.get('page', 0), page_size = data.get('pageSize', 250))
+            return {
+                "page": page,
+                "updated": updated,
+                "new": new,
+                "found": found,
+                "total_pages": total_pages,
+            }
+        task_queue = functions.task_queue("reimportsql")
+        target_uri = get_function_url("reimportsql")
+
         for i in range(total_pages + 1):
             body = {"data": {"page": i, "size": count}}
             task_options = functions.TaskOptions(schedule_time=datetime.now(),
