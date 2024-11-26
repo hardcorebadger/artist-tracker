@@ -362,7 +362,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         </HStack>
         
         </HStack>
-        <Box width="calc(100vw - 301px)" maxWidth={'100%'}>
+        <Box width="calc(100vw - 300px)" maxWidth={'100%'}>
         {/* This is MUI */}
         <div
           style={{

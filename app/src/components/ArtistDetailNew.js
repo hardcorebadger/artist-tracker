@@ -84,7 +84,7 @@ function CopyrightCard({artist, linkSources}) {
   const priorsColor = artist.evaluation?.status == 2 ? 'yellow' : 'green'
   return (
 
-      <Box>
+      <Box sx={{maxWidth: '100%'}}>
     <Card p={25} variant="outline" mt={0}>
       <Stack w="100%" spacing={3}>
         <Heading size="xs">Copyright Evaluation</Heading>

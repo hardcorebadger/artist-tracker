@@ -321,7 +321,7 @@ export default function DashboardLayout() {
         <GridItem area={'nav'}>
           <NavBar navItems={navItems}/>
         </GridItem>
-        <GridItem area={'main'}>
+        <GridItem area={'main'} maxW={'calc(100vw - 315px)'}>
           <Outlet />
         </GridItem>
 
