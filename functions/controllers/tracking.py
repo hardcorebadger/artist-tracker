@@ -416,9 +416,7 @@ class TrackingController():
   def convert_eval(self, artist, existingId = None):
     if artist.get('eval_as_of') != None:
         status = 1
-        if artist.get('eval_prios') == 'dirty':
-            status = 2
-        elif artist.get('eval_status') == 'unsigned':
+        if artist.get('eval_status') == 'unsigned':
             status = 0
 
         if artist.get('eval_distro_type') == 'indie':

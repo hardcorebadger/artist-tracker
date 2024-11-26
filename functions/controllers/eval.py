@@ -201,9 +201,7 @@ class EvalController():
     parse_evals(sp_evals)
     parse_evals(yt_evals)
     sql_status = 1
-    if priors == 'dirty':
-        sql_status = 2
-    elif status == 'unsigned':
+    if status == 'unsigned':
         sql_status = 0
 
     if main_eval['distribution_type'] == 'indie':
