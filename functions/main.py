@@ -353,14 +353,14 @@ def load_stat_types():
     return list_sorted
 
 
-@https_fn.on_call()
+@https_fn.on_call(min_instances=1)
 def get_statistic_types(req: https_fn.CallableRequest):
     global stat_types
     if stat_types is None:
         stat_types = load_stat_types()
     return stat_types
 
-@https_fn.on_call()
+@https_fn.on_call(min_instances=1)
 def get_link_sources(req: https_fn.CallableRequest):
     global link_sources
     if link_sources is None:
@@ -368,7 +368,7 @@ def get_link_sources(req: https_fn.CallableRequest):
     return link_sources
 
 
-@https_fn.on_call(cors=options.CorsOptions(
+@https_fn.on_call(min_instances=1,cors=options.CorsOptions(
         cors_origins="*",
             cors_methods=["get", "post", "options"]))
 def get_artists(req: https_fn.CallableRequest):
