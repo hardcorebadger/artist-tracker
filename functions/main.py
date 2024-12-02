@@ -211,6 +211,12 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
         return eval_controller.evaluate_copyrights(data['spotify_id'])
 
+    @v2_api.post("/eval-artists-lookup")
+    def eval_artist_lookup():
+        data = flask.request.get_json()
+        limit = data.get('limit', 100)
+        return eval_controller.find_needs_eval_refresh(limit)
+
     @v2_api.post("/add-ingest-update-artist")
     def add_ingest_update_artist():
         data = flask.request.get_json()
