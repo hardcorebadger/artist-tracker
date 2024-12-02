@@ -71,6 +71,11 @@ class TrackingController():
 
     sql_session = self.sql.get_session()
     sqlRef = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id)).first()
+    if sqlRef is not None:
+        if not sqlRef.active:
+            sqlRef.active = True
+            sql_session.add(sqlRef)
+            sql_session.commit()
     sql_session.close()
     ref = self.db.collection("artists_v2").document(spotify_id)
 
