@@ -343,4 +343,7 @@ class EvalController():
         filter=FieldFilter('eval_as_of', "<", (datetime.now()-timedelta(days=7)))
     ).limit(limit).get()
     ids = [d.id for d in docs]
-    return ids
+    sql_session = self.sql.get_session()
+    sql_ids = sql_session.scalars(select(Artist.spotify_id)).where(Artist.spotify_id.in_(ids)).filter(Artist.active == True)
+    sql_ids = list(map(lambda x: x.spotifY_id, sql_ids))
+    return sql_ids

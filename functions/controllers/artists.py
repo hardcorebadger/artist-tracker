@@ -1,5 +1,8 @@
+import hashlib
+import json
 import time
 import copy
+from itertools import count
 
 from firebase_admin import firestore, initialize_app
 from firebase_functions import https_fn
@@ -9,6 +12,8 @@ from sqlalchemy.orm import subqueryload, joinedload, contains_eager, defer, alia
 
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
     CloudSQLClient, LinkSource, ArtistLink, ArtistTag, OrganizationArtist, Evaluation, StatisticType, Statistic, UserArtist
+
+count_by_query = None
 
 class ArtistController():
 
@@ -31,9 +36,33 @@ class ArtistController():
         start = time.time()
 
         sql_session = self.sql.get_session()
-        count = self.build_query(uid, copy.deepcopy(data), db, sql_session, True).count()
 
-        query = self.build_query(uid, copy.deepcopy(dict(data)), db, sql_session).limit(page_size).offset(page * page_size)
+        filters = data.get('filterModel', [])
+        user_data = get_user(uid, db)
+
+        hashed_data = dict({'filters': filters, 'org': user_data.get('organization', None) })
+        json_string = json.dumps(hashed_data, sort_keys=True)
+
+        # Create a hash object (using SHA-256 algorithm)
+        hash_object = hashlib.sha256(json_string.encode())
+
+        # Get the hexadecimal representation of the hash
+        hex_digest = hash_object.hexdigest()
+
+        global count_by_query
+        count = None
+        if count_by_query is None:
+            count_by_query = dict()
+
+        if hex_digest in count_by_query:
+            count_object = count_by_query[hex_digest]
+            if (time.time() - count_object['time']) < 360:
+                count = count_object['count']
+        if count is None:
+            count = self.build_query(uid, user_data, copy.deepcopy(data), db, sql_session, True).count()
+            count_by_query[hex_digest] = dict({"count": count, "time": time.time()})
+
+        query = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session).limit(page_size).offset(page * page_size)
 
         artists_set = sql_session.scalars(query).unique()
 
@@ -49,8 +78,7 @@ class ArtistController():
             "rowCount": count
         }
 
-    def build_query(self, uid, data, db, sql_session, count = False):
-        user_data = get_user(uid, db)
+    def build_query(self, uid, user_data, data, db, sql_session, count = False):
         query = sql_session.query(Artist)
 
         if not count:
@@ -62,6 +90,8 @@ class ArtistController():
                 contains_eager(Artist.users),
                 contains_eager(Artist.tags)
             ))
+
+        query = query.filter(Artist.active == True)
         query = query.outerjoin(Evaluation, Artist.evaluation).outerjoin(UserArtist, Artist.users).outerjoin(ArtistTag, Artist.tags)
         query = query.where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization')))
         query = query.filter(UserArtist.organization_id == user_data.get('organization'))

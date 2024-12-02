@@ -20,6 +20,7 @@ class Artist(Base):
     spotify_id = Column(String(22), unique=True)
     onboard_wait_until: TIMESTAMP|None = Column(TIMESTAMP, nullable=True, index=True)
     avatar = Column(Text)
+    active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     evaluation_id: Mapped[int] = mapped_column(Integer, ForeignKey('evaluations.id'), nullable=False)
