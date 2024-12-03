@@ -223,8 +223,11 @@ class ArtistTag(Base):
             "id": self.id,
             "tag_type_id": self.tag_type_id,
             "organization_id": self.organization_id,
-            "type": self.type.as_dict(),
-            "created_at": self.created_at
+        }
+    def as_tag_dict(self):
+        return {
+            "tag": self.tag,
+            "tag_type_id": self.tag_type_id,
         }
 
 class ArtistLink(Base):

@@ -24,20 +24,15 @@ function PageArtistReport() {
       snapshotListenOptions: { includeMetadataChanges: true },
     }
   )
-  const { statisticTypes, setStatisticTypes, linkSources, setLinkSources } = useContext(ColumnDataContext);
+  const { statisticTypes, setStatisticTypes, linkSources, setLinkSources, tagTypes, setTagTypes } = useContext(ColumnDataContext);
   useEffect(() => {
-    if (statisticTypes == null || statisticTypes?.length === 0) {
-      const getTypes = httpsCallable(functions, 'get_statistic_types')
+    if (statisticTypes == null || statisticTypes?.length === 0 || linkSources == null || linkSources?.length === 0 || tagTypes === null) {
+      const getTypes = httpsCallable(functions, 'get_type_definitions')
       getTypes().then((response) => {
-        setStatisticTypes(response.data)
+        setStatisticTypes(response.data.statistic_types)
+        setLinkSources(response.data.link_sources)
+        setTagTypes(response.data.tag_types)
       });
-    }
-
-    if (linkSources == null || linkSources?.length === 0) {
-      const getSources = httpsCallable(functions, 'get_link_sources')
-      getSources().then((response) => {
-        setLinkSources(response.data)
-      })
     }
   }, []);
 

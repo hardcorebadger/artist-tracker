@@ -16,7 +16,6 @@ import {
   Avatar,
   Link
 } from '@chakra-ui/react';
-import { LockIcon } from '@chakra-ui/icon'
 import Logo from '../components/Logo';
 import screenies from '../resources/screenies.png';
 import TechnologyLogo from '../components/TechnologyLogo';

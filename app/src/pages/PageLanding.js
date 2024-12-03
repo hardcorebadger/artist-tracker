@@ -15,7 +15,6 @@ import {
   useColorModeValue,
   Avatar
 } from '@chakra-ui/react';
-import { LockIcon } from '@chakra-ui/icon'
 import Logo from '../components/Logo';
 import screenies from '../resources/promo.png';
 import TechnologyLogo from '../components/TechnologyLogo';

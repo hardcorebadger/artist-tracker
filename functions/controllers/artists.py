@@ -113,7 +113,7 @@ class ArtistController():
             field = filter_field.get('field')
             operator = filter_field.get('operator')
             value = filter_field.get('value', None)
-            if value is None and operator != 'isEmpty' and operator != 'isNotEmpty':
+            if value is None and operator != 'isEmpty' and operator != 'isNotEmpty' and not field.startswith('tag_'):
                 continue
             if (field.startswith('statistic.')):
                 key_parts = field.split('.')
@@ -126,6 +126,23 @@ class ArtistController():
                 if value is not None:
                     value = int(value)
                 query = self.build_condition(query, getattr(dynamic, statistic_func), operator, value)
+            elif field.startswith('tag_genre') or field.startswith('tag_user'):
+                tag_type = 2
+                if field == 'tag_genre':
+                    tag_type = 1
+                if operator == 'is':
+                    if value is None:
+                        query = query.filter(~(Artist.tags.any(ArtistTag.tag_type_id == tag_type)))
+                    else:
+                        query = query.filter(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == tag_type)))
+                elif operator == 'not':
+                    if value is None:
+                        query = query.filter(Artist.tags.any(ArtistTag.tag_type_id == tag_type))
+                    else:
+                        query = query.filter(~(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == tag_type))))
+                elif operator == 'isAnyOf' and value is not None and len(value) > 0:
+                    query = query.filter(Artist.tags.any(and_(ArtistTag.tag.in_(value), ArtistTag.tag_type_id == tag_type)))
+
             elif field.startswith('evaluation.'):
                 eval_key = field.split('.')
                 eval_key = eval_key[1]

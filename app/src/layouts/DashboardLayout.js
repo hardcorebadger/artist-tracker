@@ -308,7 +308,7 @@ export default function DashboardLayout() {
                   "nav main"`}
       gridTemplateRows={'85px 1fr'}
       gridTemplateColumns={'300px 1fr'}
-      h={'calc(100vh - 10px'}
+      h={'calc(100vh - 10px)'}
       w='100vw'
       maxW={'100%'}
       gap='0'>

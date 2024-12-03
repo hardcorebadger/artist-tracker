@@ -10,9 +10,16 @@ export const ColumnDataContext = React.createContext(null);
 function App() {
     const [statisticTypes, setStatisticTypes] = useState(null);
     const [linkSources, setLinkSources] = useState(null);
+    const [tagTypes, setTagTypes] = useState(null)
     return (
     <ChakraProvider theme={theme}>
-        <ColumnDataContext.Provider  value={{ statisticTypes: statisticTypes, setStatisticTypes: setStatisticTypes, linkSources: linkSources, setLinkSources: setLinkSources }}>
+        <ColumnDataContext.Provider  value={{ statisticTypes: statisticTypes,
+            setStatisticTypes: setStatisticTypes,
+            linkSources: linkSources,
+            setLinkSources: setLinkSources,
+            tagTypes: tagTypes,
+            setTagTypes: setTagTypes,
+        }}>
 
           <Router>
             <Routes/>

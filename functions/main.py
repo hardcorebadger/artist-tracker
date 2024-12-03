@@ -7,7 +7,7 @@ from firebase_functions.options import RetryConfig, RateLimits, MemoryOption
 from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter
 from openai import organization
-from sqlalchemy import select, update
+from sqlalchemy import select, update, or_
 from sqlalchemy.orm import joinedload, subqueryload
 
 from controllers.artists import ArtistController
@@ -15,7 +15,8 @@ from cron_jobs import airtable_v1_cron, eval_cron, stats_cron, onboarding_cron
 from lib.utils import get_function_url
 from tmp_keys import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
-    CloudSQLClient, LinkSource, ArtistLink, OrganizationArtist, Evaluation, StatisticType, Statistic, UserArtist
+    CloudSQLClient, LinkSource, ArtistLink, OrganizationArtist, Evaluation, StatisticType, Statistic, UserArtist, \
+    ArtistTag
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController
 import flask
 from datetime import datetime, timedelta
@@ -42,6 +43,19 @@ artists = ArtistController(PROJECT_ID, LOCATION, sql)
 
 stat_types = None
 link_sources = None
+
+tag_types = dict({
+    1: {
+        "id": 1,
+        "name": "Genre",
+        "key": "genre"
+    },
+    2: {
+        "id": 2,
+        "name": "User Tag",
+        "key": "user"
+    }
+})
 
 @tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, min_backoff_seconds=60), memory=MemoryOption.MB_512)
 def reimportsql(req: tasks_fn.CallableRequest) -> str:
@@ -384,18 +398,29 @@ def load_stat_types():
 
 
 @https_fn.on_call(min_instances=1)
-def get_statistic_types(req: https_fn.CallableRequest):
-    global stat_types
-    if stat_types is None:
-        stat_types = load_stat_types()
-    return stat_types
-
-@https_fn.on_call(min_instances=1)
-def get_link_sources(req: https_fn.CallableRequest):
-    global link_sources
+def get_type_definitions(req: https_fn.CallableRequest):
+    global stat_types, link_sources
     if link_sources is None:
         link_sources = load_link_sources()
-    return link_sources
+    if stat_types is None:
+        stat_types = load_stat_types()
+    return {
+        "statistic_types": stat_types,
+        "link_sources": link_sources,
+        "tag_types": tag_types
+    }
+
+@https_fn.on_call(min_instances=1)
+def get_existing_tags(req: https_fn.CallableRequest):
+    db = firestore.client(app)
+    uid = req.auth.uid
+    user_data = get_user(uid, db)
+    sql_session = sql.get_session()
+    records = select(ArtistTag).distinct(ArtistTag.tag_type_id, ArtistTag.tag).filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))
+    records = sql_session.scalars(records).all()
+    records = list(map(lambda type: type.as_tag_dict(), records))
+    sql_session.close()
+    return records
 
 
 @https_fn.on_call(min_instances=1,cors=options.CorsOptions(
