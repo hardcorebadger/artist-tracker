@@ -3,7 +3,7 @@ import time
 from google.cloud.firestore_v1.query_results import QueryResultsList
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
-
+import traceback
 from lib import SongstatsClient, ErrorResponse, SpotifyClient, get_user, ArtistLink, LinkSource, StatisticType, \
     OrganizationArtist, Evaluation, Statistic, UserArtist
 from datetime import datetime, timedelta
@@ -221,6 +221,9 @@ class TrackingController():
       "links": info['artist_info']['links'],
       "ob_status": "onboarded"
     })
+
+
+
     print("[INGEST] info updated")
 
     return 'success', 200
@@ -246,13 +249,17 @@ class TrackingController():
       raise ErrorResponse('Artist not found', 404, 'Tracking')
 
     sql_session = self.sql.get_session()
-    sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True)).where(Artist.spotify_id == spotify_id)).first()
+    sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True),joinedload(Artist.links, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()
+    sql_session.close()
     if sql_ref is None:
         print('Artist needs migration; importing to SQL')
         self.import_sql(doc)
+        sql_session = self.sql.get_session()
+        sql_ref = sql_session.scalars(select(Artist).options(
+            joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True), joinedload(Artist.links, innerjoin=False)).where(
+            Artist.spotify_id == spotify_id)).first()
+        sql_session.close()
 
-    sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True)).where(Artist.spotify_id == spotify_id)).first()
-    sql_session.close()
     # check the artist is ingested - not needed
     # data = doc.to_dict()
     # if data['ob_status'] != 'ingested' and not is_ob:
@@ -283,19 +290,37 @@ class TrackingController():
 
     print("[INGEST] has stats")
 
-    
-    #  update the hot tracking stats on the artist
-    update = {"stat_dates": stats['as_of'], "stats_as_of": datetime.now()}
-    for s in HOT_TRACKING_FIELDS:
-      sql_statistic_type = self.get_statistic_type_from_field(s)
-      values = stats['stats'][s] if s in stats['stats'] else []
-      update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = values
-      self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
+    try:
+        #  update the hot tracking stats on the artist
+        update = {"stat_dates": stats['as_of'], "stats_as_of": datetime.now()}
+        for s in HOT_TRACKING_FIELDS:
+          sql_statistic_type = self.get_statistic_type_from_field(s)
+          values = stats['stats'][s] if s in stats['stats'] else []
+          update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = values
+          self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
 
-    ref.update(update)
-    sql_session = self.sql.get_session()
-    sql_session.add_all([sql_ref])
-    sql_session.commit()
+        sql_ref.avatar = doc.get('avatar')
+        sql_ref.active = True
+        sql_links = self.convert_links(doc, sql_ref.id)
+        sql_session = self.sql.get_session()
+        final = list()
+        for link in sql_links:
+            existing = list(filter(lambda x: x.link_source_id == link.link_source_id and x.path == link.path,sql_ref.links)).pop()
+            if existing is not None:
+                continue
+            final.append(link)
+        for link in sql_ref.links:
+            existing = list(filter(lambda x: x.link_source_id == link.link_source_id and x.path == link.path, sql_links)).pop()
+            if existing is None:
+                sql_session.delete(link)
+
+        ref.update(update)
+        sql_session.add_all(final)
+        sql_session.add_all([sql_ref])
+        sql_session.commit()
+    except Exception as e:
+        print(e)
+        return 'error', 500
     print("[INGEST] stats updated")
 
     # TODO Add the deep stats subcollection
@@ -384,7 +409,7 @@ class TrackingController():
     ids = [d.id for d in docs]
     return ids
 
-  def convert_artist_link(self, link, sources):
+  def convert_artist_link(self, link, sources, artist_id = None):
 
       filtered_sources = list(filter(lambda s: s.key == link.get('source'), sources))
 
@@ -412,11 +437,13 @@ class TrackingController():
       if len(scheme_part_two) > 0:
           url_identifier = url_identifier.split(scheme_part_two)[0]
       url_identifier = url_identifier.split("?")[0]
-
-      return ArtistLink(
-          link_source_id=source.id,
-          path=url_identifier,
+      artist_link = ArtistLink(
+         link_source_id=source.id,
+         path=url_identifier,
       )
+      if artist_id is not None:
+         artist_link.artist_id = artist_id
+      return artist_link
 
   def convert_eval(self, artist, existingId = None):
     if artist.get('eval_as_of') != None:
@@ -456,7 +483,6 @@ class TrackingController():
   def import_sql(self, old_artists):
       if not isinstance(old_artists, QueryResultsList):
           old_artists = [old_artists]
-      link_sources = self.sql.load_all_for_model(LinkSource)
       sql_session = self.sql.get_session()
       stat_types = list(sql_session.scalars(select(StatisticType)).all())
       userOrgs = dict()
@@ -565,12 +591,7 @@ class TrackingController():
                           organization_id=userOrgs[user_id],
                           created_at=found_details.get('found_on')
                       ))
-                  links = list(map(lambda x: self.convert_artist_link(x, link_sources), artist.get('links')))
-                  filtered_links = list()
-                  for link in links:
-                      if len(list(filter(lambda x: x.path == link.path and x.link_source_id == link.link_source_id, filtered_links))) > 0:
-                          continue
-                      filtered_links.append(link)
+                  filtered_links = self.convert_links(artist)
                   add_batch.append(Artist(
                       spotify_id=spotify_id,
                       name=artist.get('name'),
@@ -591,10 +612,26 @@ class TrackingController():
               except Exception as e:
                   fails[artist.get('spotify_id')] = repr(e)
 
-
+      if len(fails) > 0:
+          print(fails)
       sql_session.close()
       end = time.time()
       avg = 0
       if imported > 0:
         avg = (end-start) / imported
       return imported, skipped, avg, fails
+
+  def convert_links(self, artist, sql_id = None):
+      link_sources = self.sql.load_all_for_model(LinkSource)
+      links = list()
+      dict_artist = artist.to_dict()
+      if 'links' in dict_artist:
+          links = list(map(lambda x: self.convert_artist_link(x, link_sources, sql_id), dict_artist.get('links', [])))
+
+          filtered_links = list()
+          for link in links:
+              if len(list(
+                  filter(lambda x: (x.path == link.path and x.link_source_id == link.link_source_id), filtered_links))) > 0:
+                  continue
+              filtered_links.append(link)
+      return links

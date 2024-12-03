@@ -126,6 +126,16 @@ export const columnOptions = {
     ],
     type: 'singleSelect',
   },
+  "organization.created_at": {
+    field: 'organization.created_at',
+    headerName: 'Added At',
+    filterable: false,
+    valueGetter: (data) => {
+      return (new Date(data.row?.organization?.created_at) ?? null)
+    },
+    isMetric: false,
+    type: 'dateTime'
+  }
   // "genres": {
   //   field: 'tags',
   //   type: 'multiSelect',

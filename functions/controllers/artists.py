@@ -221,6 +221,15 @@ class ArtistController():
                     if sort['sort'] == 'desc':
                         column = getattr(tableAliased, evalKey).desc()
                     query = query.outerjoin(tableAliased, Artist.evaluation_id == tableAliased.id).order_by(column)
+                elif sortFieldKey.startswith('organization'):
+                    orgKey = sortFieldKey.split('.')
+                    orgKey = orgKey[1]
+                    tableAliased = aliased(OrganizationArtist)
+                    column = getattr(tableAliased, orgKey).asc()
+
+                    if sort['sort'] == 'desc':
+                        column = getattr(tableAliased, orgKey).desc()
+                    query = query.outerjoin(tableAliased, and_(Artist.id == tableAliased.artist_id, tableAliased.organization_id == user_data.get('organization'))).order_by(column)
 
                 elif sortFieldKey.startswith('user'):
                     userKey = sortFieldKey.split('.')

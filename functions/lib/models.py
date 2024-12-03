@@ -55,7 +55,7 @@ class Artist(Base):
             dict['link_' + link.source.key] = link.url
 
         dict['users'] = list(map(lambda user: user.as_dict(), self.users))
-        dict['organization'] = list(map(lambda org: org.as_dict(), self.organizations))
+        dict['organization'] = list(map(lambda org: org.as_dict(), self.organizations)).pop()
         dict['statistics'] = list(map(lambda stat: stat.as_dict(), self.statistics))
         dict['tags'] = list(map(lambda tag: tag.as_dict(), self.tags))
 
