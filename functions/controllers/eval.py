@@ -341,7 +341,7 @@ class EvalController():
   def find_needs_eval_refresh(self, limit: int):
     sql_session = self.sql.get_session()
     sql_ids = (select(Artist.spotify_id).outerjoin(Evaluation, Artist.evaluation)
-               .filter(or_(Evaluation.updated_at <= func.now() - timedelta(days=1), Evaluation.id is None))
+               .filter(or_(Evaluation.updated_at <= func.now() - timedelta(days=7), Evaluation.id == None))
                .filter(Artist.active == True)).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()
     sql_session.close()
