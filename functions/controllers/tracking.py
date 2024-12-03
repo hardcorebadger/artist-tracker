@@ -446,7 +446,7 @@ class TrackingController():
       return artist_link
 
   def convert_eval(self, artist, existingId = None):
-    if artist.get('eval_as_of') != None:
+    if artist.get('eval_status') != 'no_eval':
         status = 1
         if artist.get('eval_status') == 'unsigned':
             status = 0
@@ -479,6 +479,8 @@ class TrackingController():
         )
         if existingId is not None:
             eval.artist_id = existingId
+    else:
+        return None
     return eval
   def import_sql(self, old_artists):
       if not isinstance(old_artists, QueryResultsList):

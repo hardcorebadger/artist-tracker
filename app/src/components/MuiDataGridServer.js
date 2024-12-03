@@ -59,12 +59,14 @@ const metricColumnFactory = (metric, func) => ({
              const filtered = data.row['statistics'].filter((stat) => stat['statistic_type_id'] === columnOptions[metric]?.statTypeId)
              if (filtered.length > 0 && func in filtered[0]) {
                  return filtered[0][func]
+             } else {
+                 return null
              }
         }
         if (func === 'data') {
             return null
         }
-        return 'n/a'
+        return null
     },
     renderHeader: columnOptions[metric].renderHeader,
     description: columnOptions[metric].description,

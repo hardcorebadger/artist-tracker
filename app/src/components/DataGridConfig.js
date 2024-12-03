@@ -97,15 +97,15 @@ export const columnOptions = {
     field: 'evaluation.distributor_type',
     type: 'singleSelect',
     headerName: 'Distributor Type',
-    valueGetter: (data) => data.row?.evaluation?.distributor_type === 0 ? "DIY" : data.row?.evaluation?.distributor_type === 1 ? "Indie" : "Major",
+    valueGetter: (data) => data.row.evaluation ? (data.row?.evaluation?.distributor_type === 0 ? "DIY" : data.row?.evaluation?.distributor_type === 1 ? "Indie" : "Major") : "Unknown",
     isMetric: false,
     valueOptions: [
-      {value: 0, label: 'DIY'}, {value: 2, label: 'Major'}, {value: 1, label: 'Indie'}
+      {value: 0, label: 'DIY'}, {value: 2, label: 'Major'}, {value: 1, label: 'Indie'}, {value: null, label: 'Unknown'}
     ],
     renderCell: (params) => {
       return (
       <Chip variant="outlined" size='small'
-            color={params.value == "Major" ? "error" : params.value == "Indie" ? "warning" : "primary"}
+            color={params.value == "Major" ? "error" : (params.value == "Indie" || params.value == 'Unknown' ? "warning" : "primary")}
             label={params.value}/>
 
       )
@@ -184,7 +184,7 @@ export const metricFunctions = {
       type: 'number',
       sortable: true,
       // filterEditor: NumberFilter,
-      renderCell: (params) => <span>{numeral(params.value).format('0.0 a')}</span>
+      renderCell: (params) => <span>{params.value !== null ? numeral(params.value).format('0.0 a') : 'N/A'}</span>
     }
   },
   "previous": {
@@ -198,7 +198,7 @@ export const metricFunctions = {
       type: 'number',
       sortable: true,
       // filterEditor: NumberFilter,
-      renderCell: (params) => row => <span>{numeral(params.value).format('0.0a')}</span>
+      renderCell: (params) => <span>{params.value !== null ? numeral(params.value).format('0.0 a') : 'N/A'}</span>
     }
   },
   "week_over_week": {
@@ -212,7 +212,7 @@ export const metricFunctions = {
       type: 'number',
       sortable: true,
       // filterEditor: NumberFilter,
-      renderCell: (params) => <span>{numeral(params.value).format('0.00%')}</span>
+      renderCell: (params) => <span>{params.value !== null ? numeral(params.value).format('0.00%') : 'N/A'}</span>
     }
   },
   "month_over_month": {
@@ -226,7 +226,7 @@ export const metricFunctions = {
       type: 'number',
       sortable: true,
       // filterEditor: NumberFilter,
-      renderCell: (params) => <span>{numeral(params.value).format('0.00%')}</span>
+      renderCell: (params) => <span>{params.value !== null ? numeral(params.value).format('0.00%') : 'N/A'}</span>
     }
   },
   "data": {
