@@ -2,7 +2,7 @@
 // import SelectFilter from '@inovua/reactdatagrid-community/SelectFilter'
 
 import {
-  Badge,
+  Badge, Box,
   Button,
   Link, Wrap
 } from '@chakra-ui/react';
@@ -13,9 +13,10 @@ import { Sparklines, SparklinesLine } from 'react-sparklines';
 import {useState} from "react";
 import {httpsCallable} from "firebase/functions";
 import {functions} from "../firebase";
-import {Chip} from '@mui/material';
+import {Chip, Tooltip} from '@mui/material';
 import {getGridDateOperators} from "@mui/x-data-grid-pro";
-
+import Moment from 'react-moment';
+import moment from 'moment';
 // const miniBarChartOptions = {
 //   chart: {
 //     type: 'line',
@@ -134,26 +135,31 @@ export const columnOptions = {
     field: 'organization.created_at',
     headerName: 'Added On',
     filterOperators: dateOperators,
+    width: 150,
     valueGetter: (data) => {
       return (new Date(data.row?.organization?.created_at) ?? null)
     },
     isMetric: false,
-    type: 'dateTime'
+    type: 'dateTime',
+    renderCell: (params) => (<Moment format={"lll"}>{params?.value}</Moment>),
   },
   "users": {
     field: 'users',
     headerName: 'Added By',
     sortable: false,
     isMetric: false,
+    width: 250,
     renderCell: (params) => {
       return (
-          <Wrap>
-            {params.value.map((item) => {
-              return <Chip key={"user-"+item.id+"-"+item.artist_id} variant="outlined" size='small'
+
+          <Box flex flexWrap={'no-wrap'} flexDirection={'row'} align={'center'} justifyContent={'flex-start'}>
+            {params.value.map((item, index) => {
+              return <Tooltip title={"Added on: " + moment(item.created_at).format("lll")}><Chip sx={{marginLeft: (index > 0 ? '5px' : '0')}} key={"user-"+item.id+"-"+item.artist_id} variant="outlined" size='small'
                            color={"info"}
                            label={item.first_name + " " + item.last_name}/>
+              </Tooltip>
             })}
-          </Wrap>
+          </Box>
 
       )
     },

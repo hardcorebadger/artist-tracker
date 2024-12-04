@@ -151,26 +151,33 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
           isMetric: true
       }
   }
-  if (users) {
       columnOptions['users']['valueGetter'] = (data) => {
-          const artistUsers = data.row?.users
-          for (const userIndex in artistUsers) {
-              const artistUser = artistUsers[userIndex]
-              if (artistUser.user_id in users) {
-                  artistUser.user = users[artistUser.user_id]
-              } else {
-                  artistUser.user = null
+          if (users) {
+              const artistUsers = data.row?.users
+              const filtered = []
+              for (const userIndex in artistUsers) {
+                  const artistUser = artistUsers[userIndex]
+                  if (artistUser.user_id in users) {
+                      artistUser.user = users[artistUser.user_id]
+                      if (artistUser.user && artistUser.user.id) {
+                          filtered.push(artistUser)
+                      }
+                  } else {
+                      artistUser.user = null
+                  }
               }
-              artistUsers[userIndex] = artistUser
+              return (filtered?.map((item) => {
+                  return {
+                      "created_at": item.created_at,
+                      "artist_id": item.artist_id,
+                      ...item.user
+                  }
+              }) ?? [])
+          } else {
+              return []
           }
-
-          return (artistUsers?.map((item) => {
-              return {
-                  "artist_id": item.artist_id,
-                  ...item.user
-              }
-          }) ?? [])
       }
+  if (users) {
       columnOptions['users']['valueOptions'] = Object.values(users ?? {}).map((user) => {
           return {
               label: user.first_name + " " + user.last_name,
