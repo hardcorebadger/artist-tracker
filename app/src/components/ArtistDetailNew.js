@@ -33,11 +33,11 @@ import { PageLayoutContained } from '../layouts/DashboardLayout';
 import Iconify from './Iconify';
 import Chart from "react-apexcharts";
 import { columnOptions } from './DataGridConfig'
-import {useContext, useState} from 'react';
-import {ColumnDataContext} from "../App";
+import {useContext, useEffect, useState} from 'react';
 import {Box, Link as MUILink} from "@mui/material";
 import {theme} from "./MuiDataGridServer";
 import {ThemeProvider} from "@mui/material/styles";
+import {LoadingWidget} from "../routing/LoadingScreen";
 
 const chartOptions = {
   chart: {
@@ -65,14 +65,16 @@ const chartOptions = {
 }
 
 const bakeStats = (linkSources) => {
-  const stats = []
-  Object.keys(columnOptions).forEach(key => {
-    const col = columnOptions[key]
-    if (!col.isMetric) {return}
-    col.sourceLogo = linkSources.filter((s) => s.key === col.source).pop()?.logo
-    stats.push(col)
-  })
-  return stats
+    const stats = []
+    Object.keys(columnOptions).forEach(key => {
+      const col = columnOptions[key]
+      if (!col.isMetric) {
+        return
+      }
+      col.sourceLogo = linkSources.filter((s) => s.key === col.source).pop()?.logo
+      stats.push(col)
+    })
+    return stats
 }
 
 function CopyrightCard({artist, linkSources}) {
@@ -121,11 +123,15 @@ function CopyrightCard({artist, linkSources}) {
 }
 
 export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
-
   const [tabIndex, setTabIndex] = useState(0)
   const stats = bakeStats(linkSources)
   const filteredStat = artist['statistics'].filter((stat) => stat['statistic_type_id'] === stats[tabIndex]?.statTypeId).pop()
   const filteredData = (filteredStat && 'data' in filteredStat) ? filteredStat['data'] : []
+  if (stats.length === 0) {
+    return (
+        <LoadingWidget/>
+    )
+  }
   return (
     <VStack spacing={10} align="left">
       <HStack justifyContent='space-between'>
@@ -163,6 +169,7 @@ export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
               />
             </Card>
           </Tabs>
+
         </GridItem>
         <GridItem colSpan={1}>
           {artist && <CopyrightCard artist={artist} linkSources={linkSources}/> }

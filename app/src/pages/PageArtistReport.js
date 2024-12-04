@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Button, HStack, Heading, Skeleton, Text, VStack } from '@chakra-ui/react';
 import {useContext, useEffect, useState} from 'react';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
-import {ColumnDataContext} from "../App";
+import {ColumnDataContext, CurrentReportContext} from "../App";
 import {httpsCallable} from "firebase/functions";
 import ArtistDetailNew from "../components/ArtistDetailNew";
 import LoadingScreen from "../routing/LoadingScreen";
@@ -18,51 +18,68 @@ function PageArtistReport() {
   const user = useUser()
   const navigate = useNavigate()
   const { id } = useParams()
-  const [report, reportLoading, reportError] = useDocument(
-    doc(db, 'reports', id),
-    {
-      snapshotListenOptions: { includeMetadataChanges: true },
-    }
-  )
-  const { statisticTypes, setStatisticTypes, linkSources, setLinkSources, tagTypes, setTagTypes } = useContext(ColumnDataContext);
-  useEffect(() => {
-    if (statisticTypes == null || statisticTypes?.length === 0 || linkSources == null || linkSources?.length === 0 || tagTypes === null) {
-      const getTypes = httpsCallable(functions, 'get_type_definitions')
-      getTypes().then((response) => {
-        setStatisticTypes(response.data.statistic_types)
-        setLinkSources(response.data.link_sources)
-        setTagTypes(response.data.tag_types)
-      });
-    }
-  }, []);
+  const { statisticTypes, linkSources, setActiveArtist, activeArtist } = useContext(ColumnDataContext);
+  const { setCurrentReport, currentReport, setCurrentRows, setCurrentQueryModel } = useContext(CurrentReportContext);
 
-  const [activeArtist, setActiveArtist] = useState(null)
+  async function getDocument(collectionName, documentId) {
+    try {
+      const docRef = doc(db, collectionName, documentId);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        return docSnap.data();
+      } else {
+        return false
+      }
+    } catch (error) {
+      console.error("Error getting document:", error);
+    }
+  }
+
+  useEffect(() => {
+    const check = async () =>
+    {
+      if (currentReport === null || currentReport.id !== id) {
+        setCurrentRows(null)
+        setCurrentQueryModel(null)
+        const documentData = await getDocument("reports", id);
+        if (documentData) {
+            setCurrentReport({
+              id: id,
+              data: documentData
+            })
+        }
+      }
+    }
+    check()
+  }, [id, currentReport]);
+  if (currentReport === null || currentReport?.id !== id) {
+
+      return (
+          <VStack spacing={5} align="left">
+            <HStack px={6} justifyContent='space-between'>
+              <VStack spacing={3} align="left">
+                <Skeleton isLoaded={false}>
+                  <Heading size="md">Loading Report</Heading>
+                </Skeleton>
+                <Skeleton isLoaded={false}>
+                  <Text size="sm" color="text.subtle">Artist Report</Text>
+                </Skeleton>
+              </VStack>
+              <HStack>
+                <Skeleton><Button>Loading</Button></Skeleton>
+              </HStack>
+            </HStack>
+          </VStack>
+      )
+  }
+
 
   const onOpenArtist = (artist) => {
-    setActiveArtist(artist)
+    setActiveArtist(artist);
+    navigate(`/app/reports/`+id+`/artists/${artist.id}`);
   }
 
-  if (reportLoading || reportError) {
-    return (
-      <VStack spacing={5} align="left">
-      <HStack px={6} justifyContent='space-between'>
-      <VStack spacing={3} align="left">
-        <Skeleton isLoaded={!reportLoading}>
-      <Heading size="md">Loading Report</Heading>
-      </Skeleton>
-      <Skeleton isLoaded={!reportLoading}>
-      <Text size="sm" color="text.subtle">Artist Report</Text>
-      </Skeleton>
-      </VStack>
-      <HStack>
-      <Skeleton><Button>Loading</Button></Skeleton>
-      </HStack>
-      </HStack>
-      </VStack>
-    )
-  }
-
-  const reportData = report.data()
   // some url for new reports
   // on save, create a new report
   // then reload to that new url
@@ -79,8 +96,8 @@ function PageArtistReport() {
       organization: user.org.id,
       last_modified_by: user.auth.uid,
       last_modified_on: Date.now(),
-      created_on: reportData.created_on,
-      created_by: reportData.created_by,
+      created_on: currentReport?.data.created_on,
+      created_by: currentReport?.data.created_by,
       type: 'artist',
       name: reportName,
       columnOrder: columnOrder,
@@ -113,25 +130,17 @@ function PageArtistReport() {
     )
   }
   return (
-    <>
-    {activeArtist != null &&
-    <PageLayoutContained size="lg">
-      <ArtistDetailNew artist={activeArtist} linkSources={linkSources} onNavigateBack={()=>setActiveArtist(null)}/>
-      </PageLayoutContained>
-    }
-    <Box sx={{opacity:activeArtist!=null?0:1,height:activeArtist!=null?0:'auto', maxWidth: '100%'}} >
+    <Box sx={{height:'auto', maxWidth: '100%'}} >
     <MuiDataGridController
-    initialReportName={reportData?.name}
-    initialColumnOrder={reportData?.columnOrder}
-    initialFilterValues={reportData?.filterValue}
+    initialReportName={currentReport?.data.name}
+    initialColumnOrder={currentReport?.data.columnOrder}
+    initialFilterValues={currentReport?.data.filterValue}
     onSave={onReportSave} 
     onSaveNew={onReportSaveNew} 
     onDelete={onReportDelete}
     onOpenArtist={onOpenArtist}
     />
     </Box>
-    
-    </>
   );
 }
 

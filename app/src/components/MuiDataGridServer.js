@@ -14,7 +14,7 @@ import { buildColumnSelection, columnOptions, metricFunctions } from "./DataGrid
 import { deepCompare, deepCopy } from "../util/objectUtil";
 import { httpsCallable } from "firebase/functions";
 import { functions } from '../firebase';
-import {ColumnDataContext} from "../App";
+import {ColumnDataContext, CurrentReportContext} from "../App";
 import {Chip, Link as MUILink, Tooltip} from '@mui/material'
 import { Link as RouterLink } from "react-router-dom";
 import {GridFilterOperator} from "@mui/x-data-grid-pro";
@@ -127,137 +127,7 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
       renderCell: (params) => (<strong>{params.value}</strong>)
     }
   ]
-  for (let typeIndex in statTypes) {
-      const type = statTypes[typeIndex];
-      const key = 'statistic.' + type['id']
-      const sourceName = type['source'].charAt(0).toUpperCase() + type['source'].slice(1);
-      const linkSource = linkSources.filter((s) => s.key === type['source']).pop()
-      columnOptions[key] = {
-          field: key,
-          keyName: type['source'] + "." + type['key'],
-          headerName:  sourceName +' ' + type['name'],
-          statName: type['name'],
-          statTypeId: type['id'],
-          source: type['source'],
-          description: sourceName +' ' + type['name'],
-          renderHeader: (params) => (
-              <Tooltip title={linkSource['display_name'] + ' ' + type['name']}>
-                  <Box flex align={'center'} flexWrap={"nowrap"}>
-                      {linkSource && linkSource['logo'] ? <Iconify sx={{display: 'inline-block'}} icon={linkSource['logo']}></Iconify> : null}
-                      <Text display={'inline-block'}>&nbsp;{type['name']}</Text>
-                  </Box>
-              </Tooltip>
-          ),
-          isMetric: true
-      }
-  }
-      columnOptions['users']['valueGetter'] = (data) => {
-          if (users) {
-              const artistUsers = data.row?.users
-              const filtered = []
-              for (const userIndex in artistUsers) {
-                  const artistUser = artistUsers[userIndex]
-                  if (artistUser.user_id in users) {
-                      artistUser.user = users[artistUser.user_id]
-                      if (artistUser.user && artistUser.user.id) {
-                          filtered.push(artistUser)
-                      }
-                  } else {
-                      artistUser.user = null
-                  }
-              }
-              return (filtered?.map((item) => {
-                  return {
-                      "created_at": item.created_at,
-                      "artist_id": item.artist_id,
-                      ...item.user
-                  }
-              }) ?? [])
-          } else {
-              return []
-          }
-      }
-  if (users) {
-      columnOptions['users']['valueOptions'] = Object.values(users ?? {}).map((user) => {
-          return {
-              label: user.first_name + " " + user.last_name,
-              value: user.id
-          }
-      })
-  }
 
-  for (let tagIndex in tagTypes) {
-      const tagType = tagTypes[tagIndex];
-      if (tagType['key'] !== 'user') {
-          continue;
-      }
-      const key = 'tag_' + tagType['key']
-      const valueOptions = []
-      if (existingTags) {
-          const filtered = existingTags.filter((tag) => {
-              return tag.tag_type_id === tagType['id']
-          }).map((tag) => {
-              return {
-                  "label": tag.tag,
-                  "value": tag.tag
-              }
-          })
-          for (const tag of filtered) {
-              valueOptions.push(tag)
-          }
-      }
-      columnOptions[key] = {
-          field: key,
-          keyName: key,
-          type: 'singleSelect',
-          headerName: tagType['name'] + 's',
-          description:  tagType['name'] + 's',
-          sortable: false,
-          valueGetter: (data) => data.row?.tags.filter((tag) => tag.tag_type_id === tagType['id']) ?? [],
-          valueOptions: valueOptions,
-          renderCell: (params) => {
-              return (
-                  <Wrap>
-                    {params.value.map((item) => {
-                      return <Chip key={"tag-"+item.id} variant="outlined" size='small'
-                            color={"info"}
-                            label={item.tag}/>
-                    })}
-                  </Wrap>
-
-              )
-          },
-        isMetric: false
-      }
-  }
-
-  for (let typeIndex in linkSources) {
-      const type = linkSources[typeIndex];
-
-      const key = 'link_' + type['key']
-      columnOptions[key] = {
-          field: key,
-          keyName: key,
-          social: type['social'],
-          filterable: false,
-          sortable: false,
-          headerName: type['display_name'] + ' Link',
-          description:  type['display_name'] + ' Link',
-          valueOptions: [
-              {value: 0, label: 'DIY'}, {value: 2, label: 'Major'}, {value: 1, label: 'Indie'}
-          ],
-          renderHeader: (params) => (
-              <Tooltip title={type['display_name'] + ' Link'}>
-                  <Wrap align={'center'}>
-                      {type['logo'] ? <Iconify sx={{display: 'inline-block'}} icon={type['logo']}></Iconify> : null}
-                      Link
-                  </Wrap>
-              </Tooltip>
-          ),
-          renderCell: (params) => ( <MUILink color='primary' href={params.value}>{type['display_name']} <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></MUILink> ),
-          isMetric: false
-      }
-  }
 
 
 
@@ -306,52 +176,33 @@ function array_move(arr, old_index, new_index) {
     return arr; // for testing
 }
 
-export default function MuiDataGridController({initialReportName, initialColumnOrder, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
-    const [statTypes, setStatTypes] = useState(null)
-    const [currentParams, setCurrentParams] = useState(null)
-    const [currentRows, setCurrentRows] = useState(null)
-    const [existingTags, setExistingTags] = useState(null)
-    const [users, setUsers] = useState(null)
+const initialPagination = {
+    page: 0,
+    pageSize: 20,
+}
 
-    const { statisticTypes, setStatisticTypes, linkSources, tagTypes } = useContext(ColumnDataContext);
+export default function MuiDataGridController({initialReportName, initialColumnOrder, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
+
+    const { statisticTypes, linkSources, tagTypes, users, existingTags } = useContext(ColumnDataContext);
+    const { currentRows, setCurrentRows, currentQueryModel, setCurrentQueryModel } = useContext(CurrentReportContext);
 
     // Server side data source for the table
     const getArtists = httpsCallable(functions, 'get_artists')
-    const [rowRequests, setRowRequests] = useState({});
-    const [paginationModel, setPaginationModel] = useState({
-        page: 0,
-        pageSize: 20,
-    });
-    const [sortModel, setSortModel] = useState([]);
+    const [paginationModel, setPaginationModel] = useState(deepCopy(currentQueryModel?.pagination ?? initialPagination));
+    const [sortModel, setSortModel] = useState(deepCopy(currentQueryModel?.sorts ?? []));
     const [dataIsLoading, setDataIsLoading] = useState(false)
-    const [columnOrder, setColumnOrder] = useState(deepCopy(initialColumnOrder))
+    const [columnOrder, setColumnOrder] = useState(deepCopy(currentQueryModel?.columnOrder ?? initialColumnOrder))
     if (!initialFilterValues?.hasOwnProperty('items')) {
         initialFilterValues = {items:[]}
     }
-    const [filterModel, setFilterModel] = useState(deepCopy(initialFilterValues))
+    const [filterModel, setFilterModel] = useState(deepCopy(currentQueryModel?.filters ?? initialFilterValues))
     const [currentReqTime, setCurrentReqTime] = useState(null)
     const apiRef = useGridApiRef();
-    const loadOrgFilters = async () => {
-        const getTags = httpsCallable(functions, 'get_existing_tags')
-        if (existingTags === null) {
-            getTags().then((response) => {
-                setExistingTags(response.data.tags)
-                const newUsers = {}
-                for (const index in response.data.users) {
-                    const user = response.data.users[index]
-                    newUsers[user.id] = user
-                }
 
-                setUsers(newUsers)
-
-            });
-        }
-    }
-    useEffect(() => {
-        loadOrgFilters()
-    }, []);
 
     useEffect(() => {
+
+
         const fetcher = async () => {
             setDataIsLoading(true)
             const startTime = Date.now()
@@ -368,47 +219,58 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                 //     rows: resp.data.rows,
                 //     rowCount: resp.data.rowCount
                 // }
-                setRowRequests({
+                if (resp.data.page !== paginationModel.page || resp.data.pageSize !== paginationModel.pageSize) {
+                    return
+                }
+                if (JSON.stringify(resp.data.filterModel) !== JSON.stringify(filterModel)) {
+                    return
+                }
+                if (JSON.stringify(resp.data.sortModel) !== JSON.stringify(sortModel)) {
+                    return
+                }
+                setCurrentRows({
                     time: startTime,
                     rows: resp.data.rows,
                     rowCount: resp.data.rowCount
                 });
         };
-        fetcher();
+        let refreshNeeded = false;
+        if (currentRows === null || currentQueryModel === null) {
+            refreshNeeded = true;
+        } else {
+            if (JSON.stringify(currentQueryModel?.filters ?? initialFilterValues) !== JSON.stringify(filterModel)) {
+                refreshNeeded = true
+            } else if (JSON.stringify(currentQueryModel?.sorts ?? []) !== JSON.stringify(sortModel)) {
+                refreshNeeded = true
+            } else if (JSON.stringify(currentQueryModel?.pagination ?? initialPagination) !== JSON.stringify(paginationModel)) {
+                refreshNeeded = true
+            }
+
+        }
+        const updateModel =  {
+            filters: filterModel,
+            sorts: sortModel,
+            pagination: paginationModel,
+            columnOrder: currentQueryModel?.columnOrder ?? null,
+        }
+        setCurrentQueryModel(updateModel)
+
+        if (refreshNeeded) {
+            fetcher();
+        }
     }, [paginationModel, sortModel, filterModel]);
-    // calls every time we need an update
-    // params are printing on server (main.py at the bottom)
-    // const customDataSource = {
-    //
-    //   getRows: async (params) => {
-    //     console.log('params: ', params)
-    //       console.log('current: ')
-    //   if (currentRows !== null && JSON.stringify(params) === JSON.stringify(currentParams)) {
-    //       return currentRows
-    //   }
-    //   const resp = await getArtists({...params});
-    //       const returnData = {
-    //           rows: resp.data.rows,
-    //           rowCount: resp.data.rowCount,
-    //       };
-    //     return returnData;
-    //   },
-    // }
-
-    // example of how columns are supposed to look for MUI
-
-    // const columns = [
-    //     { field: 'col1', headerName: 'Column 1', width: 150 },
-    //     { field: 'col2', headerName: 'Column 2', width: 150 },
-    // ];
-
     // saves state for report config (currently only works for add/remove column, rest (reorder, filter, sort) are TODO)
 
     const [reportName, setReportName] = useState(initialReportName)
 
 
     useEffect(() => {
-
+        const updateModel = {
+            columnOrder: columnOrder,
+            ...(currentQueryModel ?? {}),
+        }
+        setCurrentQueryModel(updateModel)
+        localStorage.setItem('currentQueryModel', JSON.stringify(updateModel))
     }, [columnOrder, initialFilterValues]);
 
     // callback from the column menu to the grid to set the columns
@@ -420,21 +282,9 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     const revertState = () => {
         setColumnOrder(deepCopy(initialColumnOrder))
         setFilterModel(deepCopy(initialFilterValues))
+        setCurrentQueryModel(null)
         setReportName(initialReportName)
     }
-
-    const rows = rowRequests ?? {}
-
-    // if (rows && rows.hasOwnProperty('time') && rows['time'] === currentReqTime) {
-    //     if (dataIsLoading) {
-    //         setDataIsLoading(false)
-    //     }
-    //     if (Object.keys(rowRequests).length > 1) {
-    //         const newReq = {};
-    //         newReq[currentReqTime] = rows
-    //         setRowRequests(newReq)
-    //     }
-    // }
 
     const handleColumnOrderChange = (change) => {
       const column = change.column.field
@@ -494,11 +344,10 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                 <DataGridPro
                   columns={columns}
                   loading={dataIsLoading}
-                  rows={rows?.rows ?? []}
+                  rows={currentRows?.rows ?? []}
                   sortingMode="server"
                   filterMode="server"
                   paginationMode="server"
-                  onPaginationModelChange={setPaginationModel}
                   onSortModelChange={setSortModel}
                   onFilterModelChange={setFilterModel}
                   onColumnOrderChange={handleColumnOrderChange}
@@ -506,20 +355,18 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                   ref={apiRef}
                   onCellClick={(e) => {
                       if (e.field === 'name') {
-                          const artist = rows?.rows?.filter((row) => row?.id == e.id).pop()
+                          const artist = currentRows?.rows?.filter((row) => row?.id == e.id).pop()
                           onOpenArtist(artist)
                       }
                   }}
-                  rowCount={rows?.rowCount ?? 0}
+                  rowCount={currentRows?.rowCount ?? 0}
                   filterModel={filterModel}
                   sortModel={sortModel}
+                  onPaginationModelChange={setPaginationModel}
+                  paginationModel={paginationModel}
                   initialState={{
-                    pagination: {
-                      paginationModel: { pageSize: 20, page: 0 },
-                      rowCount: 0,
-                    },
+                      pagination: currentQueryModel?.pagination ?? initialPagination,
                   }}
-                  
                   pageSizeOptions={[10, 20, 50]}
                  />
                 

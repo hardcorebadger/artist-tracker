@@ -59,13 +59,16 @@ export default function Router() {
           children: [
             { index: true, element: <Navigate to="all" replace />   },
             { path: 'all', element: <PageReports /> },
-            { path: ':id', element: <PageArtistReport /> },
+            { path: ':id', children: [
+                { index: true, element: <PageArtistReport/>},
+                { path: 'artists/:artistId', element: <PageArtist/>}
+              ] },
           ]
         },
         { path: 'artists',
           children: [
-            { path: 'new', element: <PageAddArtist /> },
-            { path: ':id', element: <PageArtist /> },
+            // { path: 'new', element: <PageAddArtist /> },
+            { path: ':artistId', element: <PageArtist /> },
           ]
         },
       ],

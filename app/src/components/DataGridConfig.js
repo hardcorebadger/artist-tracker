@@ -4,7 +4,7 @@
 import {
   Badge, Box,
   Button,
-  Link, Wrap
+  Link, Text, Wrap
 } from '@chakra-ui/react';
 import Iconify from '../components/Iconify';
 // import Chart from "react-apexcharts";
@@ -13,7 +13,7 @@ import { Sparklines, SparklinesLine } from 'react-sparklines';
 import {useState} from "react";
 import {httpsCallable} from "firebase/functions";
 import {functions} from "../firebase";
-import {Chip, Tooltip} from '@mui/material';
+import {Chip, Link as MUILink, Tooltip} from '@mui/material';
 import {getGridDateOperators} from "@mui/x-data-grid-pro";
 import Moment from 'react-moment';
 import moment from 'moment';
@@ -154,7 +154,7 @@ export const columnOptions = {
 
           <Box flex flexWrap={'no-wrap'} flexDirection={'row'} align={'center'} justifyContent={'flex-start'}>
             {params.value.map((item, index) => {
-              return <Tooltip title={"Added on: " + moment(item.created_at).format("lll")}><Chip sx={{marginLeft: (index > 0 ? '5px' : '0')}} key={"user-"+item.id+"-"+item.artist_id} variant="outlined" size='small'
+              return <Tooltip  key={"user-"+item.id+"-"+item.artist_id}  title={"Added on: " + moment(item.created_at).format("lll")}><Chip sx={{marginLeft: (index > 0 ? '5px' : '0')}} variant="outlined" size='small'
                            color={"info"}
                            label={item.first_name + " " + item.last_name}/>
               </Tooltip>
@@ -318,4 +318,138 @@ export const buildDefaultFilters = () => {
     }
   })
   return {items:defaultFilters}
+}
+
+export const bakeColumnDef = (statTypes, linkSources, tagTypes, users, existingTags) => {
+  for (let typeIndex in statTypes) {
+    const type = statTypes[typeIndex];
+    const key = 'statistic.' + type['id']
+    const sourceName = type['source'].charAt(0).toUpperCase() + type['source'].slice(1);
+    const linkSource = linkSources.filter((s) => s.key === type['source']).pop()
+    columnOptions[key] = {
+      field: key,
+      keyName: type['source'] + "." + type['key'],
+      headerName:  sourceName +' ' + type['name'],
+      statName: type['name'],
+      statTypeId: type['id'],
+      source: type['source'],
+      description: sourceName +' ' + type['name'],
+      renderHeader: (params) => (
+          <Tooltip title={linkSource['display_name'] + ' ' + type['name']}>
+            <Box flex align={'center'} flexWrap={"nowrap"}>
+              {linkSource && linkSource['logo'] ? <Iconify sx={{display: 'inline-block'}} icon={linkSource['logo']}></Iconify> : null}
+              <Text display={'inline-block'}>&nbsp;{type['name']}</Text>
+            </Box>
+          </Tooltip>
+      ),
+      isMetric: true
+    }
+  }
+  columnOptions['users']['valueGetter'] = (data) => {
+    if (users) {
+      const artistUsers = data.row?.users
+      const filtered = []
+      for (const userIndex in artistUsers) {
+        const artistUser = artistUsers[userIndex]
+        if (artistUser.user_id in users) {
+          artistUser.user = users[artistUser.user_id]
+          if (artistUser.user && artistUser.user.id) {
+            filtered.push(artistUser)
+          }
+        } else {
+          artistUser.user = null
+        }
+      }
+      return (filtered?.map((item) => {
+        return {
+          "created_at": item.created_at,
+          "artist_id": item.artist_id,
+          ...item.user
+        }
+      }) ?? [])
+    } else {
+      return []
+    }
+  }
+  if (users) {
+    columnOptions['users']['valueOptions'] = Object.values(users ?? {}).map((user) => {
+      return {
+        label: user.first_name + " " + user.last_name,
+        value: user.id
+      }
+    })
+  }
+
+  for (let tagIndex in tagTypes) {
+    const tagType = tagTypes[tagIndex];
+    if (tagType['key'] !== 'user') {
+      continue;
+    }
+    const key = 'tag_' + tagType['key']
+    const valueOptions = []
+    if (existingTags) {
+      const filtered = existingTags.filter((tag) => {
+        return tag.tag_type_id === tagType['id']
+      }).map((tag) => {
+        return {
+          "label": tag.tag,
+          "value": tag.tag
+        }
+      })
+      for (const tag of filtered) {
+        valueOptions.push(tag)
+      }
+    }
+    columnOptions[key] = {
+      field: key,
+      keyName: key,
+      type: 'singleSelect',
+      headerName: tagType['name'] + 's',
+      description:  tagType['name'] + 's',
+      sortable: false,
+      valueGetter: (data) => data.row?.tags.filter((tag) => tag.tag_type_id === tagType['id']) ?? [],
+      valueOptions: valueOptions,
+      renderCell: (params) => {
+        return (
+            <Wrap>
+              {params.value.map((item) => {
+                return <Chip key={"tag-"+item.id} variant="outlined" size='small'
+                             color={"info"}
+                             label={item.tag}/>
+              })}
+            </Wrap>
+
+        )
+      },
+      isMetric: false
+    }
+  }
+
+  for (let typeIndex in linkSources) {
+    const type = linkSources[typeIndex];
+
+    const key = 'link_' + type['key']
+    columnOptions[key] = {
+      field: key,
+      keyName: key,
+      social: type['social'],
+      filterable: false,
+      sortable: false,
+      headerName: type['display_name'] + ' Link',
+      description:  type['display_name'] + ' Link',
+      valueOptions: [
+        {value: 0, label: 'DIY'}, {value: 2, label: 'Major'}, {value: 1, label: 'Indie'}
+      ],
+      renderHeader: (params) => (
+          <Tooltip title={type['display_name'] + ' Link'}>
+            <Wrap align={'center'}>
+              {type['logo'] ? <Iconify sx={{display: 'inline-block'}} icon={type['logo']}></Iconify> : null}
+              Link
+            </Wrap>
+          </Tooltip>
+      ),
+      renderCell: (params) => ( <MUILink color='primary' href={params.value}>{type['display_name']} <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></MUILink> ),
+      isMetric: false
+    }
+  }
 }

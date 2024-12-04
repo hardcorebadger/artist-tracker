@@ -1,4 +1,4 @@
-import {useState, useEffect, Children} from 'react';
+import {useState, useEffect, Children, useContext} from 'react';
 import {
   Box, Grid,
   GridItem,
@@ -23,6 +23,7 @@ import { collection, query, where } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { db } from '../firebase';
 import { deepCopy } from '../util/objectUtil';
+import {ColumnDataContext, CurrentReportContext} from "../App";
 
 const basePadding = 6
 
@@ -71,7 +72,7 @@ function UserBlock() {
   )
 }
 
-function NavItem({icon, path, display, index, children}) {
+function NavItem({icon, path, display, index, children, clickFirst}) {
   const navigate = useNavigate()
 
   const active = (path === index)
@@ -84,6 +85,9 @@ function NavItem({icon, path, display, index, children}) {
   const padding = icon ? 5 : 2
 
   const onClick = () => {
+    if (clickFirst) {
+      clickFirst(path)
+    }
     navigate(path)
   }
 
@@ -132,7 +136,8 @@ function NavItem({icon, path, display, index, children}) {
 function NavBar({navItems}) {
   const location = useLocation()
   const index = location.pathname
-
+  const {setActiveArtist} = useContext(ColumnDataContext)
+  const {setCurrentQueryModel, setCurrentRows, setCurrentReport} = useContext(CurrentReportContext)
   return (
   <Box pl={basePadding} pr={basePadding} pt={3} w="100%" h="100%" position="relative"
   sx ={{
@@ -146,7 +151,12 @@ function NavBar({navItems}) {
         <NavItem path={item.path} key={item.path} display={item.name} index={index} icon={item.icon}>
           {item.children &&
             item.children.map(item => (
-              <NavItem  path={item.path} key={item.path} display={item.name} index={index} />
+              <NavItem clickFirst={() => {
+                setCurrentQueryModel(null)
+                setCurrentReport(null)
+
+
+              }} path={item.path} key={item.path} display={item.name} index={index} />
             ))
           }
         </NavItem>
