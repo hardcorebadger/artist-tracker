@@ -47,13 +47,13 @@ link_sources = None
 tag_types = dict({
     1: {
         "id": 1,
-        "name": "Genre",
-        "key": "genre"
+        "name": "User Tag",
+        "key": "user"
     },
     2: {
         "id": 2,
-        "name": "User Tag",
-        "key": "user"
+        "name": "Genre",
+        "key": "genre"
     }
 })
 
@@ -229,7 +229,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     def eval_artist_lookup():
         data = flask.request.get_json()
         limit = data.get('limit', 100)
-        return eval_controller.find_needs_eval_refresh(limit)
+        return tracking_controller.find_needs_stats_refresh(limit)
 
     @v2_api.post("/add-ingest-update-artist")
     def add_ingest_update_artist():
@@ -396,6 +396,15 @@ def load_stat_types():
     list_sorted.sort(key=sort_ordered)
     return list_sorted
 
+def load_users(organization_id):
+    db = firestore.client(app)
+    users = db.collection('users').where(filter=FieldFilter('organization', '==', organization_id)).get()
+    return list(map(lambda user: {
+        "id": user.id,
+        "first_name": user.get('first_name'),
+        "last_name": user.get('last_name')
+    }, users))
+
 
 @https_fn.on_call(min_instances=1)
 def get_type_definitions(req: https_fn.CallableRequest):
@@ -420,7 +429,10 @@ def get_existing_tags(req: https_fn.CallableRequest):
     records = sql_session.scalars(records).all()
     records = list(map(lambda type: type.as_tag_dict(), records))
     sql_session.close()
-    return records
+    return {
+        "tags": records,
+        "users": load_users(user_data.get('organization'))
+    }
 
 
 @https_fn.on_call(min_instances=1,cors=options.CorsOptions(

@@ -114,7 +114,7 @@ const applyColumnOrder = (currentOrder, selectedColumns) => {
   }
 
 // given a column selection from available columns, build the columns for MUI format
-const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTypes, linkSources, tagTypes, existingTags) => {
+const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTypes, linkSources, tagTypes, existingTags, users) => {
   let columns = [
     {
       field: 'name',
@@ -151,9 +151,39 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
           isMetric: true
       }
   }
+  if (users) {
+      columnOptions['users']['valueGetter'] = (data) => {
+          const artistUsers = data.row?.users
+          for (const userIndex in artistUsers) {
+              const artistUser = artistUsers[userIndex]
+              if (artistUser.user_id in users) {
+                  artistUser.user = users[artistUser.user_id]
+              } else {
+                  artistUser.user = null
+              }
+              artistUsers[userIndex] = artistUser
+          }
+
+          return (artistUsers?.map((item) => {
+              return {
+                  "artist_id": item.artist_id,
+                  ...item.user
+              }
+          }) ?? [])
+      }
+      columnOptions['users']['valueOptions'] = Object.values(users ?? {}).map((user) => {
+          return {
+              label: user.first_name + " " + user.last_name,
+              value: user.id
+          }
+      })
+  }
 
   for (let tagIndex in tagTypes) {
       const tagType = tagTypes[tagIndex];
+      if (tagType['key'] !== 'user') {
+          continue;
+      }
       const key = 'tag_' + tagType['key']
       const valueOptions = []
       if (existingTags) {
@@ -274,6 +304,8 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     const [currentParams, setCurrentParams] = useState(null)
     const [currentRows, setCurrentRows] = useState(null)
     const [existingTags, setExistingTags] = useState(null)
+    const [users, setUsers] = useState(null)
+
     const { statisticTypes, setStatisticTypes, linkSources, tagTypes } = useContext(ColumnDataContext);
 
     // Server side data source for the table
@@ -292,16 +324,24 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     const [filterModel, setFilterModel] = useState(deepCopy(initialFilterValues))
     const [currentReqTime, setCurrentReqTime] = useState(null)
     const apiRef = useGridApiRef();
-    const loadTags = async () => {
+    const loadOrgFilters = async () => {
         const getTags = httpsCallable(functions, 'get_existing_tags')
         if (existingTags === null) {
             getTags().then((response) => {
-                setExistingTags(response.data)
+                setExistingTags(response.data.tags)
+                const newUsers = {}
+                for (const index in response.data.users) {
+                    const user = response.data.users[index]
+                    newUsers[user.id] = user
+                }
+
+                setUsers(newUsers)
+
             });
         }
     }
     useEffect(() => {
-       loadTags()
+        loadOrgFilters()
     }, []);
 
     useEffect(() => {
@@ -399,7 +439,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     }, [existingTags])
     
     // bake the columns for MUI based on current column order object
-    const columns = bakeColumns(buildColumnSelection(columnOrder, true), null, null, null, statisticTypes, linkSources, tagTypes, existingTags)
+    const columns = bakeColumns(buildColumnSelection(columnOrder, true), null, null, null, statisticTypes, linkSources, tagTypes, existingTags, users)
 
     // check current state vs saved report config to see if we should show save button
     const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterModel)

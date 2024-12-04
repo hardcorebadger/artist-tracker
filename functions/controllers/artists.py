@@ -2,11 +2,12 @@ import hashlib
 import json
 import time
 import copy
+from datetime import datetime
 from itertools import count
 
 from firebase_admin import firestore, initialize_app
 from firebase_functions import https_fn
-from sqlalchemy import select, func, and_, not_
+from sqlalchemy import select, func, and_, not_, or_
 from sqlalchemy.dialects.mssql.information_schema import columns
 from sqlalchemy.orm import subqueryload, joinedload, contains_eager, defer, aliased
 
@@ -95,11 +96,12 @@ class ArtistController():
         query = query.outerjoin(Evaluation, Artist.evaluation).outerjoin(UserArtist, Artist.users).outerjoin(ArtistTag, Artist.tags)
         query = query.where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization')))
         query = query.filter(UserArtist.organization_id == user_data.get('organization'))
-        query = query.filter(ArtistTag.organization_id == user_data.get('organization') or ArtistTag.organization_id == None)
-        query = self.build_filters(user_data, data, query)
+        query = query.filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))
+
+        query, eval_dynamic, org_dynamic  = self.build_filters(user_data, data, query)
 
         # .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
-        query = self.build_sorts(data, query, count, user_data)
+        query = self.build_sorts(data, query, count, user_data, eval_dynamic, org_dynamic)
 
         return query
 
@@ -108,6 +110,8 @@ class ArtistController():
 #         print(filter_model)
         if not filter_model or len(filter_model) == 0:
             return query
+        eval_dynamic = None
+        org_dynamic = None
         filter_model = filter_model.get('items', list())
         for filter_field in filter_model:
             field = filter_field.get('field')
@@ -127,35 +131,55 @@ class ArtistController():
                     value = int(value)
                 query = self.build_condition(query, getattr(dynamic, statistic_func), operator, value)
             elif field.startswith('tag_genre') or field.startswith('tag_user'):
-                tag_type = 2
+                tag_type = 1
                 if field == 'tag_genre':
-                    tag_type = 1
+                    tag_type = 2
+
                 if operator == 'is':
                     if value is None:
-                        query = query.filter(~(Artist.tags.any(ArtistTag.tag_type_id == tag_type)))
+                        query = query.filter(~(Artist.tags.any(and_(ArtistTag.tag_type_id == tag_type, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None)))))
                     else:
-                        query = query.filter(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == tag_type)))
+                        query = query.filter(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == tag_type, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))))
                 elif operator == 'not':
                     if value is None:
-                        query = query.filter(Artist.tags.any(ArtistTag.tag_type_id == tag_type))
+                        query = query.filter(Artist.tags.any(and_(ArtistTag.tag_type_id == tag_type, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))))
                     else:
-                        query = query.filter(~(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == tag_type))))
+                        query = query.filter(~(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == tag_type, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None)))))
                 elif operator == 'isAnyOf' and value is not None and len(value) > 0:
-                    query = query.filter(Artist.tags.any(and_(ArtistTag.tag.in_(value), ArtistTag.tag_type_id == tag_type)))
+                    query = query.filter(Artist.tags.any(and_(ArtistTag.tag.in_(value), ArtistTag.tag_type_id == tag_type, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))))
 
             elif field.startswith('evaluation.'):
                 eval_key = field.split('.')
                 eval_key = eval_key[1]
                 newValue = value
 
-                dynamic = aliased(Evaluation)
-                column = getattr(dynamic, eval_key)
-                query = query.outerjoin(dynamic, Artist.evaluation_id == dynamic.id)
+                eval_dynamic = aliased(Evaluation)
+                column = getattr(eval_dynamic, eval_key)
+                query = query.outerjoin(eval_dynamic, Artist.evaluation_id == eval_dynamic.id)
                 query = self.build_condition(query, column, operator, newValue)
+            elif field.startswith('organization.'):
+                org_key = field.split('.')
+                org_key = org_key[1]
+                newValue = value
+
+                org_dynamic = aliased(OrganizationArtist)
+                column = getattr(org_dynamic, org_key)
+                query = query.outerjoin(org_dynamic, and_(Artist.id == org_dynamic.artist_id, org_dynamic.organization_id == user_data.get('organization'))).order_by(column)
+                query = self.build_condition(query, column, operator, newValue)
+
+            elif field == 'users':
+
+                if operator == 'is':
+                    query = query.filter(Artist.users.any(and_(UserArtist.user_id == value, UserArtist.organization_id == user_data.get('organization'))))
+                elif operator == 'not':
+                    query = query.filter(~Artist.users.any(and_(UserArtist.user_id == value, UserArtist.organization_id == user_data.get('organization'))))
+                elif operator == 'isAnyOf' and len(value) > 0:
+                    query = query.filter(Artist.users.any(and_(UserArtist.user_id.in_(value), UserArtist.organization_id == user_data.get('organization'))))
+
             else:
                 column = Artist.__table__.columns[field]
                 query = self.build_condition(query, column, operator, value)
-        return query
+        return query, eval_dynamic, org_dynamic
 
     def build_condition(self, query, column, operator, value):
         if value is None:
@@ -165,26 +189,28 @@ class ArtistController():
                 return query.filter(column != None)
             else:
                 return query
+        if operator in ['after', 'before', 'onOrAfter', 'onOrBefore']:
+            value = parse_datetime(value)
         if operator == 'isAnyOf':
             return query.filter(column.in_(value))
         elif operator == 'isNotOf':
             return query.filter(not_(column.in_(value)))
-        elif operator == '>':
+        elif operator == '>' or operator == 'after':
             return query.filter(column > value)
-        elif operator == '<':
+        elif operator == '<' or operator == 'before':
             return query.filter(column < value)
-        elif operator == '>=':
+        elif operator == '>=' or operator == 'onOrAfter':
             return query.filter(column >= value)
-        elif operator == '<=':
+        elif operator == '<=' or operator == 'onOrBefore':
             return query.filter(column <= value)
         elif operator == 'startsWith':
-            search = '{}%'.format(value)
+            search = '{}%'.format(escape_sql_search_text(value))
             return query.filter(column.like(search))
         elif operator == 'endsWith':
-            search = '%{}'.format(value)
+            search = '%{}'.format(escape_sql_search_text(value))
             return query.filter(column.like(search))
         elif operator == 'contains':
-            return query.filter(column.contains(value))
+            return query.filter(column.contains(escape_sql_search_text(value)))
         elif operator == 'doesNotContain':
             return query.filter(not_(column.contains(value)))
         elif operator == '==' or operator == 'equals' or operator == 'is':
@@ -193,7 +219,7 @@ class ArtistController():
             return query.filter(column != value)
         return query
 
-    def build_sorts(self, data, query, count, user_data):
+    def build_sorts(self, data, query, count, user_data, eval_dynamic = None, org_dynamic = None):
         if count:
             return query
         if data.get('sortModel', False) and len(data['sortModel']) > 0:
@@ -215,21 +241,27 @@ class ArtistController():
                 elif sortFieldKey.startswith('evaluation'):
                     evalKey = sortFieldKey.split('.')
                     evalKey = evalKey[1]
-                    tableAliased = aliased(Evaluation)
-                    column = getattr(tableAliased, evalKey).asc()
+
+                    if eval_dynamic is None:
+                        eval_dynamic = aliased(Evaluation)
+                        query = query.outerjoin(eval_dynamic, Artist.evaluation_id == eval_dynamic.id)
+
+                    column = getattr(eval_dynamic, evalKey).asc()
 
                     if sort['sort'] == 'desc':
-                        column = getattr(tableAliased, evalKey).desc()
-                    query = query.outerjoin(tableAliased, Artist.evaluation_id == tableAliased.id).order_by(column)
+                        column = getattr(eval_dynamic, evalKey).desc()
+                    query = query.order_by(column)
                 elif sortFieldKey.startswith('organization'):
                     orgKey = sortFieldKey.split('.')
                     orgKey = orgKey[1]
-                    tableAliased = aliased(OrganizationArtist)
-                    column = getattr(tableAliased, orgKey).asc()
+                    if org_dynamic is None:
+                        org_dynamic = aliased(OrganizationArtist)
+                        query = query.outerjoin(org_dynamic, and_(Artist.id == org_dynamic.artist_id, org_dynamic.organization_id == user_data.get('organization')))
+                    column = getattr(org_dynamic, orgKey).asc()
 
                     if sort['sort'] == 'desc':
-                        column = getattr(tableAliased, orgKey).desc()
-                    query = query.outerjoin(tableAliased, and_(Artist.id == tableAliased.artist_id, tableAliased.organization_id == user_data.get('organization'))).order_by(column)
+                        column = getattr(org_dynamic, orgKey).desc()
+                    query = query.order_by(column)
 
                 elif sortFieldKey.startswith('user'):
                     userKey = sortFieldKey.split('.')
@@ -247,3 +279,17 @@ class ArtistController():
                         column = Artist.__table__.columns[sortFieldKey].desc()
                     query = query.order_by(column)
         return query
+
+def parse_datetime(date_string):
+    """Parses a datetime string with or without time."""
+    try:
+        # Try parsing with time
+        return datetime.strptime(date_string, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        try:
+            # Try parsing without time
+            return datetime.strptime(date_string, "%Y-%m-%d")
+        except ValueError:
+            raise ValueError("Invalid datetime format: {}".format(date_string))
+def escape_sql_search_text(text: str) -> str:
+    return text.replace("%", "\\%").replace("\\", "\\\\").replace("_", "\\_")

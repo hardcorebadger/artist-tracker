@@ -54,7 +54,8 @@ class Artist(Base):
         for link in self.links:
             dict['link_' + link.source.key] = link.url
 
-        dict['users'] = list(map(lambda user: user.as_dict(), self.users))
+        sorted_users = sorted(list(map(lambda user: user.as_dict(), self.users)), key=lambda x: x["created_at"])
+        dict['users'] = sorted_users
         dict['organization'] = list(map(lambda org: org.as_dict(), self.organizations)).pop()
         dict['statistics'] = list(map(lambda stat: stat.as_dict(), self.statistics))
         dict['tags'] = list(map(lambda tag: tag.as_dict(), self.tags))

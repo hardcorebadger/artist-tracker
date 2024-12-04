@@ -14,6 +14,7 @@ import {useState} from "react";
 import {httpsCallable} from "firebase/functions";
 import {functions} from "../firebase";
 import {Chip} from '@mui/material';
+import {getGridDateOperators} from "@mui/x-data-grid-pro";
 
 // const miniBarChartOptions = {
 //   chart: {
@@ -55,6 +56,9 @@ import {Chip} from '@mui/material';
 export const defaultReportName = "New artist report"
 
 export const defaultColumnOrder = ['link_spotify', 'evaluation.status', 'evaluation.distributor', 'evaluation.back_catalog', 'statistic.30-latest']
+const dateOperators = getGridDateOperators().filter(
+    (operator) => operator.value !== 'is' && operator.value !== 'not' && operator.value !== 'isEmpty' && operator.value !== 'isNotEmpty',
+);
 
 export const columnOptions = {
   "evaluation.distributor": {
@@ -128,13 +132,32 @@ export const columnOptions = {
   },
   "organization.created_at": {
     field: 'organization.created_at',
-    headerName: 'Added At',
-    filterable: false,
+    headerName: 'Added On',
+    filterOperators: dateOperators,
     valueGetter: (data) => {
       return (new Date(data.row?.organization?.created_at) ?? null)
     },
     isMetric: false,
     type: 'dateTime'
+  },
+  "users": {
+    field: 'users',
+    headerName: 'Added By',
+    sortable: false,
+    isMetric: false,
+    renderCell: (params) => {
+      return (
+          <Wrap>
+            {params.value.map((item) => {
+              return <Chip key={"user-"+item.id+"-"+item.artist_id} variant="outlined" size='small'
+                           color={"info"}
+                           label={item.first_name + " " + item.last_name}/>
+            })}
+          </Wrap>
+
+      )
+    },
+    type: 'singleSelect'
   }
   // "genres": {
   //   field: 'tags',

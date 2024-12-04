@@ -1,7 +1,7 @@
 import time
 
 from google.cloud.firestore_v1.query_results import QueryResultsList
-from sqlalchemy import select
+from sqlalchemy import select, or_, func
 from sqlalchemy.orm import joinedload
 import traceback
 from lib import SongstatsClient, ErrorResponse, SpotifyClient, get_user, ArtistLink, LinkSource, StatisticType, \
@@ -300,7 +300,6 @@ class TrackingController():
           self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
 
         sql_ref.avatar = doc.get('avatar')
-        sql_ref.active = True
         sql_links = self.convert_links(doc, sql_ref.id)
         sql_session = self.sql.get_session()
         final = list()
@@ -400,14 +399,14 @@ class TrackingController():
     return ids
   
   def find_needs_stats_refresh(self, limit: int):
-    docs = self.db.collection("artists_v2").where(
-        filter=BaseCompositeFilter(operator=StructuredQuery.CompositeFilter.Operator.AND, filters=[
-          FieldFilter('ob_status', "==", "onboarded"),
-          FieldFilter('stats_as_of', "<", (datetime.now()-timedelta(days=1)))
-        ])
-    ).limit(limit).get()
-    ids = [d.id for d in docs]
-    return ids
+    sql_session = self.sql.get_session()
+    sql_ids = (select(Artist.spotify_id)
+               .filter(Artist.evaluation.has())
+               .filter(Artist.statistics.any(Statistic.updated_at <  func.now() - timedelta(days=1)))
+               .filter(Artist.active == True)).limit(limit)
+    sql_ids = sql_session.scalars(sql_ids).unique()
+    sql_session.close()
+    return list(sql_ids)
 
   def convert_artist_link(self, link, sources, artist_id = None):
 
@@ -603,7 +602,8 @@ class TrackingController():
                       organizations=orgs,
                       evaluation=eval,
                       statistics=stats,
-                      users=userArtists
+                      users=userArtists,
+                      active=True
                   ))
 
                   if len(add_batch) > 0:
