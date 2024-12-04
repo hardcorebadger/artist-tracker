@@ -155,7 +155,9 @@ class Statistic(Base):
     last_date = Column(DateTime)
     @hybrid_property
     def dates(self):
-        return list(map(lambda date: date.isoformat(), [self.last_date - datetime.timedelta(weeks=idx) for idx in range(8)]))
+        dates = list(map(lambda date: date.isoformat(), [self.last_date - datetime.timedelta(weeks=idx) for idx in range(8)]))
+        dates.reverse()
+        return dates
 
     def as_dict(self):
 

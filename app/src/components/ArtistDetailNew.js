@@ -59,6 +59,7 @@ const chartOptions = {
       format: 'dd/MM/yy HH:mm'
     },
   },
+
   yaxis: {
     min: 0
   }
@@ -125,7 +126,7 @@ function CopyrightCard({artist, linkSources}) {
 export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
   const [tabIndex, setTabIndex] = useState(0)
   const stats = bakeStats(linkSources)
-  const filteredStat = artist['statistics'].filter((stat) => stat['statistic_type_id'] === stats[tabIndex]?.statTypeId).pop()
+  const filteredStat = artist['statistics'].filter((stat) => stat['statistic_type_id'] === stats[tabIndex]?.statTypeId).pop() ?? null
   const filteredData = (filteredStat && 'data' in filteredStat) ? filteredStat['data'] : []
   if (stats.length === 0) {
     return (
@@ -160,11 +161,26 @@ export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
             <Card variant="outline" p={2} mt={5}>
               <Heading size={'md'}>{stats[tabIndex].headerName}{(filteredData && filteredData.length > 0 ? '' : ' - (No Data Available)')}</Heading>
               <Chart
-                options={chartOptions}
+                options={{
+                  xaxis: (filteredData && filteredData.length > 0) ? {
+                    labels: {
+                      show: true,
+                      formatter: function (val) {
+                        if (filteredStat) {
+                          return filteredStat['dates'][val]
+                        } else {
+                          return "N/A"
+                        }
+                      }
+                    }
+                  } : {},
+                  ...chartOptions
+                }}
                 series={[{
                   name: stats[tabIndex].headerName,
                   data: filteredData
                 }]}
+
                 type="area"
               />
             </Card>
