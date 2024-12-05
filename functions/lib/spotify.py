@@ -128,7 +128,7 @@ class SpotifyClient():
         if id not in dedupe_set:
           dedupe_set.add(id)
           artist_ids.append(id)
-    return artist_ids
+    return artist_ids, p['name']
   
   def find_artist(self, name):
     search = self.get('/search', {

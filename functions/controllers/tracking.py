@@ -2,10 +2,10 @@ import time
 
 from google.cloud.firestore_v1.query_results import QueryResultsList
 from sqlalchemy import select, or_, func
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, contains_eager
 import traceback
 from lib import SongstatsClient, ErrorResponse, SpotifyClient, get_user, ArtistLink, LinkSource, StatisticType, \
-    OrganizationArtist, Evaluation, Statistic, UserArtist
+    OrganizationArtist, Evaluation, Statistic, UserArtist, Attribution
 from datetime import datetime, timedelta
 from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilter, StructuredQuery
 from google.cloud.firestore_v1.transforms import DELETE_FIELD
@@ -67,18 +67,23 @@ class TrackingController():
 
 
 
-  def add_artist(self, spotify_id, user_id, org_id):
+  def add_artist(self, spotify_id, user_id, org_id, sql_playlist_id = None):
 
     sql_session = self.sql.get_session()
-    sqlRef = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id)).first()
+    sqlRef = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id).options(
+        contains_eager(Artist.organizations),
+        contains_eager(Artist.users)
+    )).first()
     if sqlRef is not None:
         if not sqlRef.active:
             sqlRef.active = True
             sql_session.add(sqlRef)
             sql_session.commit()
-    sql_session.close()
     ref = self.db.collection("artists_v2").document(spotify_id)
-
+    attribution = Attribution(
+        user_id=user_id,
+        playlist_id=sql_playlist_id,
+    )
     doc = ref.get()
     # if artist exists add the user/org to tracking
     if doc.exists:
@@ -108,12 +113,27 @@ class TrackingController():
       })
       if sqlRef is None:
         print('Artist needs migration; importing to SQL')
-        self.import_sql(doc)
+        self.import_sql(doc, attribution)
+      else:
+          if len(list(filter(lambda x: x.user_id == user_id, sqlRef.users))) == 0:
+              sqlRef.users.append(UserArtist(
+                  user_id,
+                  organization_id=org_id,
+              ))
+          if len(list(filter(lambda x: x.organization_id == org_id, sqlRef.organizations))) == 0:
+              sqlRef.organizations.append(OrganizationArtist(
+                  organization_id=org_id,
+              ))
+          attribution.artist_id = sqlRef.id
+          sql_session.add(sqlRef)
+          sql_session.add(attribution)
+          sql_session.commit()
+      sql_session.close()
       return 'Artist exists, added to tracking', 200
     
     # check if the ID is valid (this will raise a 400 if the artist is invalid)
     artist = self.spotify.get_artist(spotify_id)
-    
+    sql_session.close()
     # create an artist
     new_schema = {
         "id": spotify_id,
@@ -163,10 +183,11 @@ class TrackingController():
         #   }
         # ],
     }
+
     for s in HOT_TRACKING_FIELDS:
       new_schema[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = []
     ref.set(new_schema)
-    self.import_sql(ref.get())
+    self.import_sql(ref.get(), attribution)
     return 'success', 200
   
   def ingest_artist(self, spotify_id : str):
@@ -481,7 +502,7 @@ class TrackingController():
     else:
         return None
     return eval
-  def import_sql(self, old_artists):
+  def import_sql(self, old_artists, attribution = None):
       if not isinstance(old_artists, QueryResultsList):
           old_artists = [old_artists]
       sql_session = self.sql.get_session()
@@ -603,7 +624,11 @@ class TrackingController():
                       evaluation=eval,
                       statistics=stats,
                       users=userArtists,
-                      active=True
+                      active=True,
+                      attributions=list([Attribution(
+                          user_id=attribution.user_id,
+                          playlist_id=attribution.playlist_id,
+                      )])
                   ))
 
                   if len(add_batch) > 0:

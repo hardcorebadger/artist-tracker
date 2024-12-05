@@ -44,6 +44,7 @@ class Artist(Base):
     evaluation: Mapped["Evaluation"] = relationship(back_populates='artist', foreign_keys=[evaluation_id])
 
     tags: Mapped[List["ArtistTag"]] = relationship(back_populates='artist')
+    attributions: Mapped[List["Attribution"]] = relationship(back_populates='artist')
 
     def as_dict(self):
         dict = {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -270,3 +271,34 @@ class LinkSource(Base):
 
     def __repr__(self):
         return f"<LinkSource({self.id=}, {self.key=}, {self.logo=}, {self.url_scheme=}, {self.display_name})>"
+
+class Playlist(Base):
+    __tablename__ = 'playlists'
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
+    name = Column(String(256), nullable=True)
+    spotify_id = Column(String(22), nullable=False)
+    created_at = Column(TIMESTAMP, nullable=False)
+    updated_at = Column(TIMESTAMP, nullable=False)
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+    def __repr__(self):
+        return f"<Playlist({self.id=}, {self.spotify_id=}, {self.name=}, {self.created_at=}, {self.updated_at})>"
+
+class Attribution(Base):
+    __tablename__ = 'attribution'
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
+    artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
+    user_id = Column(String(28), nullable=False)
+    playlist_id: Mapped[int] = mapped_column(Integer, ForeignKey('playlists.id'), nullable=True)
+    created_at = Column(TIMESTAMP, nullable=False)
+
+    playlist: Mapped["Playlist"] = relationship()
+    artist: Mapped["Artist"] = relationship(back_populates="attributions")
+
+
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+    def __repr__(self):
+        return f"<Attribution({self.id=}, {self.artist_id=}, {self.user_id=}, {self.playlist_id=}, {self.created_at})>"

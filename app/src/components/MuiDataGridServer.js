@@ -362,7 +362,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     }
     useEffect(() => {
 
-    }, [existingTags])
+    }, [existingTags, users])
     
     // bake the columns for MUI based on current column order object
     const columns = bakeColumns(buildColumnSelection(columnOrder, true), null, null, null, quickFilter)

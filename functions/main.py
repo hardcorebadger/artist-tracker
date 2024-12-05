@@ -16,7 +16,7 @@ from lib.utils import get_function_url
 from tmp_keys import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
     CloudSQLClient, LinkSource, ArtistLink, OrganizationArtist, Evaluation, StatisticType, Statistic, UserArtist, \
-    ArtistTag
+    ArtistTag, Playlist
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController
 import flask
 from datetime import datetime, timedelta
@@ -145,7 +145,13 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
             data = flask.request.get_json()
         else:
             data = {}
-        return artist_controller.get_artists_test(data, app)
+        spotify_id = spotify.url_to_id(data.get('spotify_url'), 'playlist')
+        if spotify_id == 'invalid':
+            return {'message': 'Invalid URL, try copy pasting an artist or playlist URL from Spotify directly.',
+                    'status': 400, 'added_count': 0}
+        else:
+            aids, name = spotify.get_playlist_artists(spotify_id)
+            return {'message': 'sucess', 'status': 200, 'added': name}
 
     @v2_api.post("/reimport-artists")
     def reimport_artists():
@@ -364,10 +370,29 @@ def add_artist(req: https_fn.CallableRequest):
             else:
                 uid = req.auth.uid
                 user_data = get_user(uid, db)
-                aids = spotify.get_playlist_artists(spotify_id)
-                for a in aids:
-                    tracking_controller.add_artist(a, uid, user_data['organization'])
-                return {'message': 'sucess', 'status': 200, 'added_count': len(aids)}
+                try:
+                    aids, playlist_name = spotify.get_playlist_artists(spotify_id)
+
+                    sql_session = sql.get_session()
+                    sql_playlist = sql_session.scalars(select(Playlist).where(Playlist.spotify_id == spotify_id)).first()
+                    if sql_playlist is None:
+                        sql_playlist = Playlist(
+                            spotify_id=spotify_id,
+                            name=playlist_name,
+                        )
+                        sql_session.add(sql_playlist)
+                        sql_session.commit()
+                        sql_session.refresh(sql_playlist)
+                    sql_session.close()
+
+                    for a in aids:
+                        tracking_controller.add_artist(a, uid, user_data['organization'], sql_playlist.id)
+                    return {'message': 'sucess', 'status': 200, 'added_count': len(aids)}
+                except Exception as e:
+                    print(e)
+                    return {
+                        'message': 'failed', 'status': 500, 'error': traceback.format_exc()
+                    }
         else:
             uid = req.auth.uid
             user_data = get_user(uid, db)
