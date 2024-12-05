@@ -92,9 +92,6 @@ export const columnOptions = {
     valueOptions: [
       {value: 1, label: 'Signed'}, {value: 0, label: 'Unsigned'}, {value: null, label: 'Unknown'}
     ],
-    renderCell: (params) => (
-      <Chip variant="outlined" size='small' color={params.value == 1 ? "error" : params.value == 0 ? "primary" : "warning"} label={params.value == 0 ? 'Unsigned' : (params.value == 1 ? 'Signed' : 'Unknown')} />
-    ),
     type: 'singleSelect',
 
   },
@@ -102,28 +99,17 @@ export const columnOptions = {
     field: 'evaluation.distributor_type',
     type: 'singleSelect',
     headerName: 'Distributor Type',
-    valueGetter: (data) => data.row.evaluation ? (data.row?.evaluation?.distributor_type === 0 ? "DIY" : data.row?.evaluation?.distributor_type === 1 ? "Indie" : "Major") : "Unknown",
+    valueGetter: (data) => data.row.evaluation ? data.row.evaluation?.distributor_type : null,
     isMetric: false,
     valueOptions: [
       {value: 0, label: 'DIY'}, {value: 2, label: 'Major'}, {value: 1, label: 'Indie'}, {value: null, label: 'Unknown'}
     ],
-    renderCell: (params) => {
-      return (
-      <Chip variant="outlined" size='small'
-            color={params.value == "Major" ? "error" : (params.value == "Indie" || params.value == 'Unknown' ? "warning" : "primary")}
-            label={params.value}/>
-
-      )
-    },
 
   },
   "evaluation.back_catalog": {
     field: 'evaluation.back_catalog',
     headerName: 'Backcatalog Status',
     valueGetter: (data) => (data.row?.evaluation?.back_catalog ?? null),
-    renderCell: (params) => (
-      <Chip variant="outlined" size='small' color={params.value == 1 ? "warning" : "primary"} label={(params.value == null ? 'Unknown' : (params.value == 0 ? 'Clean' : 'Dirty'))} />
-    ),
     isMetric: false,
     // filterEditor: SelectFilter,
     valueOptions: [
@@ -149,20 +135,6 @@ export const columnOptions = {
     sortable: false,
     isMetric: false,
     width: 250,
-    renderCell: (params) => {
-      return (
-
-          <Box flex flexWrap={'no-wrap'} flexDirection={'row'} align={'center'} justifyContent={'flex-start'}>
-            {params.value.map((item, index) => {
-              return <Tooltip  key={"user-"+item.id+"-"+item.artist_id}  title={"Added on: " + moment(item.created_at).format("lll")}><Chip sx={{marginLeft: (index > 0 ? '5px' : '0')}} variant="outlined" size='small'
-                           color={"info"}
-                           label={item.first_name + " " + item.last_name}/>
-              </Tooltip>
-            })}
-          </Box>
-
-      )
-    },
     type: 'singleSelect'
   }
   // "genres": {

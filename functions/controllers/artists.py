@@ -118,7 +118,7 @@ class ArtistController():
 
         # .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
         if id_lookup is None:
-            query = self.build_sorts(data, query, count, user_data, eval_dynamic, org_dynamic)
+            query = self.build_sorts(data, query, count, user_data)
 
         return query
 
@@ -281,15 +281,15 @@ class ArtistController():
                         column = getattr(org_dynamic, orgKey).desc()
                     query = query.order_by(column)
 
-                elif sortFieldKey.startswith('user'):
-                    userKey = sortFieldKey.split('.')
-                    userKey = userKey[1]
-                    tableAliased = aliased(OrganizationArtist)
-                    column = getattr(tableAliased, userKey).asc()
-
-                    if sort['sort'] == 'desc':
-                        column = getattr(tableAliased, userKey).desc()
-                    query = query.outerjoin(tableAliased, Artist.id == tableAliased.artist_id).where(tableAliased.organization_id == user_data['organization']).order_by(column)
+                # elif sortFieldKey.startswith('user'):
+                #     userKey = sortFieldKey.split('.')
+                #     userKey = userKey[1]
+                #     tableAliased = aliased(OrganizationArtist)
+                #     column = getattr(tableAliased, userKey).asc()
+                #
+                #     if sort['sort'] == 'desc':
+                #         column = getattr(tableAliased, userKey).desc()
+                #     query = query.outerjoin(tableAliased, Artist.id == tableAliased.artist_id).where(tableAliased.organization_id == user_data['organization']).order_by(column)
                 else:
                     column = Artist.__table__.columns[sortFieldKey].asc()
 

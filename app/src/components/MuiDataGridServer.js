@@ -18,6 +18,7 @@ import {ColumnDataContext, CurrentReportContext} from "../App";
 import {Chip, Link as MUILink, Tooltip} from '@mui/material'
 import { Link as RouterLink } from "react-router-dom";
 import {GridFilterOperator} from "@mui/x-data-grid-pro";
+import moment from "moment/moment";
 
 // const ChakraDataGrid = chakra(DataGrid);
 
@@ -114,7 +115,7 @@ const applyColumnOrder = (currentOrder, selectedColumns) => {
   }
 
 // given a column selection from available columns, build the columns for MUI format
-const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTypes, linkSources, tagTypes, existingTags, users) => {
+const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, quickFilter) => {
   let columns = [
     {
       field: 'name',
@@ -127,9 +128,46 @@ const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, statTyp
       renderCell: (params) => (<strong>{params.value}</strong>)
     }
   ]
+  columnOptions['evaluation.status']['renderCell'] = (params) => (
+      <Chip
+          onClick={() => {
+              quickFilter('evaluation.status', 'is', params.value)
+          }}
+          variant="outlined" size='small' color={params.value == 1 ? "error" : params.value == 0 ? "primary" : "warning"} label={params.value == 0 ? 'Unsigned' : (params.value == 1 ? 'Signed' : 'Unknown')} />
+  )
+  columnOptions['evaluation.back_catalog']['renderCell'] = (params) => (
+      <Chip
+          onClick={() => {
+              quickFilter('evaluation.back_catalog', 'is', params.value)
+          }}
+          variant="outlined" size='small' color={params.value == 1 ? "warning" : "primary"} label={(params.value == null ? 'Unknown' : (params.value == 0 ? 'Clean' : 'Dirty'))} />
+  )
 
+  columnOptions['evaluation.distributor_type']['renderCell'] = (params) => {
+      return (
+          <Chip variant="outlined" size='small'
+                onClick={() => {
+                    quickFilter('evaluation.distributor_type', 'is', params.value)
+                }}
+                color={params.value === 2 ? "error" : (params.value === 1|| params.value == null ? "warning" : "primary")}
+                label={params.value !== null ? (params.value === 0 ? "DIY" : (params.value === 1 ? "Indie" : "Major")) : "Unknown"}/>
 
+      )
+  }
+  columnOptions['users']['renderCell'] = (params) => {
+      return (
 
+          <Box flex flexWrap={'no-wrap'} flexDirection={'row'} align={'center'} justifyContent={'flex-start'}>
+              {params.value.map((item, index) => {
+                  return <Tooltip  key={"user-"+item.id+"-"+item.artist_id}  title={"Added on: " + moment(item.created_at).format("lll")}><Chip onClick={() => {
+                      quickFilter('users', 'is', item.id)
+                  }} sx={{marginLeft: (index > 0 ? '5px' : '0')}} variant="outlined" size='small' color={"info"} label={item.first_name + " " + item.last_name}/>
+                  </Tooltip>
+              })}
+          </Box>
+
+      )
+  }
 
   Object.keys(selection).forEach(key => {
       if (key === 'link') {
@@ -208,24 +246,29 @@ export default function MuiDataGridController({initialReportName, initialColumnO
             const startTime = Date.now()
             setCurrentReqTime(startTime)
             // fetch data from server
+            const objectsEqual = (o1, o2) =>
+                typeof o1 === 'object' && Object.keys(o1).length > 0
+                    ? Object.keys(o1).length === Object.keys(o2).length
+                    && Object.keys(o1).every(p => objectsEqual(o1[p], o2[p]))
+                    : o1 === o2;
+
+            const arraysEqual = (a1, a2) =>
+                a1.length === a2.length && a1.every((o, idx) => objectsEqual(o, a2[idx]));
+
             const resp = await getArtists({page: paginationModel.page,
                 pageSize: paginationModel.pageSize,
                 sortModel,
                 filterModel});
                 setDataIsLoading(false)
-                // const newReq = {}
-                // newReq[startTime] = {
-                //     time: startTime,
-                //     rows: resp.data.rows,
-                //     rowCount: resp.data.rowCount
-                // }
+
                 if (resp.data.page !== paginationModel.page || resp.data.pageSize !== paginationModel.pageSize) {
                     return
                 }
-                if (JSON.stringify(resp.data.filterModel) !== JSON.stringify(filterModel)) {
+
+                if (!arraysEqual(resp.data.filterModel?.items ?? [], filterModel?.items ?? [])) {
                     return
                 }
-                if (JSON.stringify(resp.data.sortModel) !== JSON.stringify(sortModel)) {
+                if (JSON.stringify(resp.data.sortModel) !== JSON.stringify(sortModel) && !objectsEqual(resp.data.sortModel, sortModel)) {
                     return
                 }
                 setCurrentRows({
@@ -256,6 +299,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         setCurrentQueryModel(updateModel)
 
         if (refreshNeeded) {
+            console.log(updateModel, 'fetching')
             fetcher();
         }
     }, [paginationModel, sortModel, filterModel]);
@@ -278,6 +322,31 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         setColumnOrder(deepCopy(applyColumnOrder(columnOrder, selection)))
     }
 
+    const quickFilter = (field, operator, value) => {
+        let set = false
+        const newFilterModel = deepCopy(filterModel ?? {})
+        filterModel?.items?.forEach((item, index) => {
+            if (item.field === field && operator === operator) {
+                newFilterModel.items[index] = {
+                    ...item,
+                    value: value,
+
+                }
+                set = true
+            }
+        })
+        if (!set) {
+            newFilterModel.items.push({
+                field,
+                operator,
+                value,
+                id: Date.now()
+            })
+        }
+        setFilterModel(newFilterModel)
+
+    }
+
     // reset to the saved version of the report
     const revertState = () => {
         setColumnOrder(deepCopy(initialColumnOrder))
@@ -296,7 +365,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     }, [existingTags])
     
     // bake the columns for MUI based on current column order object
-    const columns = bakeColumns(buildColumnSelection(columnOrder, true), null, null, null, statisticTypes, linkSources, tagTypes, existingTags, users)
+    const columns = bakeColumns(buildColumnSelection(columnOrder, true), null, null, null, quickFilter)
 
     // check current state vs saved report config to see if we should show save button
     const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterModel)
