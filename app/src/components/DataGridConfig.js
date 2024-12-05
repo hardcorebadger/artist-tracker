@@ -56,7 +56,7 @@ import moment from 'moment';
 
 export const defaultReportName = "New artist report"
 
-export const defaultColumnOrder = ['link_spotify', 'evaluation.status', 'evaluation.distributor', 'evaluation.back_catalog', 'statistic.30-latest']
+export const defaultColumnOrder = ['link_spotify', 'evaluation.status', 'evaluation.distributor', 'evaluation.back_catalog', 'statistic.30-latest', 'organization.created_at', 'users']
 const dateOperators = getGridDateOperators().filter(
     (operator) => operator.value !== 'is' && operator.value !== 'not' && operator.value !== 'isEmpty' && operator.value !== 'isNotEmpty',
 );
