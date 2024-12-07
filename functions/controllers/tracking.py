@@ -11,6 +11,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilte
 from google.cloud.firestore_v1.transforms import DELETE_FIELD
 
 from lib import CloudSQLClient, Artist
+from lib.utils import pop_default
 
 HOT_TRACKING_FIELDS = {
   "spotify__monthly_listeners": "abs",
@@ -29,6 +30,7 @@ DEPRECATED_STATS = {
   "shazam__shazams_total": "rel",
   "instagram__followers_total": "rel" 
 }
+
 
 class TrackingController():
   def __init__(self, spotify: SpotifyClient, songstats : SongstatsClient, sql: CloudSQLClient, db):
@@ -200,11 +202,17 @@ class TrackingController():
       raise ErrorResponse('Artist not found', 404, 'Tracking')
 
     sql_session = self.sql.get_session()
-    sql_ref = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id)).first()
+    sql_ref = sql_session.scalars(select(Artist).options(
+        joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True),
+        joinedload(Artist.links, innerjoin=False)).where(
+        Artist.spotify_id == spotify_id)).first()
     if sql_ref is None:
         print('Artist needs migration; importing to SQL')
         self.import_sql(doc)
-    sql_ref = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id)).first()
+        sql_ref = sql_session.scalars(select(Artist).options(
+            joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True),
+            joinedload(Artist.links, innerjoin=False)).where(
+            Artist.spotify_id == spotify_id)).first()
     sql_session.close()
     data = doc.to_dict()
 
@@ -242,7 +250,7 @@ class TrackingController():
       "links": info['artist_info']['links'],
       "ob_status": "onboarded"
     })
-
+    self.update_sql_meta(sql_ref, doc)
 
 
     print("[INGEST] info updated")
@@ -320,24 +328,10 @@ class TrackingController():
           update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = values
           self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
 
-        sql_ref.avatar = doc.get('avatar')
-        sql_links = self.convert_links(doc, sql_ref.id)
-        sql_session = self.sql.get_session()
-        final = list()
-        for link in sql_links:
-            existing = list(filter(lambda x: x.link_source_id == link.link_source_id and x.path == link.path,sql_ref.links)).pop()
-            if existing is not None:
-                continue
-            final.append(link)
-        for link in sql_ref.links:
-            existing = list(filter(lambda x: x.link_source_id == link.link_source_id and x.path == link.path, sql_links)).pop()
-            if existing is None:
-                sql_session.delete(link)
+        self.update_sql_meta(sql_ref, doc)
+
 
         ref.update(update)
-        sql_session.add_all(final)
-        sql_session.add_all([sql_ref])
-        sql_session.commit()
     except Exception as e:
         print(e)
         return 'error', 500
@@ -345,6 +339,29 @@ class TrackingController():
 
     # TODO Add the deep stats subcollection
     return 'success', 200
+
+  def update_sql_meta(self, sql_ref, doc):
+      sql_ref.avatar = doc.get('avatar')
+      sql_links = self.convert_links(doc, sql_ref.id)
+      sql_session = self.sql.get_session()
+      if sql_ref.avatar is not None or len(sql_links) > 0:
+          sql_ref.onboard_wait_until = None
+      final = list()
+      for link in sql_links:
+          existing = pop_default(list(
+              filter(lambda x: x.link_source_id == link.link_source_id and x.path == link.path, sql_ref.links)), None)
+          if existing is not None:
+              continue
+          final.append(link)
+      for link in sql_ref.links:
+          existing = pop_default(list(
+              filter(lambda x: x.link_source_id == link.link_source_id and x.path == link.path, sql_links)), None)
+          if existing is None:
+              sql_session.delete(link)
+
+      sql_session.add_all(final)
+      sql_session.add_all([sql_ref])
+      sql_session.commit()
 
   def add_or_update_sql_stat(self, artist: Artist, statistic_type: StatisticType, date, values):
       if len(values) == 0:
@@ -402,22 +419,14 @@ class TrackingController():
   #   return ids
 
   def find_needs_ob_ingest(self, limit: int):
-    needs_ingest = self.db.collection("artists_v2").where(
-        filter=FieldFilter('ob_status', "==", "needs_ingest")
-    ).limit(limit).get()
-    ids = [d.id for d in needs_ingest]
-    # if we can still do more, find some that are done waiting
-    if len(ids) < limit:
-      waiting_ingest_complete = self.db.collection("artists_v2").where(
-          filter=BaseCompositeFilter(operator=StructuredQuery.CompositeFilter.Operator.AND, filters=[
-            FieldFilter('ob_status', "==", "waiting_ingest"),
-            FieldFilter('ob_wait_till', "<", datetime.now())
-          ])
-      ).limit(limit - len(ids)).get()
-      for d in waiting_ingest_complete:
-        ids.append(d.id)
-    
-    return ids
+    sql_session = self.sql.get_session()
+    sql_ids = (select(Artist.spotify_id)
+               .filter(Artist.onboarded == False)
+               .filter(or_(Artist.onboard_wait_until == None, Artist.onboard_wait_until < func.now()))
+               .filter(Artist.active == True)).limit(limit)
+    sql_ids = sql_session.scalars(sql_ids).unique()
+    sql_session.close()
+    return list(sql_ids)
   
   def find_needs_stats_refresh(self, limit: int):
     sql_session = self.sql.get_session()
@@ -624,6 +633,7 @@ class TrackingController():
                       evaluation=eval,
                       statistics=stats,
                       users=userArtists,
+                      onboarded=artist.get("ob_status") == 'onboarded' or artist.get('avatar') is not None,
                       active=True,
                       attributions=list([Attribution(
                           user_id=attribution.user_id,

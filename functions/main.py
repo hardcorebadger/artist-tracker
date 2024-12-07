@@ -235,7 +235,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     def eval_artist_lookup():
         data = flask.request.get_json()
         limit = data.get('limit', 100)
-        return tracking_controller.find_needs_stats_refresh(limit)
+        return tracking_controller.find_needs_ob_ingest(limit)
 
     @v2_api.post("/add-ingest-update-artist")
     def add_ingest_update_artist():
@@ -359,6 +359,7 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
 def add_artist(req: https_fn.CallableRequest):
     db = firestore.client(app)
     tracking_controller = TrackingController(spotify, songstats, sql, db)
+    preview = req.data.get('preview', False)
     # Message text passed from the client.
     try:
         spotify_url = req.data["spotify_url"]
@@ -464,5 +465,4 @@ def get_existing_tags(req: https_fn.CallableRequest):
         cors_origins="*",
             cors_methods=["get", "post", "options"]))
 def get_artists(req: https_fn.CallableRequest):
-
     return artists.get_artists(req.auth.uid, req.data, app)

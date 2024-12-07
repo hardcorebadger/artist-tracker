@@ -9,6 +9,12 @@ def get_user(uid, db):
     data = doc.to_dict()
     return data
 
+def pop_default(input_list, default_value):
+    try:
+        return input_list.pop()
+    except IndexError:
+        return default_value
+
 def get_function_url(name: str, location: str = SupportedRegion.US_CENTRAL1) -> str:
     """Get the URL of a given v2 cloud function.
 

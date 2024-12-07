@@ -21,7 +21,7 @@ import {
   Wrap,
   Badge,
   Stack,
-  Text, Link,
+  Text, Link, Image,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../routing/AuthGuard';
@@ -38,12 +38,12 @@ import {Box, Link as MUILink} from "@mui/material";
 import {theme} from "./MuiDataGridServer";
 import {ThemeProvider} from "@mui/material/styles";
 import {LoadingWidget} from "../routing/LoadingScreen";
+import Moment from "react-moment";
+import {ColumnDataContext} from "../App";
+import UserAvatar from "./UserAvatar";
 
 const chartOptions = {
-  chart: {
-    height: 300,
-    type: 'area'
-  },
+
   colors:['#329795'],
   dataLabels: {
     enabled: false
@@ -126,6 +126,7 @@ function CopyrightCard({artist, linkSources}) {
 export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
   const [tabIndex, setTabIndex] = useState(0)
   const stats = bakeStats(linkSources)
+  const {users} = useContext(ColumnDataContext)
   const filteredStat = artist['statistics'].filter((stat) => stat['statistic_type_id'] === stats[tabIndex]?.statTypeId).pop() ?? null
   const filteredData = (filteredStat && 'data' in filteredStat) ? filteredStat['data'] : []
   if (stats.length === 0) {
@@ -138,7 +139,7 @@ export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
       <HStack justifyContent='space-between'>
         <HStack spacing={5}>
           {onNavigateBack && <IconButton size="sm" variant="outline" onClick={onNavigateBack} icon={<Iconify icon="mdi:arrow-left"/>}/>}
-          <Heading size="lg">{artist?.name}</Heading>
+          <Heading size="lg"><Box sx={{'display': 'flex', 'alignItems': 'center'}}><Image mr={2} height={'50px'} src={artist.avatar}/> <Text >{artist?.name}</Text></Box></Heading>
         </HStack>
       <Button colorScheme='primary'><Link href={ artist.link_spotify } target="_blank">
         Open in Spotify</Link></Button>
@@ -161,6 +162,7 @@ export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
             <Card variant="outline" p={2} mt={5}>
               <Heading size={'md'}>{stats[tabIndex].headerName}{(filteredData && filteredData.length > 0 ? '' : ' - (No Data Available)')}</Heading>
               <Chart
+                height={'300px'}
                 options={{
                   xaxis: (filteredData && filteredData.length > 0) ? {
                     labels: {
@@ -183,6 +185,33 @@ export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
 
                 type="area"
               />
+            </Card>
+            <Card variant={"unstyled"} p={2} mt={5}>
+              <Wrap justify={'center'}>
+              {
+                artist?.attributions?.map(item => {
+                  const user = users ? users[item.user_id] : null
+                  return (
+
+                      <Wrap align={'center'} key={item.id}>
+
+                        <UserAvatar inline={true} userId={item.user_id}/>
+                      <Text color={"text.subtle"} fontSize={"15px"} ml={"-5px"}>
+                        &nbsp;added on <Moment format={"ll"}>{item.created_at}</Moment> at <Moment format={"hh:mm A"}>{item.created_at}</Moment> {item.playlist ? 'from' : 'manually'}
+                      </Text>
+                        {item.playlist ?
+                            (
+                                <ThemeProvider theme={theme}  >
+
+                                <MUILink target="_blank" href={"https://open.spotify.com/playlist/" + item.playlist.spotify_id}>{item.playlist.name} <Iconify sx={{display: 'inline-block', verticalAlign: '-0.125em'}} icon="mdi:external-link" /> </MUILink>
+                                </ThemeProvider>
+                            ) : null
+                        }
+                      </Wrap>
+                  )
+                })
+              }
+              </Wrap>
             </Card>
           </Tabs>
 

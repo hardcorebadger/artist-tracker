@@ -1,6 +1,6 @@
 import datetime
 import uuid
-from typing import List
+from typing import List, Optional
 
 from dataclasses import dataclass
 from sqlalchemy import Column, Integer, SmallInteger, JSON, Float, Boolean, Text, String, TIMESTAMP, create_engine, \
@@ -9,6 +9,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, relationship, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
+
+from lib.utils import pop_default
 
 Base = declarative_base()
 
@@ -24,6 +26,7 @@ class Artist(Base):
     created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     evaluation_id: Mapped[int] = mapped_column(Integer, ForeignKey('evaluations.id'), nullable=False)
+    onboarded = Column(Boolean, default=False)
 
     links: Mapped[List["ArtistLink"]] = relationship(
         back_populates = "artist", cascade = "all, delete-orphan"
@@ -57,7 +60,7 @@ class Artist(Base):
 
         sorted_users = sorted(list(map(lambda user: user.as_dict(), self.users)), key=lambda x: x["created_at"])
         dict['users'] = sorted_users
-        dict['organization'] = list(map(lambda org: org.as_dict(), self.organizations)).pop()
+        dict['organization'] = pop_default(list(map(lambda org: org.as_dict(), self.organizations)), None)
         dict['statistics'] = list(map(lambda stat: stat.as_dict(), self.statistics))
         dict['tags'] = list(map(lambda tag: tag.as_dict(), self.tags))
 
@@ -73,6 +76,14 @@ class Artist(Base):
         #     dict['stat_' + stat.type.source + '__' + stat.type.key + '-date'] = stat.created_at
 
         return dict
+
+    def as_deep_dict(self):
+        dict = self.as_dict()
+        attr = list(map(lambda attribution: attribution.as_dict(), self.attributions))
+        attr.reverse()
+        dict['attributions'] = attr
+        return dict
+
     def __repr__(self):
         return f"<Artist({self.id=}, {self.name=}, {self.spotify_id=}, {self.onboard_wait_until=}, {self.avatar})>"
 
@@ -290,15 +301,25 @@ class Attribution(Base):
     id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
     artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
     user_id = Column(String(28), nullable=False)
-    playlist_id: Mapped[int] = mapped_column(Integer, ForeignKey('playlists.id'), nullable=True)
+    playlist_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('playlists.id'), nullable=True)
     created_at = Column(TIMESTAMP, nullable=False)
 
-    playlist: Mapped["Playlist"] = relationship()
-    artist: Mapped["Artist"] = relationship(back_populates="attributions")
+    playlist: Mapped[Optional["Playlist"]] = relationship(foreign_keys=[playlist_id])
+    artist: Mapped["Artist"] = relationship(back_populates="attributions", foreign_keys=[artist_id])
 
 
     def as_dict(self):
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        playlist = None
+        if self.playlist:
+            playlist = self.playlist.as_dict()
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "playlist_id": self.playlist_id,
+            "artist_id": self.artist_id,
+            "created_at": self.created_at,
+            "playlist": playlist,
+        }
 
     def __repr__(self):
         return f"<Attribution({self.id=}, {self.artist_id=}, {self.user_id=}, {self.playlist_id=}, {self.created_at})>"

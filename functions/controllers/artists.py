@@ -13,7 +13,8 @@ from sqlalchemy.dialects.mssql.information_schema import columns
 from sqlalchemy.orm import subqueryload, joinedload, contains_eager, defer, aliased
 
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
-    CloudSQLClient, LinkSource, ArtistLink, ArtistTag, OrganizationArtist, Evaluation, StatisticType, Statistic, UserArtist
+    CloudSQLClient, LinkSource, ArtistLink, ArtistTag, OrganizationArtist, Evaluation, StatisticType, Statistic, \
+    UserArtist, Attribution, pop_default
 
 count_by_query = None
 
@@ -27,6 +28,8 @@ class ArtistController():
     def get_artists_test(self, data, app):
         return (self.get_artists('9sRMdvFDUKVKckwpzeARiG6x2LG2', data, app))
     def get_artists(self, uid, data, app):
+        id_lookup = data.get('id', None)
+
         try:
             # request schema from MUI
             # req.data = {'groupKeys': [], 'paginationModel': {'page': 0, 'pageSize': 10}, 'sortModel': [], 'filterModel': {'items': [], 'logicOperator': 'and', 'quickFilterValues': [], 'quickFilterLogicOperator': 'and'}, 'start': 0, 'end': 9}
@@ -48,7 +51,6 @@ class ArtistController():
 
             # Get the hexadecimal representation of the hash
             hex_digest = hash_object.hexdigest()
-            id_lookup = data.get('id', None)
             global count_by_query
             count = None
             if count_by_query is None:
@@ -65,13 +67,19 @@ class ArtistController():
             query = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup).limit(page_size).offset(page * page_size)
 
             artists_set = sql_session.scalars(query).unique()
-
-            artists = list(map(lambda artist: artist.as_dict(), artists_set))
+            artists = None
+            if id_lookup is not None:
+                artists = list(map(lambda artist: artist.as_deep_dict(), artists_set))
+            else:
+                artists = list(map(lambda artist: artist.as_dict(), artists_set))
 
             sql_session.close()
             db.close()
             if id_lookup is not None:
-                return artists.pop()
+                return {
+                    "artist": pop_default(artists, None),
+                    "error": None
+                }
 
             return {
                 "rows": artists,
@@ -79,9 +87,16 @@ class ArtistController():
                 "page": page,
                 "pageSize": page_size,
                 "filterModel": data.get('filterModel'),
-                "sortModel": data.get('sortModel')
+                "sortModel": data.get('sortModel'),
+                "error": None
             }
         except Exception as e:
+            print (traceback.format_exc())
+            if id_lookup is not None:
+                return {
+                    "artist": None,
+                    "error": traceback.format_exc()
+                }
             return {
                 "rows": [],
                 "rowCount": 0,
@@ -90,7 +105,7 @@ class ArtistController():
                 "filterModel": data.get('filterModel'),
                 "sortModel": data.get('sortModel'),
                 "error": traceback.format_exc()
-            }, 500
+            }
 
     def build_query(self, uid, user_data, data, db, sql_session, id_lookup, count = False):
         query = sql_session.query(Artist)
@@ -106,6 +121,17 @@ class ArtistController():
             ))
 
         if id_lookup is not None:
+            query = (select(Artist).options(
+                joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True).defer(
+                    StatisticType.created_at).defer(StatisticType.updated_at),
+                joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True).defer(
+                    LinkSource.logo),
+                joinedload(Artist.organizations, innerjoin=True),
+                contains_eager(Artist.evaluation),
+                contains_eager(Artist.users),
+                contains_eager(Artist.tags),
+                joinedload(Artist.attributions).joinedload(Attribution.playlist)
+            ))
             query = query.filter(Artist.id == id_lookup)
 
         query = query.filter(Artist.active == True)

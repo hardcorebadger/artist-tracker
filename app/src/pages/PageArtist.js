@@ -6,26 +6,40 @@ import {useNavigate, useParams} from "react-router-dom";
 import {ColumnDataContext, CurrentReportContext} from "../App";
 import {httpsCallable} from "firebase/functions";
 import {functions} from "../firebase";
+import {useToast} from "@chakra-ui/react";
 
 function PageArtist() {
     const { artistId } = useParams()
     const {  setActiveArtist, activeArtist, linkSources } = useContext(ColumnDataContext);
     const {currentQueryModel} = useContext(CurrentReportContext);
-
+    const toast = useToast();
     const navigate = useNavigate()
     const loadArtist = async () => {
         const getArtist = httpsCallable(functions, 'get_artists')
         if (activeArtist === null || activeArtist.id !== artistId) {
             getArtist({"id": artistId}).then((response) => {
-                setActiveArtist(response.data)
+                console.log(response);
+                if (!response.data.error) {
+                    setActiveArtist(response.data.artist)
+                } else {
+                    toast({
+                        title: 'Failed to load artist',
+                        description: "An error occurred while loading the artist.",
+                        status: 'error',
+                        duration: 9000,
+                        isClosable: true,
+                    })
+                }
 
             });
         }
     }
 
     useEffect(() => {
-        if (activeArtist === null || activeArtist.id !== artistId) {
-            setActiveArtist(null)
+        if (!activeArtist?.hasOwnProperty('attributions') || activeArtist === null || activeArtist.id !== artistId) {
+            if ( activeArtist?.id !== artistId) {
+                setActiveArtist(null)
+            }
             loadArtist()
         }
     }, [artistId])
