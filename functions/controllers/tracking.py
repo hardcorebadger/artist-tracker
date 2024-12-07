@@ -358,7 +358,7 @@ class TrackingController():
               filter(lambda x: x.link_source_id == link.link_source_id and x.path == link.path, sql_links)), None)
           if existing is None:
               sql_session.delete(link)
-
+      sql_ref.onboarded = doc.get("ob_status") == 'onboarded' or sql_ref.avatar is not None
       sql_session.add_all(final)
       sql_session.add_all([sql_ref])
       sql_session.commit()
