@@ -16,7 +16,7 @@ function PageArtist() {
     const navigate = useNavigate()
     const loadArtist = async () => {
         const getArtist = httpsCallable(functions, 'get_artists')
-        if (activeArtist === null || activeArtist.id !== artistId) {
+        if (!activeArtist?.hasOwnProperty('attributions') || activeArtist === null || activeArtist.id !== artistId) {
             getArtist({"id": artistId}).then((response) => {
                 console.log(response);
                 if (!response.data.error) {
