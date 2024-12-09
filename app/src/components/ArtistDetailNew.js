@@ -32,7 +32,6 @@ import { Link as ReactRouterLink } from 'react-router-dom'
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import Iconify from './Iconify';
 import Chart from "react-apexcharts";
-import { columnOptions } from './DataGridConfig'
 import {useContext, useEffect, useState} from 'react';
 import {Box, Chip, Link as MUILink} from "@mui/material";
 import {theme} from "./MuiDataGridServer";
@@ -66,15 +65,13 @@ const chartOptions = {
   }
 }
 
-const bakeStats = (linkSources) => {
+const bakeStats = (statisticTypes, linkSources) => {
     const stats = []
-    Object.keys(columnOptions).forEach(key => {
-      const col = columnOptions[key]
-      if (!col.isMetric) {
-        return
-      }
-      col.sourceLogo = linkSources.filter((s) => s.key === col.source).pop()?.logo
-      stats.push(col)
+    statisticTypes.forEach(stat => {
+      stats.push({
+        'stat': stat,
+        'logo': linkSources.filter((s) => s.key === stat['source']).pop()?.logo
+      })
     })
     return stats
 }
@@ -145,10 +142,10 @@ function CopyrightCard({artist, linkSources}) {
   )
 }
 
-export default function ArtistDetailNew({artist, onNavigateBack, linkSources, onTagSave}) {
+export default function ArtistDetailNew({artist, onNavigateBack, statisticTypes, linkSources, onTagSave}) {
   const [tabIndex, setTabIndex] = useState(0)
-  const { isOpen, onOpen, onClose } = useDisclosure()
-  const stats = bakeStats(linkSources)
+const { isOpen, onOpen, onClose } = useDisclosure()
+    const stats = bakeStats(statisticTypes, linkSources)
   const {users} = useContext(ColumnDataContext)
   const filteredStat = artist['statistics'].filter((stat) => stat['statistic_type_id'] === stats[tabIndex]?.statTypeId).pop() ?? null
   const filteredData = (filteredStat && 'data' in filteredStat) ? filteredStat['data'] : []

@@ -20,7 +20,7 @@ import { db } from '../firebase';
 import { collection, query, where, addDoc } from 'firebase/firestore';
 import { Link as ReactRouterLink } from 'react-router-dom'
 import { format } from "date-fns"
-import { defaultColumnOrder, buildDefaultFilters, defaultReportName} from '../components/DataGridConfig';
+import { defaultColumnOrder, defaultFilterModel, defaultReportName} from '../components/ColumnConfig';
 import {useState, useContext} from 'react';
 import UserAvatar from './UserAvatar'
 
@@ -50,9 +50,9 @@ export default function ReportsList() {
       last_modified_on: Date.now(),
       last_modified_by: user.auth.uid,
       type: 'artist',
-      name: "New Report",
+      name: defaultReportName,
       columnOrder: defaultColumnOrder,
-      filterValue: buildDefaultFilters()
+      filterValue: defaultFilterModel
     })
     navigate('/app/reports/'+docRef.id)
     setCreateReportLoading(false)

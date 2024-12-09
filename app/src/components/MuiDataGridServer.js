@@ -10,15 +10,11 @@ import ConfirmButton from "./ConfirmButton";
 import DataGridColumnMenu from './DataGridColumnMenu'
 import {useContext, useEffect, useState} from "react";
 import Iconify from "./Iconify";
-import { buildColumnSelection, columnOptions, metricFunctions } from "./DataGridConfig";
 import { deepCompare, deepCopy } from "../util/objectUtil";
 import { httpsCallable } from "firebase/functions";
 import { functions } from '../firebase';
 import {ColumnDataContext, CurrentReportContext} from "../App";
-import {Chip, Link as MUILink, Tooltip} from '@mui/material'
-import { Link as RouterLink } from "react-router-dom";
-import {GridFilterOperator} from "@mui/x-data-grid-pro";
-import moment from "moment/moment";
+import { buildColumnOptions, buildColumns } from "./ColumnConfig";
 
 // const ChakraDataGrid = chakra(DataGrid);
 
@@ -49,160 +45,6 @@ const compareState = (
     )
   }
 
-
-
-// Comes up with column names based on a stat and the function (ie WoW, MoM etc)
-const metricColumnFactory = (metric, func) => ({
-    field: metric + "-" + func,
-    headerName: columnOptions[metric].headerName + " (" + metricFunctions[func].headerName + ")",
-    valueGetter: (data) => {
-        if (data?.row && data.row['statistics']) {
-             const filtered = data.row['statistics'].filter((stat) => stat['statistic_type_id'] === columnOptions[metric]?.statTypeId)
-             if (filtered.length > 0 && func in filtered[0]) {
-                 return filtered[0][func]
-             } else {
-                 return null
-             }
-        }
-        if (func === 'data') {
-            return null
-        }
-        return null
-    },
-    renderHeader: columnOptions[metric].renderHeader,
-    description: columnOptions[metric].description,
-    ...metricFunctions[func].options
-})
-
-// given a new column selection from the selector menu, build a new column order based on current ordering
-const applyColumnOrder = (currentOrder, selectedColumns) => {
-    Object.keys(selectedColumns).forEach(key => {
-      if (key === 'link') {
-          Object.keys(selectedColumns[key]).forEach(linkSource => {
-              const col = key+"_"+linkSource
-              if (selectedColumns[key][linkSource]) {
-                  if (!currentOrder.includes(col)) {
-                      currentOrder.push(col)
-                  }
-              } else {
-                  if (currentOrder.includes(col)) {
-                      currentOrder = currentOrder.filter(element => element != col)
-                  }
-              }
-          })
-      } else
-      if (columnOptions[key].isMetric) {
-        Object.keys(selectedColumns[key]).forEach(subkey => {
-          const col = key+"-"+subkey
-          if (selectedColumns[key][subkey]) {
-            if (!currentOrder.includes(col)) {
-              currentOrder.push(col)
-            }
-          } else {
-            if (currentOrder.includes(col)) {
-              currentOrder = currentOrder.filter(element => element != col)
-            }
-          }
-        })
-      } else {
-        if (selectedColumns[key] && !currentOrder.includes(key))
-          currentOrder.push(key)
-        else if (!selectedColumns[key] && currentOrder.includes(key))
-          currentOrder = currentOrder.filter(element => element != key)
-      }
-    })
-    return currentOrder
-  }
-
-// given a column selection from available columns, build the columns for MUI format
-const bakeColumns = (selection, toggleFavs, toggleRowFav, favoritesOnly, quickFilter) => {
-  let columns = [
-    {
-      field: 'name',
-      headerName: "Artist",
-      disableReorder: true,
-      order: 0,
-      flex: 1,
-      minWidth: 150,
-      cellClassName: 'hover-cell',
-      renderCell: (params) => (<strong>{params.value}</strong>)
-    }
-  ]
-  columnOptions['evaluation.status']['renderCell'] = (params) => (
-      <Chip
-          onClick={() => {
-              quickFilter('evaluation.status', 'is', params.value)
-          }}
-          variant="outlined" size='small' color={params.value == 1 ? "error" : params.value == 0 ? "primary" : "warning"} label={params.value == 0 ? 'Unsigned' : (params.value == 1 ? 'Signed' : 'Unknown')} />
-  )
-  columnOptions['evaluation.back_catalog']['renderCell'] = (params) => (
-      <Chip
-          onClick={() => {
-              quickFilter('evaluation.back_catalog', 'is', params.value)
-          }}
-          variant="outlined" size='small' color={params.value == 1 ? "warning" : "primary"} label={(params.value == null ? 'Unknown' : (params.value == 0 ? 'Clean' : 'Dirty'))} />
-  )
-
-  columnOptions['evaluation.distributor_type']['renderCell'] = (params) => {
-      return (
-          <Chip variant="outlined" size='small'
-                onClick={() => {
-                    quickFilter('evaluation.distributor_type', 'is', params.value)
-                }}
-                color={params.value === 2 ? "error" : (params.value === 1|| params.value == null ? "warning" : "primary")}
-                label={params.value !== null ? (params.value === 0 ? "DIY" : (params.value === 1 ? "Indie" : "Major")) : "Unknown"}/>
-
-      )
-  }
-  columnOptions['users']['renderCell'] = (params) => {
-      return (
-
-          <Box flex flexWrap={'no-wrap'} flexDirection={'row'} align={'center'} justifyContent={'flex-start'}>
-              {params.value.map((item, index) => {
-                  return <Tooltip  key={"user-"+item.id+"-"+item.artist_id}  title={"Added on: " + moment(item.created_at).format("lll")}><Chip onClick={() => {
-                      quickFilter('users', 'is', item.id)
-                  }} sx={{marginLeft: (index > 0 ? '5px' : '0')}} variant="outlined" size='small' color={"info"} label={item.first_name + " " + item.last_name}/>
-                  </Tooltip>
-              })}
-          </Box>
-
-      )
-  }
-
-  Object.keys(selection).forEach(key => {
-      if (key === 'link') {
-          Object.keys(selection[key]).forEach(linkSource => {
-              if (selection[key][linkSource] !== -1) {
-                  let colDef = columnOptions['link_' + linkSource]
-                  colDef['source'] = linkSource
-                  colDef['order'] = selection[key][linkSource] + 1
-                  columns.push(colDef)
-              }
-          })
-      } else if (columnOptions[key].isMetric) {
-      Object.keys(selection[key]).forEach(subkey => {
-        if (selection[key][subkey] !== -1) {
-            const colDef = metricColumnFactory(key, subkey)
-            colDef.function = subkey;
-            colDef.order = selection[key][subkey] + 1
-          columns.push(colDef)
-        }
-      })
-    } else {
-      if (selection[key] !== -1) {
-          const colDef = columnOptions[key];
-          colDef.order = selection[key] + 1
-          columns.push(colDef)
-      }
-    }
-  })
-
-    columns = columns.sort(function(a,b){
-        return a.order > b.order ? 1: -1
-    })
-  return columns;
-}
-
 function array_move(arr, old_index, new_index) {
     if (new_index >= arr.length) {
         var k = new_index - arr.length + 1;
@@ -221,26 +63,29 @@ const initialPagination = {
 
 export default function MuiDataGridController({initialReportName, initialColumnOrder, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
 
+    // contexts
     const { statisticTypes, linkSources, tagTypes, users, existingTags } = useContext(ColumnDataContext);
     const { currentRows, setCurrentRows, currentQueryModel, setCurrentQueryModel } = useContext(CurrentReportContext);
 
-    // Server side data source for the table
+    // data
     const getArtists = httpsCallable(functions, 'get_artists')
+    const [dataIsLoading, setDataIsLoading] = useState(false)
+
+    // report state
     const [paginationModel, setPaginationModel] = useState(deepCopy(currentQueryModel?.pagination ?? initialPagination));
     const [sortModel, setSortModel] = useState(deepCopy(currentQueryModel?.sorts ?? []));
-    const [dataIsLoading, setDataIsLoading] = useState(false)
+    const [filterModel, setFilterModel] = useState(deepCopy(currentQueryModel?.filters ?? initialFilterValues))
     const [columnOrder, setColumnOrder] = useState(deepCopy(currentQueryModel?.columnOrder ?? initialColumnOrder))
     if (!initialFilterValues?.hasOwnProperty('items')) {
         initialFilterValues = {items:[]}
     }
-    const [filterModel, setFilterModel] = useState(deepCopy(currentQueryModel?.filters ?? initialFilterValues))
+
+    // helpers
     const [currentReqTime, setCurrentReqTime] = useState(null)
     const apiRef = useGridApiRef();
 
-
+    // reload data when pagination, sort, or filter changes
     useEffect(() => {
-
-
         const fetcher = async () => {
             setDataIsLoading(true)
             const startTime = Date.now()
@@ -259,23 +104,24 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                 pageSize: paginationModel.pageSize,
                 sortModel,
                 filterModel});
-                setDataIsLoading(false)
 
-                if (resp.data.page !== paginationModel.page || resp.data.pageSize !== paginationModel.pageSize) {
-                    return
-                }
+            setDataIsLoading(false)
 
-                if (!arraysEqual(resp.data.filterModel?.items ?? [], filterModel?.items ?? [])) {
-                    return
-                }
-                if (JSON.stringify(resp.data.sortModel) !== JSON.stringify(sortModel) && !objectsEqual(resp.data.sortModel, sortModel)) {
-                    return
-                }
-                setCurrentRows({
-                    time: startTime,
-                    rows: resp.data.rows,
-                    rowCount: resp.data.rowCount
-                });
+            if (resp.data.page !== paginationModel.page || resp.data.pageSize !== paginationModel.pageSize) {
+                return
+            }
+
+            if (!arraysEqual(resp.data.filterModel?.items ?? [], filterModel?.items ?? [])) {
+                return
+            }
+            if (JSON.stringify(resp.data.sortModel) !== JSON.stringify(sortModel) && !objectsEqual(resp.data.sortModel, sortModel)) {
+                return
+            }
+            setCurrentRows({
+                time: startTime,
+                rows: resp.data.rows,
+                rowCount: resp.data.rowCount
+            });
         };
         let refreshNeeded = false;
         if (currentRows === null || currentQueryModel === null) {
@@ -299,7 +145,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         setCurrentQueryModel(updateModel)
 
         if (refreshNeeded) {
-            console.log(updateModel, 'fetching')
+            // console.log(updateModel, 'fetching')
             fetcher();
         }
     }, [paginationModel, sortModel, filterModel]);
@@ -307,7 +153,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
 
     const [reportName, setReportName] = useState(initialReportName)
 
-
+    // update the current query model when the column order changes
     useEffect(() => {
         const updateModel = {
             columnOrder: columnOrder,
@@ -316,11 +162,6 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         setCurrentQueryModel(updateModel)
         localStorage.setItem('currentQueryModel', JSON.stringify(updateModel))
     }, [columnOrder, initialFilterValues]);
-
-    // callback from the column menu to the grid to set the columns
-    const applyColumnSelection = (selection) => {
-        setColumnOrder(deepCopy(applyColumnOrder(columnOrder, selection)))
-    }
 
     const quickFilter = (field, operator, value) => {
         let set = false
@@ -363,9 +204,10 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     useEffect(() => {
 
     }, [existingTags, users])
+
     
     // bake the columns for MUI based on current column order object
-    const columns = bakeColumns(buildColumnSelection(columnOrder, true), null, null, null, quickFilter)
+    const columns = buildColumns(columnOrder, quickFilter, statisticTypes, linkSources, tagTypes, users, existingTags)
 
     // check current state vs saved report config to see if we should show save button
     const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterModel)
@@ -387,7 +229,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
           onAffirm={onDelete}
           />
           }
-          <DataGridColumnMenu currentSelection={buildColumnSelection(columnOrder)} applySelection={applyColumnSelection} />
+          <DataGridColumnMenu columnOrder={columnOrder} columnOptions={buildColumnOptions(statisticTypes, linkSources)} setColumnOrder={setColumnOrder} />
           {(hasBeenEdited && onSaveNew)&& <Button colorScheme='primary' variant='outline' onClick={revertState}>Revert</Button>}
           {hasBeenEdited&& <Button colorScheme='primary' onClick={() => onSave(columnOrder, filterModel, reportName)}>Save</Button> }
           {(hasBeenEdited && onSaveNew) && <Button colorScheme='primary' onClick={() => onSaveNew(columnOrder, filterModel, reportName)}>Save as New</Button>}

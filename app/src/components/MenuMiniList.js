@@ -1,6 +1,5 @@
 import {Box, Button, Checkbox, HStack, Menu, MenuButton, MenuItem, MenuList, Text} from "@chakra-ui/react";
 import Iconify from "./Iconify";
-import {columnOptions} from "./DataGridConfig";
 import MenuMiniListItem from "./MenuMiniListItem";
 
 export default function MenuMiniList({title, items, totalEnabled}) {
