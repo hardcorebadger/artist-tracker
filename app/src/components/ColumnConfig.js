@@ -169,13 +169,13 @@ export const staticColumnFactory = (colId, quickFilter, existingTags) => {
             valueOptions: valueOptions,
             renderCell: (params) => {
             return (
-                <Wrap>
-                    {params.value.map((item) => {
-                    return <Chip key={"tag-"+item.id} variant="outlined" size='small'
-                                    color={"info"}
-                                    label={item.tag}/>
+                <Box flex flexWrap={'no-wrap'} flexDirection={'row'} align={'center'} justifyContent={'flex-start'}>
+                    {params.value.map((item, index) => {
+                        return <Chip sx={{marginLeft:(index > 0) ? '3px' : 0, fontSize: '11px'}} key={"tag-"+item.id} variant="outlined" size='small'
+                                     color={"info"}
+                                     label={item.tag}/>
                     })}
-                </Wrap>
+                </Box>
             )
             },
             isMetric: false
