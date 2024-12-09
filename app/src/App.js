@@ -7,7 +7,7 @@ import {ChakraProvider} from '@chakra-ui/react';
 import {theme} from './theme'
 import {httpsCallable} from "firebase/functions";
 import {functions} from "./firebase";
-import {bakeColumnDef} from "./components/DataGridConfig";
+
 export const ColumnDataContext = React.createContext(null);
 export const CurrentReportContext = React.createContext(null);
 function getInitialState(key) {
@@ -34,8 +34,6 @@ function App() {
                     setStatisticTypes(response.data.statistic_types)
                     setLinkSources(response.data.link_sources)
                     setTagTypes(response.data.tag_types)
-                    bakeColumnDef(response.data.statistic_types, response.data.link_sources, response.data.tag_types, users, existingTags)
-
                 });
             }
             const getTags = httpsCallable(functions, 'get_existing_tags')
@@ -49,8 +47,6 @@ function App() {
                     }
 
                     setUsers(newUsers)
-
-                    bakeColumnDef(statisticTypes, linkSources, tagTypes, newUsers, response.data.tags)
                 });
             }
         }
