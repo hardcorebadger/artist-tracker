@@ -324,6 +324,18 @@ class ArtistController():
                     query = query.order_by(column)
         return query
 
+def artist_with_meta(sql_session, spotify_id = None, id = None):
+    query = select(Artist).options(
+        joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True),
+        joinedload(Artist.links, innerjoin=False), joinedload(Artist.tags, innerjoin=False))
+
+    if spotify_id is not None:
+        query = query.where(Artist.spotify_id == spotify_id)
+    if id is not None:
+        query = query.where(Artist.id == id)
+    return sql_session.scalars(query).first()
+
+
 def parse_datetime(date_string):
     """Parses a datetime string with or without time."""
     try:

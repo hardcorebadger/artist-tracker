@@ -4,8 +4,10 @@ from google.cloud.firestore_v1.query_results import QueryResultsList
 from sqlalchemy import select, or_, func
 from sqlalchemy.orm import joinedload, contains_eager
 import traceback
+
+from controllers.artists import artist_with_meta
 from lib import SongstatsClient, ErrorResponse, SpotifyClient, get_user, ArtistLink, LinkSource, StatisticType, \
-    OrganizationArtist, Evaluation, Statistic, UserArtist, Attribution
+    OrganizationArtist, Evaluation, Statistic, UserArtist, Attribution, ArtistTag
 from datetime import datetime, timedelta
 from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilter, StructuredQuery
 from google.cloud.firestore_v1.transforms import DELETE_FIELD
@@ -59,22 +61,70 @@ class TrackingController():
   # Onboarding
   # #####################
   
-  def add_ingest_update_artist(self, spotify_id, user_id, org_id):
-    msg, status = self.add_artist(spotify_id, user_id, org_id)
+  def add_ingest_update_artist(self, spotify_id, user_id, org_id, tags = None):
+    msg, status = self.add_artist(spotify_id, user_id, org_id, None, tags)
     if status != 200:
       return msg, status
     return self.ingest_artist(spotify_id)
 
   # def add_artist_sql(self, spotify_id, user_id, org_id):
 
+  def set_tags(self, organization_id, identifier, tags):
+      sql_session = self.sql.get_session()
+      sql_ref = artist_with_meta(sql_session=sql_session, id=identifier)
+      final = list()
+      for tag in tags:
+          existing = pop_default(list(
+              filter(lambda x: x.tag == tag and x.organization_id == organization_id, sql_ref.tags)), None)
+          existing_self = pop_default(list(
+              filter(lambda x: x.tag == tag and x.organization_id == organization_id, final)), None)
+          if existing is not None or existing_self is not None:
+              continue
+          final.append(ArtistTag(
+              artist_id=sql_ref.id,
+              tag_type_id=1,
+              tag=tag,
+              organization_id=organization_id,
+          ))
+      for tag in sql_ref.tags:
+          existing = pop_default(list(
+              filter(lambda x: x == tag.tag and organization_id == tag.organization_id, tags)), None)
+          if existing is None:
+              sql_session.delete(tag)
+      sql_session.add_all(final)
+      sql_session.commit()
+      sql_session.close()
+      return True
 
+  def add_tags(self, sql_session, sql_ref: Artist, organization_id, tags):
+      any = False
+      for tag in tags:
+          found = False
+          for old_tag in sql_ref.tags:
+              if old_tag.tag == tag and (old_tag.organization_id == organization_id or old_tag.organization_id is None):
+                  found = True
+          if found:
+              continue
+          any = True
+          sql_ref.tags.append(ArtistTag(
+              tag_type_id=1,
+              tag=tag,
+              organization_id=organization_id,
+          ))
+      if any:
+        print(sql_ref.tags)
+        sql_session.add(sql_ref)
+        sql_session.commit()
 
-  def add_artist(self, spotify_id, user_id, org_id, sql_playlist_id = None):
+  def add_artist(self, spotify_id, user_id, org_id, sql_playlist_id = None, tags = None):
+    if tags is None:
+        tags = list()
 
     sql_session = self.sql.get_session()
     sqlRef = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id).options(
-        contains_eager(Artist.organizations),
-        contains_eager(Artist.users)
+        joinedload(Artist.tags, innerjoin=False),
+        joinedload(Artist.organizations, innerjoin=False),
+        joinedload(Artist.users, innerjoin=False)
     )).first()
     if sqlRef is not None:
         if not sqlRef.active:
@@ -116,6 +166,7 @@ class TrackingController():
       if sqlRef is None:
         print('Artist needs migration; importing to SQL')
         self.import_sql(doc, attribution)
+        sqlRef = artist_with_meta(sql_session, spotify_id)
       else:
           if len(list(filter(lambda x: x.user_id == user_id, sqlRef.users))) == 0:
               sqlRef.users.append(UserArtist(
@@ -130,12 +181,12 @@ class TrackingController():
           sql_session.add(sqlRef)
           sql_session.add(attribution)
           sql_session.commit()
+      self.add_tags(sql_session, sqlRef, org_id, tags)
       sql_session.close()
       return 'Artist exists, added to tracking', 200
     
     # check if the ID is valid (this will raise a 400 if the artist is invalid)
     artist = self.spotify.get_artist(spotify_id)
-    sql_session.close()
     # create an artist
     new_schema = {
         "id": spotify_id,
@@ -189,7 +240,14 @@ class TrackingController():
     for s in HOT_TRACKING_FIELDS:
       new_schema[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = []
     ref.set(new_schema)
-    self.import_sql(ref.get(), attribution)
+    imported, skipped, avg, fails = self.import_sql(ref.get(), attribution)
+    if len(fails) > 0:
+        print(fails)
+        return 'Artist failed to import, please try again', 500
+    self.add_tags(sql_session, artist_with_meta(sql_session, spotify_id), org_id, tags)
+    sql_session.close()
+
+
     return 'success', 200
   
   def ingest_artist(self, spotify_id : str):
@@ -202,17 +260,13 @@ class TrackingController():
       raise ErrorResponse('Artist not found', 404, 'Tracking')
 
     sql_session = self.sql.get_session()
-    sql_ref = sql_session.scalars(select(Artist).options(
-        joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True),
-        joinedload(Artist.links, innerjoin=False)).where(
-        Artist.spotify_id == spotify_id)).first()
+    sql_ref = artist_with_meta(sql_session, spotify_id)
+
     if sql_ref is None:
         print('Artist needs migration; importing to SQL')
         self.import_sql(doc)
-        sql_ref = sql_session.scalars(select(Artist).options(
-            joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True),
-            joinedload(Artist.links, innerjoin=False)).where(
-            Artist.spotify_id == spotify_id)).first()
+        sql_ref = artist_with_meta(sql_session, spotify_id)
+
     sql_session.close()
     data = doc.to_dict()
 
@@ -240,18 +294,18 @@ class TrackingController():
       raise e
 
     print("[INGEST] has info")
-    
-    # get the stats now that we know the artist is in SS
-    self.update_artist(spotify_id, is_ob=True)
-    
+    print(info)
     # add the additional info
     ref.update({
       "avatar": info['artist_info']['avatar'],
       "links": info['artist_info']['links'],
+    })
+    # get the stats now that we know the artist is in SS
+    self.update_artist(spotify_id, is_ob=True)
+
+    ref.update({
       "ob_status": "onboarded"
     })
-    self.update_sql_meta(sql_ref, doc)
-
 
     print("[INGEST] info updated")
 
@@ -278,15 +332,13 @@ class TrackingController():
       raise ErrorResponse('Artist not found', 404, 'Tracking')
 
     sql_session = self.sql.get_session()
-    sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True),joinedload(Artist.links, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()
+    sql_ref = artist_with_meta(sql_session, spotify_id)
     sql_session.close()
     if sql_ref is None:
         print('Artist needs migration; importing to SQL')
         self.import_sql(doc)
         sql_session = self.sql.get_session()
-        sql_ref = sql_session.scalars(select(Artist).options(
-            joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True), joinedload(Artist.links, innerjoin=False)).where(
-            Artist.spotify_id == spotify_id)).first()
+        sql_ref = artist_with_meta(sql_session, spotify_id)
         sql_session.close()
 
     # check the artist is ingested - not needed
@@ -350,7 +402,9 @@ class TrackingController():
       for link in sql_links:
           existing = pop_default(list(
               filter(lambda x: x.link_source_id == link.link_source_id and x.path == link.path, sql_ref.links)), None)
-          if existing is not None:
+          existing_self = pop_default(list(
+              filter(lambda x: x.link_source_id == link.link_source_id and x.path == link.path, final)), None)
+          if existing is not None or existing_self is not None:
               continue
           final.append(link)
       for link in sql_ref.links:
@@ -511,7 +565,8 @@ class TrackingController():
     else:
         return None
     return eval
-  def import_sql(self, old_artists, attribution = None):
+  def import_sql(self, old_artists, attribution = None, tags = None):
+
       if not isinstance(old_artists, QueryResultsList):
           old_artists = [old_artists]
       sql_session = self.sql.get_session()
@@ -616,13 +671,19 @@ class TrackingController():
                           last_date=stat_dates[len(stat_dates) - 1],
                       ))
                   userArtists = list()
-                  for user_id, found_details in artist.get('found_by_details').items():
+                  for user_id, found_details in list(filter(lambda x: x is not None, artist.get('found_by_details').items())):
                       userArtists.append(UserArtist(
                           user_id=user_id,
                           organization_id=userOrgs[user_id],
                           created_at=found_details.get('found_on')
                       ))
                   filtered_links = self.convert_links(artist)
+                  attributions_list = list()
+                  if attribution is not None:
+                      attributions_list = list([Attribution(
+                          user_id=attribution.user_id,
+                          playlist_id=attribution.playlist_id,
+                      )])
                   add_batch.append(Artist(
                       spotify_id=spotify_id,
                       name=artist.get('name'),
@@ -635,10 +696,7 @@ class TrackingController():
                       users=userArtists,
                       onboarded=artist.get("ob_status") == 'onboarded' or artist.get('avatar') is not None,
                       active=True,
-                      attributions=list([Attribution(
-                          user_id=attribution.user_id,
-                          playlist_id=attribution.playlist_id,
-                      )])
+                      attributions=attributions_list
                   ))
 
                   if len(add_batch) > 0:

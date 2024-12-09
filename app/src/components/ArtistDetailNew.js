@@ -21,7 +21,7 @@ import {
   Wrap,
   Badge,
   Stack,
-  Text, Link, Image,
+  Text, Link, Image, Tag, useDisclosure,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../routing/AuthGuard';
@@ -34,13 +34,14 @@ import Iconify from './Iconify';
 import Chart from "react-apexcharts";
 import { columnOptions } from './DataGridConfig'
 import {useContext, useEffect, useState} from 'react';
-import {Box, Link as MUILink} from "@mui/material";
+import {Box, Chip, Link as MUILink} from "@mui/material";
 import {theme} from "./MuiDataGridServer";
 import {ThemeProvider} from "@mui/material/styles";
 import {LoadingWidget} from "../routing/LoadingScreen";
 import Moment from "react-moment";
 import {ColumnDataContext} from "../App";
 import UserAvatar from "./UserAvatar";
+import ArtistTagsModal from "./EditArtistTags";
 
 const chartOptions = {
 
@@ -82,30 +83,48 @@ function CopyrightCard({artist, linkSources}) {
   const status =  artist.evaluation?.status === 0 ? 'Unsigned' :  artist.evaluation?.status === 1 ? 'Signed' : 'Unknown';
   const type = artist.evaluation?.distributor_type === 0 ? "DIY" : artist.evaluation?.distributor_type === 1 ? "Indie" : "Major";
   const prios = (artist.evaluation?.status === 2 ? 'Dirty' : 'Clean')
-  const statusColor = artist.evaluation?.status == 1 ? 'red' :  (artist.evaluation.status == 0 ? 'green' : 'yellow')
+  const statusColor = artist.evaluation?.status == 1 ? 'red' :  (artist.evaluation?.status == 0 ? 'green' : 'yellow')
   const typeColor = artist.evaluation?.distributor_type == 2 ? 'red' : (artist.evaluation?.distributor_type == 1 ? 'yellow' : 'green')
   const priorsColor = artist.evaluation?.status == 2 ? 'yellow' : 'green'
+
+  const links =  Object.keys(artist).filter((key) => {
+    if (!key.startsWith('link_')){
+      return false;
+    }
+    const value = artist[key]
+    if (value === null) {
+      return false
+    }
+    return true
+  })
   return (
 
       <Box sx={{maxWidth: '100%'}}>
     <Card p={25} variant="outline" mt={0}>
-      <Stack w="100%" spacing={3}>
-        <Heading size="xs">Copyright Evaluation</Heading>
-        <Wrap><Badge colorScheme={statusColor}>{status}</Badge><Badge colorScheme={typeColor}>{type}</Badge><Badge colorScheme={priorsColor}>{prios}</Badge></Wrap>
-        <Text fontSize="xs" fontWeight="bold">Distributor</Text>
-        <Text >{artist.evaluation?.distributor}</Text>
-        <Text fontSize="xs" fontWeight="bold" textDecor="uppercase">Label</Text>
-        <Text >{artist.evaluation?.label}</Text>
+        {artist.evaluation ? (
+            <Stack w="100%" spacing={3}>
+              <Heading size="xs">Copyright Evaluation</Heading>
+              <Wrap><Badge colorScheme={statusColor}>{status}</Badge><Badge colorScheme={typeColor}>{type}</Badge><Badge colorScheme={priorsColor}>{prios}</Badge></Wrap>
+              <Text fontSize="xs" fontWeight="bold">Distributor</Text>
+              <Text >{artist.evaluation?.distributor}</Text>
+              <Text fontSize="xs" fontWeight="bold" textDecor="uppercase">Label</Text>
+              <Text >{artist.evaluation?.label }</Text>
+            </Stack>
+
+        ) : (
+            <Stack w="100%" spacing={3}>
+              <Heading size="xs">Copyright Evaluation</Heading>
+              <Text color={'text.subtitle'}>Analysis in progress...</Text>
+            </Stack>
+        )}
+
         {/*<Button isDisabled={true}>See Details</Button>*/}
-      </Stack>
     </Card>
     <Card p={25} variant="outline" mt={5}>
         <Stack w="100%" spacing={3}>
           <Heading size="xs">Links</Heading>
-          {Object.entries(artist).map(([key, value]) => {
-            if (!key.startsWith('link_')) {
-              return null;
-            }
+          {links.map((key) => {
+            const value = artist[key]
             const source = linkSources.filter((s) => s.key === (key.split("link_")[1])).pop()
             return (
                 <ThemeProvider theme={theme} key={"detail_" + key}>
@@ -117,31 +136,50 @@ function CopyrightCard({artist, linkSources}) {
                 </ThemeProvider>
             )
           })}
+          {links?.length === 0 ? (
+              <Text fontSize={"12px"} color={'text.subtitle'}>Links are being imported now</Text>
+          ) : null}
         </Stack>
       </Card>
     </Box>
   )
 }
 
-export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
+export default function ArtistDetailNew({artist, onNavigateBack, linkSources, onTagSave}) {
   const [tabIndex, setTabIndex] = useState(0)
+  const { isOpen, onOpen, onClose } = useDisclosure()
   const stats = bakeStats(linkSources)
   const {users} = useContext(ColumnDataContext)
   const filteredStat = artist['statistics'].filter((stat) => stat['statistic_type_id'] === stats[tabIndex]?.statTypeId).pop() ?? null
   const filteredData = (filteredStat && 'data' in filteredStat) ? filteredStat['data'] : []
+
+
+
   if (stats.length === 0) {
     return (
         <LoadingWidget/>
     )
   }
   return (
-    <VStack spacing={10} align="left">
+
+
+      <VStack spacing={10} align="left">
       <HStack justifyContent='space-between'>
         <HStack spacing={5}>
           {onNavigateBack && <IconButton size="sm" variant="outline" onClick={onNavigateBack} icon={<Iconify icon="mdi:arrow-left"/>}/>}
           <Heading size="lg"><Box sx={{'display': 'flex', 'alignItems': 'center'}}><Image mr={2} height={'50px'} src={artist.avatar}/> <Text >{artist?.name}</Text></Box></Heading>
+          <HStack spacing={3} ms={1} pt={'3px'}>
+            {artist?.tags.map((item) => {
+              return <Tag p={1} px={2} key={"tag-"+item.id} variant="outline" size='small'>{item.tag}</Tag>
+            })}
+            <Button variant={'unstyled'} onClick={() => {
+              onOpen()
+            }}><Iconify icon={'material-symbols:edit-outline'}/></Button>
+          </HStack>
         </HStack>
-      <Button colorScheme='primary'><Link href={ artist.link_spotify } target="_blank">
+
+
+        <Button colorScheme='primary'><Link href={ artist.link_spotify } target="_blank">
         Open in Spotify</Link></Button>
       </HStack>
       <Grid templateColumns='repeat(4, 1fr)' gap={5}>
@@ -220,6 +258,13 @@ export default function ArtistDetailNew({artist, onNavigateBack, linkSources}) {
           {artist && <CopyrightCard artist={artist} linkSources={linkSources}/> }
         </GridItem>
         </Grid>
+        <ArtistTagsModal
+          artist={artist}
+          onOpen={onOpen}
+          onClose={onClose}
+          isOpen={isOpen}
+          onTagSave={onTagSave}
+        />
     </VStack>
   );
 }

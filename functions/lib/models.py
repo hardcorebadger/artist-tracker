@@ -288,8 +288,8 @@ class Playlist(Base):
     id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
     name = Column(String(256), nullable=True)
     spotify_id = Column(String(22), nullable=False)
-    created_at = Column(TIMESTAMP, nullable=False)
-    updated_at = Column(TIMESTAMP, nullable=False)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
+    updated_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
@@ -302,7 +302,7 @@ class Attribution(Base):
     artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
     user_id = Column(String(28), nullable=False)
     playlist_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('playlists.id'), nullable=True)
-    created_at = Column(TIMESTAMP, nullable=False)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
 
     playlist: Mapped[Optional["Playlist"]] = relationship(foreign_keys=[playlist_id])
     artist: Mapped["Artist"] = relationship(back_populates="attributions", foreign_keys=[artist_id])

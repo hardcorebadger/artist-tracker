@@ -14,9 +14,9 @@ function PageArtist() {
     const {currentQueryModel} = useContext(CurrentReportContext);
     const toast = useToast();
     const navigate = useNavigate()
-    const loadArtist = async () => {
+    const loadArtist = async (force = false) => {
         const getArtist = httpsCallable(functions, 'get_artists')
-        if (!activeArtist?.hasOwnProperty('attributions') || activeArtist === null || activeArtist.id !== artistId) {
+        if (force || !activeArtist?.hasOwnProperty('attributions') || activeArtist === null || activeArtist.id !== artistId) {
             getArtist({"id": artistId}).then((response) => {
                 console.log(response);
                 if (!response.data.error) {
@@ -58,7 +58,11 @@ function PageArtist() {
         <PageLayoutContained size="lg">
             <ArtistDetailNew artist={activeArtist} linkSources={linkSources} onNavigateBack={currentQueryModel ? (()=> {
                 navigate(-1)
-            }): null}/>
+            }): null}
+                onTagSave={() => {
+                    loadArtist(true)
+                }}
+            />
         </PageLayoutContained>
 
 

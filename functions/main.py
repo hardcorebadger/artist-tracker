@@ -358,12 +358,24 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
 @https_fn.on_call()
 def add_artist(req: https_fn.CallableRequest):
     db = firestore.client(app)
+    uid = req.auth.uid
     tracking_controller = TrackingController(spotify, songstats, sql, db)
     preview = req.data.get('preview', False)
+    identifier = req.data.get('id', False)
+    if identifier:
+        tags = req.data.get('tags', None)
+        print(tags)
+        user_data = get_user(uid, db)
+        if tags is not None:
+            tracking_controller.set_tags(user_data['organization'], identifier, tags)
+
+        return {'message': 'success', 'status': 200}
+
     # Message text passed from the client.
     try:
         spotify_url = req.data["spotify_url"]
         spotify_id = spotify.url_to_id(spotify_url)
+        tags = req.data.get('tags')
         if spotify_id == 'invalid':
             spotify_id = spotify.url_to_id(spotify_url, 'playlist')
             if spotify_id == 'invalid':
@@ -372,8 +384,15 @@ def add_artist(req: https_fn.CallableRequest):
                 uid = req.auth.uid
                 user_data = get_user(uid, db)
                 try:
-                    aids, playlist_name = spotify.get_playlist_artists(spotify_id)
-
+                    aids, playlist_name, playlist_picture = spotify.get_playlist_artists(spotify_id)
+                    if preview:
+                        return {
+                            "found": True,
+                            "type": "playlist",
+                            "name": playlist_name,
+                            "avatar": playlist_picture,
+                            "url": spotify_url.split('?')[0]
+                        }
                     sql_session = sql.get_session()
                     sql_playlist = sql_session.scalars(select(Playlist).where(Playlist.spotify_id == spotify_id)).first()
                     if sql_playlist is None:
@@ -387,19 +406,49 @@ def add_artist(req: https_fn.CallableRequest):
                     sql_session.close()
 
                     for a in aids:
-                        tracking_controller.add_artist(a, uid, user_data['organization'], sql_playlist.id)
+                        tracking_controller.add_artist(a, uid, user_data['organization'], sql_playlist.id, tags)
                     return {'message': 'sucess', 'status': 200, 'added_count': len(aids)}
                 except Exception as e:
                     print(e)
+                    if preview:
+                        return {
+                            "found": False,
+                            "url": spotify_url.split('?')[0],
+                            "error": e
+                        }
                     return {
                         'message': 'failed', 'status': 500, 'error': traceback.format_exc()
                     }
         else:
-            uid = req.auth.uid
             user_data = get_user(uid, db)
-            msg, status = tracking_controller.add_ingest_update_artist(spotify_id, uid, user_data['organization'])
+            if preview:
+                try:
+                    artist = spotify.get_artist(spotify_id)
+                    image = None
+                    if len(artist.get('images', list())) > 0:
+                        image = artist.get('images')[0]['url']
+                    return {
+                        "found": True,
+                        "type": "artist",
+                        "name": artist['name'],
+                        "avatar": image,
+                        "url": spotify_url.split('?')[0]
+                    }
+                except Exception as e:
+                    return {
+                        "found": False,
+                        "url": spotify_url.split('?')[0],
+                        "error": e
+                    }
+
+            msg, status = tracking_controller.add_ingest_update_artist(spotify_id, uid, user_data['organization'], tags)
             return {'message': msg, 'status': status, 'added_count': 1}
     except ErrorResponse as e:
+        if preview:
+            return {
+                "found": False
+            }
+
         raise e.to_https_fn_error()
 
 
