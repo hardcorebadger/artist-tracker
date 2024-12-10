@@ -103,6 +103,7 @@ function PageArtistReport() {
       columnOrder: columnOrder,
       filterValue: filterValue
     })
+    setCurrentReport(null)
   }
 
   const onReportSaveNew = async (columnOrder, filterValue, reportName) => {
