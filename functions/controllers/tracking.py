@@ -46,7 +46,7 @@ class TrackingController():
   def get_statistic_type_from_field(self, field: str):
       types = self.get_statistic_types()
       for type in types:
-          if field.startswith(type.source + '__') and field.endswith('__'+ type.key):
+          if field.startswith(type.source + '__'+type.key ):
               return type
       return None
 
@@ -377,6 +377,9 @@ class TrackingController():
         for s in HOT_TRACKING_FIELDS:
           sql_statistic_type = self.get_statistic_type_from_field(s)
           values = stats['stats'][s] if s in stats['stats'] else []
+          if values is None or len(values) == 0:
+              if sql_statistic_type.id == 30:
+                  values = stats['stats']["spotify__monthly_listeners_current"] if "spotify__monthly_listeners_current" in stats['stats'] else []
           update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = values
           self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
 
