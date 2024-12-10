@@ -364,7 +364,6 @@ def add_artist(req: https_fn.CallableRequest):
     identifier = req.data.get('id', False)
     if identifier:
         tags = req.data.get('tags', None)
-        print(tags)
         user_data = get_user(uid, db)
         if tags is not None:
             tracking_controller.set_tags(user_data['organization'], identifier, tags)

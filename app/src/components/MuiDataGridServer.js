@@ -167,9 +167,16 @@ export default function MuiDataGridController({initialReportName, initialColumnO
         let set = false
         const newFilterModel = deepCopy(filterModel ?? {})
         filterModel?.items?.forEach((item, index) => {
-            if (item.field === field && operator === operator) {
+            if (item.field === field) {
+                if (operator === 'isAnyOf') {
+                    value = [
+                        ...item.value ?? [],
+                        value
+                    ]
+                }
                 newFilterModel.items[index] = {
                     ...item,
+                    operator: operator,
                     value: value,
 
                 }

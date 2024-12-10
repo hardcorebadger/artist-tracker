@@ -161,7 +161,7 @@ class ArtistController():
             field = filter_field.get('field')
             operator = filter_field.get('operator')
             value = filter_field.get('value', None)
-            if value is None and operator != 'isEmpty' and operator != 'isNotEmpty' and not field.startswith('tag_'):
+            if value is None and operator != 'isEmpty' and operator != 'isNotEmpty' and not field.startswith('tags.'):
                 continue
             if (field.startswith('statistic.')):
                 key_parts = field.split('.')
@@ -174,7 +174,7 @@ class ArtistController():
                 if value is not None:
                     value = int(value)
                 query = self.build_condition(query, getattr(dynamic, statistic_func), operator, value)
-            elif field.startswith('tag_genre') or field.startswith('tag_user'):
+            elif field == 'tags':
                 tag_type = 1
                 if field == 'tag_genre':
                     tag_type = 2

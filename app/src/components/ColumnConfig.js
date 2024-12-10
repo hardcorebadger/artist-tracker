@@ -192,12 +192,12 @@ export const staticColumnFactory = (colId, quickFilter, existingTags, users) => 
             }
         }
         return {
-            field: "tags.user",
+            field: "tags",
             type: 'singleSelect',
             headerName: "Tags",
             description:  "Tags",
             sortable: false,
-            valueGetter: (data) => data.row?.tags.filter((tag) => tag.tag_type_id === 'user') ?? [],
+            valueGetter: (data) => data.row?.tags.filter((tag) => tag.tag_type_id === 1) ?? [],
             valueOptions: valueOptions,
             renderCell: (params) => {
             return (
@@ -205,7 +205,7 @@ export const staticColumnFactory = (colId, quickFilter, existingTags, users) => 
                     {params.value.map((item, index) => {
                         return <Chip sx={{marginLeft:(index > 0) ? '3px' : 0, fontSize: '11px'}} key={"tag-"+item.id} variant="outlined" size='small'
                                      color={"info"}
-                                     label={item.tag}/>
+                                     label={item.tag} onClick={() => quickFilter('tags', 'isAnyOf', item.tag)} />
                     })}
                 </Box>
             )
