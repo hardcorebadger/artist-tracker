@@ -23,8 +23,6 @@ import { deepCopy } from '../util/objectUtil';
 
 export default function DatGridColumnMenu({columnOptions, columnOrder, setColumnOrder}) {
 
-  console.log(columnOptions)
-
   const { isOpen, onOpen, onClose } = useDisclosure()
   const btnRef = useRef()
   
