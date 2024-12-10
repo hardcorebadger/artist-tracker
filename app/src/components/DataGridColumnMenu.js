@@ -23,6 +23,8 @@ import { deepCopy } from '../util/objectUtil';
 
 export default function DatGridColumnMenu({columnOptions, columnOrder, setColumnOrder}) {
 
+  console.log(columnOptions)
+
   const { isOpen, onOpen, onClose } = useDisclosure()
   const btnRef = useRef()
   
@@ -102,7 +104,7 @@ export default function DatGridColumnMenu({columnOptions, columnOrder, setColumn
               <Box w="100%" p={2} borderRadius="md" key={option.key}>
                 <HStack justifyContent="space-between"><Text fontSize="sm">{option.display}</Text><Checkbox
                     colorScheme='primary' isChecked={internalColumnOrder?.indexOf(option.key) !== -1}
-                    onChange={(e) => toggleColumn(option.keys, e.target.checked)}></Checkbox></HStack>
+                    onChange={(e) => toggleColumn(option.key, e.target.checked)}></Checkbox></HStack>
               </Box>
               )
             }

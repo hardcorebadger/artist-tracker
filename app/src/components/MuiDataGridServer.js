@@ -212,6 +212,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     // check current state vs saved report config to see if we should show save button
     const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterModel)
 
+    // console.log(currentRows?.rows)
     return (
         
         <VStack spacing={5} align="left" >

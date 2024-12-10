@@ -37,7 +37,7 @@ export const columnBootstrap = [
     }
 ]
 
-export const staticColumnFactory = (colId, quickFilter, existingTags) => {
+export const staticColumnFactory = (colId, quickFilter, existingTags, users) => {
     if (colId == "evaluation.distributor") return {
       field: 'evaluation.distributor',
       valueGetter: (data) => data.row?.evaluation?.distributor ?? 'N/A',
@@ -133,6 +133,38 @@ export const staticColumnFactory = (colId, quickFilter, existingTags) => {
       isMetric: false,
       width: 250,
       type: 'singleSelect',
+      valueGetter: (data) => {
+        if (users) {
+            const artistUsers = data.row?.users
+            const filtered = []
+            for (const userIndex in artistUsers) {
+                const artistUser = artistUsers[userIndex]
+                if (artistUser.user_id in users) {
+                    artistUser.user = users[artistUser.user_id]
+                    if (artistUser.user && artistUser.user.id) {
+                        filtered.push(artistUser)
+                    }
+                } else {
+                    artistUser.user = null
+                }
+            }
+            return (filtered?.map((item) => {
+            return {
+                "created_at": item.created_at,
+                "artist_id": item.artist_id,
+                ...item.user
+            }
+        }) ?? [])
+        } else {
+            return []
+        }
+        },
+        valueOptions: Object.values(users ?? {}).map((user) => {
+            return {
+                label: user.first_name + " " + user.last_name,
+                value: user.id
+            }
+        }),
       renderCell: (params) => (
         <Box flex flexWrap={'no-wrap'} flexDirection={'row'} align={'center'} justifyContent={'flex-start'}>
               {params.value.map((item, index) => {
@@ -322,7 +354,7 @@ export const buildColumns = (columnOrder, quickFilter, statisticTypes, linkSourc
             return statisticColumnFactory(statId, func, statDef, linkDef)
         }
         // static
-        return staticColumnFactory(col, quickFilter, existingTags)
+        return staticColumnFactory(col, quickFilter, existingTags, users)
     }
 
     // creates columns based on current column order
@@ -344,8 +376,8 @@ export const buildColumnOptions = (statisticTypes, linkSources) => {
         {"key": "evaluation.distributor", "display": "Distributor", "type": "simple"},
         {"key": "evaluation.label", "display": "Label", "type": "simple"},
         {"key": "evaluation.status", "display": "Status", "type": "simple"},
-        {"key": "evaluation.distributor_type", "display": "Label", "type": "simple"},
-        {"key": "evaluation.back_catalog", "display": "Label", "type": "simple"},
+        {"key": "evaluation.distributor_type", "display": "Distributor Type", "type": "simple"},
+        {"key": "evaluation.back_catalog", "display": "Back Catalog", "type": "simple"},
         {"key": "organization.created_at", "display": "Added On", "type": "simple"},
         {"key": "users", "display": "Added By", "type": "simple"},
         {"key": "tags", "display": "Tags", "type": "simple"},
@@ -362,7 +394,8 @@ export const buildColumnOptions = (statisticTypes, linkSources) => {
         }
     ]
     statisticTypes.forEach((stat) => {
-        const display = stat['name']
+        // console.log(stat)
+        const display = stat['source'].charAt(0).toUpperCase() + stat['source'].slice(1) + " " + stat['name']
         const id = stat['id']
         const baseKey = 'statistic.' + id
         columnOptions.push({
