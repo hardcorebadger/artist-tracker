@@ -92,7 +92,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
             setCurrentReqTime(startTime)
             // fetch data from server
             const objectsEqual = (o1, o2) =>
-                typeof o1 === 'object' && Object.keys(o1).length > 0
+                typeof o1 === 'object' && typeof o2 === 'object' && Object.keys(o1).length > 0
                     ? Object.keys(o1).length === Object.keys(o2).length
                     && Object.keys(o1).every(p => objectsEqual(o1[p], o2[p]))
                     : o1 === o2;
@@ -110,8 +110,9 @@ export default function MuiDataGridController({initialReportName, initialColumnO
             if (resp.data.page !== paginationModel.page || resp.data.pageSize !== paginationModel.pageSize) {
                 return
             }
-
+            
             if (!arraysEqual(resp.data.filterModel?.items ?? [], filterModel?.items ?? [])) {
+                
                 return
             }
             if (JSON.stringify(resp.data.sortModel) !== JSON.stringify(sortModel) && !objectsEqual(resp.data.sortModel, sortModel)) {
