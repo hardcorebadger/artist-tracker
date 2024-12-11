@@ -1,39 +1,28 @@
 import {
-  VStack,
+  Badge,
   Button,
-  Heading,
   Card,
-  TableContainer,
-  Table,
-  TableCaption,
-  Thead,
-  Tr,
-  Th,
-  Td,
-  Tbody,
-  HStack,
-  IconButton,
   Grid,
   GridItem,
-  Tabs,
-  TabList,
-  Tab,
-  Wrap,
-  Badge,
+  Heading,
+  HStack,
+  IconButton,
+  Image,
+  Link, List, ListItem,
   Stack,
-  Text, Link, Image, Tag, useDisclosure,
+  Tab,
+  TabList,
+  Tabs,
+  Tag,
+  Text, UnorderedList,
+  useDisclosure,
+  VStack,
+  Wrap,
 } from '@chakra-ui/react';
-import { useNavigate } from 'react-router-dom';
-import { useUser } from '../routing/AuthGuard';
-import { useCollection, useDocument } from 'react-firebase-hooks/firestore';
-import { db } from '../firebase';
-import { collection, doc, query, where } from 'firebase/firestore';
-import { Link as ReactRouterLink } from 'react-router-dom'
-import { PageLayoutContained } from '../layouts/DashboardLayout';
 import Iconify from './Iconify';
 import Chart from "react-apexcharts";
 import {useContext, useEffect, useState} from 'react';
-import {Box, Chip, Link as MUILink} from "@mui/material";
+import {Box, Link as MUILink} from "@mui/material";
 import {theme} from "./MuiDataGridServer";
 import {ThemeProvider} from "@mui/material/styles";
 import {LoadingWidget} from "../routing/LoadingScreen";
@@ -41,6 +30,8 @@ import Moment from "react-moment";
 import {ColumnDataContext} from "../App";
 import UserAvatar from "./UserAvatar";
 import ArtistTagsModal from "./EditArtistTags";
+import moment from "moment";
+import {InlineIcon} from "@iconify/react";
 
 const chartOptions = {
 
@@ -151,6 +142,12 @@ export default function ArtistDetailNew({artist, onNavigateBack, statisticTypes,
 const { isOpen, onOpen, onClose } = useDisclosure()
     const stats = bakeStats(statisticTypes, linkSources)
   const {users} = useContext(ColumnDataContext)
+  const [expandedAttributionGroup, setExpandedAttributionGroup] = useState(null)
+
+  useEffect(() => {
+    setExpandedAttributionGroup(null)
+  }, [artist]);
+
   // console.log(artist['statistics'])
   // console.log(stats[tabIndex])
   // console.log(stats[tabIndex]?.statTypeId)
@@ -165,13 +162,34 @@ const { isOpen, onOpen, onClose } = useDisclosure()
         <LoadingWidget/>
     )
   }
+
+  const attributionGroups = []
+
+  artist?.attributions?.forEach((attribution) => {
+    if (attributionGroups.length === 0) {
+      attributionGroups.push([])
+    }
+    const currentGroup = attributionGroups.length - 1
+    if (attributionGroups[currentGroup].length === 0) {
+      attributionGroups[currentGroup].push(attribution)
+    } else {
+      const last = attributionGroups[currentGroup][0]
+      if (last.user_id === attribution.user_id && moment( last.created_at).format('YYYY-MM-DD') === moment(attribution.created_at).format('YYYY-MM-DD')) {
+        attributionGroups[currentGroup].push(attribution)
+      } else {
+        attributionGroups.push([attribution])
+
+      }
+    }
+  })
+  console.log(attributionGroups)
   return (
 
 
       <VStack spacing={10} align="left">
       <HStack justifyContent='space-between'>
         <HStack spacing={5}>
-          {onNavigateBack && <IconButton size="sm" variant="outline" onClick={onNavigateBack} icon={<Iconify icon="mdi:arrow-left"/>}/>}
+          {onNavigateBack && <IconButton size="sm" variant="outline" onClick={onNavigateBack} icon={<Iconify icon="mdi:arrow-left"/>} aria-label={"Back"}/>}
           <Heading size="lg"><Box sx={{'display': 'flex', 'alignItems': 'center'}}><Image mr={2} height={'50px'} src={artist.avatar}/> <Text >{artist?.name}</Text></Box></Heading>
           <HStack spacing={3} ms={1} pt={'3px'}>
             {artist?.tags.map((item) => {
@@ -232,26 +250,73 @@ const { isOpen, onOpen, onClose } = useDisclosure()
             <Card variant={"unstyled"} p={2} mt={5}>
               <Wrap justify={'center'}>
               {
-                artist?.attributions?.map(item => {
-                  const user = users ? users[item.user_id] : null
-                  return (
+                attributionGroups.map((item, index) => {
+                  let selected = false
+                  if (index === expandedAttributionGroup) {
+                    selected = true
+                  }
+                  return [
+                      (<Wrap onClick={() => {
+                        if (expandedAttributionGroup === index) {
+                          setExpandedAttributionGroup(null)
+                        } else {
+                          setExpandedAttributionGroup(index)
+                        }
+                      }} align={'center'} justify={'center'} key={item[0].id + "-group"} style={{width: '100%', marginBottom: (item.length > 1 ? '-10px' : null), cursor: (item.length > 1 ? 'pointer' : null)}}>
 
-                      <Wrap align={'center'} key={item.id}>
-
-                        <UserAvatar inline={true} userId={item.user_id}/>
-                      <Text color={"text.subtle"} fontSize={"15px"} ml={"-5px"}>
-                        &nbsp;added on <Moment format={"ll"}>{item.created_at}</Moment> at <Moment format={"hh:mm A"}>{item.created_at}</Moment> {item.playlist ? 'from' : 'manually'}
-                      </Text>
-                        {item.playlist ?
+                        <UserAvatar inline={true} userId={item[0].user_id}/>
+                        <Text color={"text.subtle"} fontSize={"15px"} ml={"-5px"}>
+                          &nbsp;added{item.length > 1 ? ' ' + item.length + ' times ' : ''} on <Moment
+                            format={"ll"}>{item[0].created_at}</Moment>{item.length === 1 ? (
+                            (<span> at <Moment
+                                format={"hh:mm A"}>{item.created_at}</Moment> {item[0].playlist ? 'from' : 'manually'}</span>)
+                        ) : null}</Text>
+                        {item.length > 1 ? (
+                            <IconButton variant={'unstyled'} icon={<InlineIcon icon={'weui:arrow-filled'}  style={{ transform: (selected ? 'rotate(90deg)' : 'rotate(180deg)') }}/>}
+                                        aria-label={selected ? 'Collapse' : 'Expand'}/>
+                        ) : null}
+                        {item[0].playlist && item.length === 1 ?
                             (
-                                <ThemeProvider theme={theme}  >
+                                <ThemeProvider theme={theme}>
 
-                                <MUILink target="_blank" href={"https://open.spotify.com/playlist/" + item.playlist.spotify_id}>{item.playlist.name} <Iconify sx={{display: 'inline-block', verticalAlign: '-0.125em'}} icon="mdi:external-link" /> </MUILink>
+                                  <MUILink target="_blank"
+                                           href={"https://open.spotify.com/playlist/" + item[0].playlist.spotify_id}>{item[0].playlist.name}
+                                    <Iconify sx={{display: 'inline-block', verticalAlign: '-0.145em', marginLeft: '5px'}}
+                                             icon="mdi:external-link"/> </MUILink>
                                 </ThemeProvider>
                             ) : null
                         }
-                      </Wrap>
-                  )
+                      </Wrap>),
+                      (selected && item.length > 1 ? (
+                        <List>
+                        {item.map((item) => {
+                          const user = users ? users[item.user_id] : null
+
+                          return (
+                              <ListItem><Wrap align={'center'} key={item.id} justify={'center'} style={{width: '100%'}}>
+
+                                {/*<UserAvatar inline={true} userId={item.user_id}/>*/}
+                                <Text color={"text.subtle"} fontSize={"14px"} ml={"-5px"}>
+                                  <Moment format={"ll"}>{item.created_at}</Moment> at <Moment
+                                    format={"hh:mm A"}>{item.created_at}</Moment> {item.playlist ? 'from' : 'manually'}
+                                </Text>
+                                {item.playlist ?
+                                    (
+                                        <ThemeProvider theme={theme}>
+
+                                          <MUILink target="_blank"
+                                                   href={"https://open.spotify.com/playlist/" + item.playlist.spotify_id}>{item.playlist.name}
+                                            <Iconify sx={{display: 'inline-block', verticalAlign: '-0.125em'}}
+                                                     icon="mdi:external-link"/> </MUILink>
+                                        </ThemeProvider>
+                                    ) : null
+                                }
+                              </Wrap></ListItem>
+                          )
+                        })}
+                      </List>) : null)
+                    ]
+
                 })
               }
               </Wrap>
