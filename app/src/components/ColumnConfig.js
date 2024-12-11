@@ -38,7 +38,7 @@ export const columnBootstrap = [
 ]
 
 export const staticColumnFactory = (colId, quickFilter, existingTags, users) => {
-    if (colId == "evaluation.distributor") return {
+    if (colId === "evaluation.distributor") return {
       field: 'evaluation.distributor',
       valueGetter: (data) => data.row?.evaluation?.distributor ?? 'N/A',
       headerName: 'Distributor',
@@ -49,7 +49,16 @@ export const staticColumnFactory = (colId, quickFilter, existingTags, users) => 
         operator: 'startsWith',
       }
     }
-    if (colId == "evaluation.label" ) return {
+    if (colId === "organization.attribution_type") return {
+        field: "organization.attribution_type",
+        headerName: 'Playlist?',
+        isMetric: false,
+        valueGetter: (data) => {
+            return (data.row?.organization?.last_playlist_id ? true : false)
+        },
+        type: 'boolean',
+    }
+    if (colId === "evaluation.label" ) return {
       field: 'evaluation.label',
       valueGetter: (data) => data.row?.evaluation?.label ?? 'N/A',
       headerName: 'Label',
@@ -60,7 +69,7 @@ export const staticColumnFactory = (colId, quickFilter, existingTags, users) => 
         operator: 'startsWith',
       }
     }
-    if (colId == "evaluation.status" ) return {
+    if (colId === "evaluation.status" ) return {
       field: 'evaluation.status',
       headerName: 'Status',
       isMetric: false,
@@ -77,7 +86,7 @@ export const staticColumnFactory = (colId, quickFilter, existingTags, users) => 
             variant="outlined" size='small' color={params.value == 1 ? "error" : params.value == 0 ? "primary" : "warning"} label={params.value == 0 ? 'Unsigned' : (params.value == 1 ? 'Signed' : 'Unknown')} />
         )
     }
-    if (colId == "evaluation.distributor_type") return {
+    if (colId === "evaluation.distributor_type") return {
       field: 'evaluation.distributor_type',
       type: 'singleSelect',
       headerName: 'Distributor Type',
@@ -96,7 +105,7 @@ export const staticColumnFactory = (colId, quickFilter, existingTags, users) => 
 
         )
     }
-    if (colId == "evaluation.back_catalog") return {
+    if (colId === "evaluation.back_catalog") return {
       field: 'evaluation.back_catalog',
       headerName: 'Backcatalog Status',
       valueGetter: (data) => (data.row?.evaluation?.back_catalog ?? null),
@@ -111,10 +120,10 @@ export const staticColumnFactory = (colId, quickFilter, existingTags, users) => 
             onClick={() => {
                 quickFilter('evaluation.back_catalog', 'is', params.value)
             }}
-            variant="outlined" size='small' color={params.value == 1 ? "warning" : "primary"} label={(params.value == null ? 'Unknown' : (params.value == 0 ? 'Clean' : 'Dirty'))} />
+            variant="outlined" size='small' color={params.value === 1 ? "warning" : "primary"} label={(params.value == null ? 'Unknown' : (params.value == 0 ? 'Clean' : 'Dirty'))} />
         )
     }
-    if (colId == "organization.created_at") return {
+    if (colId === "organization.created_at") return {
       field: 'organization.created_at',
       headerName: 'Added On',
       filterOperators: dateOperators,
@@ -126,7 +135,7 @@ export const staticColumnFactory = (colId, quickFilter, existingTags, users) => 
       type: 'dateTime',
       renderCell: (params) => (<Moment format={"lll"}>{params?.value}</Moment>),
     }
-    if (colId == "users") return {
+    if (colId === "users") return {
       field: 'users',
       headerName: 'Added By',
       sortable: false,
@@ -379,6 +388,8 @@ export const buildColumnOptions = (statisticTypes, linkSources) => {
         {"key": "evaluation.distributor_type", "display": "Distributor Type", "type": "simple"},
         {"key": "evaluation.back_catalog", "display": "Back Catalog", "type": "simple"},
         {"key": "organization.created_at", "display": "Added On", "type": "simple"},
+        {"key": "organization.attribution_type", "display": "Playlist?", "type": "simple"},
+
         {"key": "users", "display": "Added By", "type": "simple"},
         {"key": "tags", "display": "Tags", "type": "simple"},
         {

@@ -124,6 +124,7 @@ class OrganizationArtist(Base):
             'favorite': self.favorite,
             'created_at': self.created_at,
             'added_by': self.added_by,
+            'last_playlist_id': self.last_playlist_id
             }
 
     def __repr__(self):

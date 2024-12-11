@@ -205,7 +205,16 @@ class ArtistController():
                 org_key = field.split('.')
                 org_key = org_key[1]
                 newValue = value
-
+                if org_key == 'attribution_type':
+                    org_key = 'last_playlist_id'
+                    if newValue == 'true':
+                        newValue = None
+                        operator = 'isNotEmpty'
+                    elif newValue == 'false':
+                        newValue = None
+                        operator = 'isEmpty'
+                    else:
+                        continue
                 org_dynamic = aliased(OrganizationArtist)
                 column = getattr(org_dynamic, org_key)
                 query = query.outerjoin(org_dynamic, and_(Artist.id == org_dynamic.artist_id, org_dynamic.organization_id == user_data.get('organization'))).order_by(column)
