@@ -134,6 +134,7 @@ class TrackingController():
     ref = self.db.collection("artists_v2").document(spotify_id)
     attribution = Attribution(
         user_id=user_id,
+        organization_id=org_id,
         playlist_id=sql_playlist_id,
     )
     doc = ref.get()
@@ -176,7 +177,13 @@ class TrackingController():
           if len(list(filter(lambda x: x.organization_id == org_id, sqlRef.organizations))) == 0:
               sqlRef.organizations.append(OrganizationArtist(
                   organization_id=org_id,
+                  last_playlist_id=sql_playlist_id
               ))
+          else:
+              org = list(filter(lambda x: x.organization_id == org_id, sqlRef.organizations)).pop()
+              if sql_playlist_id is not None:
+                  org.last_playlist_id = sql_playlist_id
+                  sql_session.add(org)
           attribution.artist_id = sqlRef.id
           sql_session.add(sqlRef)
           sql_session.add(attribution)
@@ -610,6 +617,7 @@ class TrackingController():
                       orgs.append(OrganizationArtist(
                           organization_id=orgId,
                           added_by=added_by,
+                          last_playlist_id=attribution.playlist_id if attribution is not None else None,
                           favorite=watchDetails.get('favorite'),
                           created_at=watchDetails.get('added_on'),
                       ))
@@ -685,6 +693,7 @@ class TrackingController():
                   if attribution is not None:
                       attributions_list = list([Attribution(
                           user_id=attribution.user_id,
+                          organization_id=orgId,
                           playlist_id=attribution.playlist_id,
                       )])
                   add_batch.append(Artist(

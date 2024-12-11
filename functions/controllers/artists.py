@@ -324,10 +324,19 @@ class ArtistController():
                     query = query.order_by(column)
         return query
 
+def artist_joined_query():
+    query = select(Artist).options(
+        contains_eager(Artist.statistics),
+        joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True),
+        joinedload(Artist.evaluation, innerjoin=False))
+    # query = query.filter(Artist.active == True)
+    return query
+
+
 def artist_with_meta(sql_session, spotify_id = None, id = None):
     query = select(Artist).options(
         joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True),
-        joinedload(Artist.links, innerjoin=False), joinedload(Artist.tags, innerjoin=False))
+        joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True), joinedload(Artist.tags, innerjoin=False))
 
     if spotify_id is not None:
         query = query.where(Artist.spotify_id == spotify_id)

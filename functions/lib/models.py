@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from dataclasses import dataclass
 from sqlalchemy import Column, Integer, SmallInteger, JSON, Float, Boolean, Text, String, TIMESTAMP, create_engine, \
-    ForeignKey, DateTime
+    ForeignKey, DateTime, select, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, relationship, mapped_column
@@ -116,6 +116,7 @@ class OrganizationArtist(Base):
     created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     artist: Mapped["Artist"] = relationship(back_populates="organizations")
+    last_playlist_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('playlists.id'), nullable=True)
     added_by = Column(String(28),  nullable=False, primary_key=True)
     def as_dict(self):
         return {
@@ -301,6 +302,8 @@ class Attribution(Base):
     id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
     artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
     user_id = Column(String(28), nullable=False)
+    organization_id = Column(String(28), nullable=False)
+
     playlist_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('playlists.id'), nullable=True)
     created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
 
