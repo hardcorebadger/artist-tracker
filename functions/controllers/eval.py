@@ -237,8 +237,8 @@ class EvalController():
         distributor_type=distributor_type,
         status=sql_status,
         back_catalog=sql_back_catalog,
-        distributor=main_eval['distributor'] if main_eval['distributor'] != "" else None,
-        label=main_eval['label'] if main_eval['label'] != "" else None,
+        distributor=main_eval['distributor'] if main_eval['distributor'] != "" and main_eval['distributor'] != 'unknown' else None,
+        label=main_eval['label'] if main_eval['label'] != "" and main_eval['label'] != 'unknown' else None,
     )
     sql_session = self.sql.get_session()
     sql_session.add_all([sql_ref])
