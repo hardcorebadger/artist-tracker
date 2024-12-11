@@ -10,7 +10,7 @@ import {useToast} from "@chakra-ui/react";
 
 function PageArtist() {
     const { artistId } = useParams()
-    const {  setActiveArtist, activeArtist, linkSources } = useContext(ColumnDataContext);
+    const {  setActiveArtist, activeArtist, linkSources, statisticTypes } = useContext(ColumnDataContext);
     const {currentQueryModel} = useContext(CurrentReportContext);
     const toast = useToast();
     const navigate = useNavigate()
@@ -18,7 +18,7 @@ function PageArtist() {
         const getArtist = httpsCallable(functions, 'get_artists')
         if (force || !activeArtist?.hasOwnProperty('attributions') || activeArtist === null || activeArtist.id !== artistId) {
             getArtist({"id": artistId}).then((response) => {
-                console.log(response);
+                // console.log(response);
                 if (!response.data.error) {
                     setActiveArtist(response.data.artist)
                 } else {
@@ -56,7 +56,7 @@ function PageArtist() {
     }
     return (
         <PageLayoutContained size="lg">
-            <ArtistDetailNew artist={activeArtist} linkSources={linkSources} onNavigateBack={currentQueryModel ? (()=> {
+            <ArtistDetailNew artist={activeArtist} linkSources={linkSources} statisticTypes={statisticTypes} onNavigateBack={currentQueryModel ? (()=> {
                 navigate(-1)
             }): null}
                 onTagSave={() => {
