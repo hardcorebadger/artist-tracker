@@ -151,13 +151,13 @@ export default function ArtistDetailNew({artist, onNavigateBack, statisticTypes,
 const { isOpen, onOpen, onClose } = useDisclosure()
     const stats = bakeStats(statisticTypes, linkSources)
   const {users} = useContext(ColumnDataContext)
-  console.log(artist['statistics'])
-  console.log(stats[tabIndex])
-  console.log(stats[tabIndex]?.statTypeId)
+  // console.log(artist['statistics'])
+  // console.log(stats[tabIndex])
+  // console.log(stats[tabIndex]?.statTypeId)
   const filteredStat = artist['statistics'].filter((stat) => stat['statistic_type_id'] === stats[tabIndex]?.statTypeId).pop() ?? null
   const filteredData = (filteredStat && 'data' in filteredStat) ? filteredStat['data'] : []
-  console.log(filteredStat)
-  console.log(filteredData)
+  // console.log(filteredStat)
+  // console.log(filteredData)
 
 
   if (stats.length === 0) {
