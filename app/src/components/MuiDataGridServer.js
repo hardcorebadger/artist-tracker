@@ -37,11 +37,12 @@ export const theme = createTheme({
 // compares the state of the report to the saved version to see if we should show save button
 const compareState = (
     initialColumnOrder, columnOrder, 
-    initialFilterValues, filterValue
+    initialFilterValues, filterValue,
+    initialSortModel, sortModel
   ) => {
     return (
     deepCompare(initialColumnOrder, columnOrder) &&
-    deepCompare(initialFilterValues, filterValue)
+    deepCompare(initialFilterValues, filterValue) && deepCompare(initialSortModel, sortModel)
     )
   }
 
@@ -61,7 +62,7 @@ const initialPagination = {
     pageSize: 20,
 }
 
-export default function MuiDataGridController({initialReportName, initialColumnOrder, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
+export default function MuiDataGridController({initialReportName, initialColumnOrder, initialSortModel, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
 
     // contexts
     const { statisticTypes, linkSources, tagTypes, users, existingTags } = useContext(ColumnDataContext);
@@ -73,7 +74,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
 
     // report state
     const [paginationModel, setPaginationModel] = useState(deepCopy(currentQueryModel?.pagination ?? initialPagination));
-    const [sortModel, setSortModel] = useState(deepCopy(currentQueryModel?.sorts ?? []));
+    const [sortModel, setSortModel] = useState(deepCopy(currentQueryModel?.sorts ?? initialSortModel));
     const [filterModel, setFilterModel] = useState(deepCopy(currentQueryModel?.filters ?? initialFilterValues))
     const [columnOrder, setColumnOrder] = useState(deepCopy(currentQueryModel?.columnOrder ?? initialColumnOrder))
     if (!initialFilterValues?.hasOwnProperty('items')) {
@@ -200,6 +201,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     const revertState = () => {
         setColumnOrder(deepCopy(initialColumnOrder))
         setFilterModel(deepCopy(initialFilterValues))
+        setSortModel(deepCopy(initialSortModel))
         setCurrentQueryModel(null)
         setReportName(initialReportName)
     }
@@ -218,7 +220,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     const columns = buildColumns(columnOrder, quickFilter, statisticTypes, linkSources, tagTypes, users, existingTags)
 
     // check current state vs saved report config to see if we should show save button
-    const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterModel)
+    const hasBeenEdited = reportName !== initialReportName || !compareState(initialColumnOrder, columnOrder, initialFilterValues, filterModel, initialSortModel, sortModel)
 
     // console.log(currentRows?.rows)
     return (
@@ -240,8 +242,8 @@ export default function MuiDataGridController({initialReportName, initialColumnO
           }
           <DataGridColumnMenu columnOrder={columnOrder} columnOptions={buildColumnOptions(statisticTypes, linkSources)} setColumnOrder={setColumnOrder} />
           {(hasBeenEdited && onSaveNew)&& <Button colorScheme='primary' variant='outline' onClick={revertState}>Revert</Button>}
-          {hasBeenEdited&& <Button colorScheme='primary' onClick={() => onSave(columnOrder, filterModel, reportName)}>Save</Button> }
-          {(hasBeenEdited && onSaveNew) && <Button colorScheme='primary' onClick={() => onSaveNew(columnOrder, filterModel, reportName)}>Save as New</Button>}
+          {hasBeenEdited&& <Button colorScheme='primary' onClick={() => onSave(columnOrder, filterModel, reportName, sortModel)}>Save</Button> }
+          {(hasBeenEdited && onSaveNew) && <Button colorScheme='primary' onClick={() => onSaveNew(columnOrder, filterModel, reportName, sortModel)}>Save as New</Button>}
         </HStack>
         
         </HStack>

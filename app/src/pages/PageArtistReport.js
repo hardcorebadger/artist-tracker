@@ -91,7 +91,7 @@ function PageArtistReport() {
   // automatically pass the new props
   // cause rerender
 
-  const onReportSave = async (columnOrder, filterValue, reportName) => {
+  const onReportSave = async (columnOrder, filterValue, reportName, sortModel) => {
     await setDoc(doc(db, 'reports', id), {
       organization: user.org.id,
       last_modified_by: user.auth.uid,
@@ -101,12 +101,13 @@ function PageArtistReport() {
       type: 'artist',
       name: reportName,
       columnOrder: columnOrder,
+      sortModel: sortModel,
       filterValue: filterValue
     })
     setCurrentReport(null)
   }
 
-  const onReportSaveNew = async (columnOrder, filterValue, reportName) => {
+  const onReportSaveNew = async (columnOrder, filterValue, reportName, sortModel) => {
     const docRef = await addDoc(collection(db, 'reports'), {
       organization: user.org.id,
       last_modified_by: user.auth.uid,
@@ -116,6 +117,7 @@ function PageArtistReport() {
       type: 'artist',
       name: reportName,
       columnOrder: columnOrder,
+      sortModel: sortModel,
       filterValue: filterValue
     })
     navigate('/app/reports/'+docRef.id)
@@ -136,6 +138,7 @@ function PageArtistReport() {
     initialReportName={currentReport?.data.name}
     initialColumnOrder={currentReport?.data.columnOrder}
     initialFilterValues={currentReport?.data.filterValue}
+    initialSortModel={currentReport?.data.sortModel ?? []}
     onSave={onReportSave} 
     onSaveNew={onReportSaveNew} 
     onDelete={onReportDelete}
