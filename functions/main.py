@@ -1,6 +1,10 @@
 import math
+import sys
 from array import array
+from io import StringIO
+from itertools import islice
 
+import pandas
 from firebase_admin import initialize_app, firestore, functions
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, params, logger, options
 from firebase_functions.options import RetryConfig, RateLimits, MemoryOption
@@ -8,11 +12,12 @@ from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter
 from openai import organization
 from sqlalchemy import select, update, or_
-from sqlalchemy.orm import joinedload, subqueryload
+from sqlalchemy.orm import joinedload, subqueryload, aliased
 
-from controllers.artists import ArtistController
+from controllers.artists import ArtistController, artist_joined_query
+from controllers.twilio import TwilioController
 from cron_jobs import airtable_v1_cron, eval_cron, stats_cron, onboarding_cron
-from lib.utils import get_function_url
+from lib.utils import get_function_url, pop_default
 from tmp_keys import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
     CloudSQLClient, LinkSource, ArtistLink, OrganizationArtist, Evaluation, StatisticType, Statistic, UserArtist, \
@@ -40,9 +45,9 @@ youtube = YoutubeClient(YOUTUBE_TOKEN)
 songstats = SongstatsClient(SONGSTATS_API_KEY)
 sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD, SQL_DB)
 artists = ArtistController(PROJECT_ID, LOCATION, sql)
-
 stat_types = None
 link_sources = None
+twilio = TwilioController(sql)
 
 tag_types = dict({
     1: {
@@ -125,6 +130,8 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     db = firestore.client(app)
     tracking_controller = TrackingController(spotify, songstats, sql, db)
+    twilio = TwilioController(sql)
+
     eval_controller = EvalController(spotify, youtube, db, sql, tracking_controller)
     artist_controller = ArtistController(PROJECT_ID, LOCATION, sql)
 
@@ -141,17 +148,18 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        if (flask.request.is_json):
-            data = flask.request.get_json()
-        else:
-            data = {}
-        spotify_id = spotify.url_to_id(data.get('spotify_url'), 'playlist')
-        if spotify_id == 'invalid':
-            return {'message': 'Invalid URL, try copy pasting an artist or playlist URL from Spotify directly.',
-                    'status': 400, 'added_count': 0}
-        else:
-            aids, name = spotify.get_playlist_artists(spotify_id)
-            return {'message': 'sucess', 'status': 200, 'added': name}
+        return {
+            'response': twilio.send_code('+19493385918')
+        }
+
+    @v2_api.post("/twilio")
+    def twilio_endpoint():
+
+        data = flask.request.form.to_dict()
+        from_number = data.get('From', None)
+        message = data.get('Body', None)
+
+        return twilio.receive_message(db, from_number, message) if from_number is not None else {"error": "Malformed request"}
 
     @v2_api.post("/reimport-artists")
     def reimport_artists():
@@ -235,7 +243,62 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     def eval_artist_lookup():
         data = flask.request.get_json()
         limit = data.get('limit', 100)
-        return tracking_controller.find_needs_ob_ingest(limit)
+        return tracking_controller.find_needs_stats_refresh(limit)
+
+    @v2_api.post('/import-artists-csv')
+    def import_artists_csv():
+        df = pandas.read_csv('/Users/qrcf/Downloads/tagged 2.csv')
+        sql_session = sql.get_session()
+        tags = list()
+        for index, row in df.iterrows():
+            tags.append(ArtistTag(
+                artist_id=row.get('id'),
+                tag=row.get('genre'),
+                tag_type_id=1,
+                organization_id='0dhwhAKcEVTX4kQILMZD',
+            ))
+            if len(tags) > 500:
+                print("Adding tags", len(tags))
+                sql_session.add_all(tags)
+                sql_session.commit()
+                tags.clear()
+        if len(tags) > 0:
+            print("Adding tags", len(tags))
+            sql_session.add_all(tags)
+            sql_session.commit()
+            tags.clear()
+        sql_session.close()
+        return {}
+
+    @v2_api.post("/get-artists-csv")
+    def get_artists_csv():
+        sql_session = sql.get_session()
+        artists_query = artist_joined_query()
+        artists_query = artists_query.outerjoin(Statistic, Artist.statistics).filter(Statistic.statistic_type_id == 30)
+        dynamic_eval = aliased(Evaluation)
+        artists_query = artists_query.outerjoin(dynamic_eval, Artist.evaluation_id == dynamic_eval.id)
+
+        artists_query = artists_query.where(or_(dynamic_eval.distributor_type == 0, dynamic_eval.distributor_type == None))
+        artists = sql_session.scalars(artists_query).unique()
+        df = pandas.DataFrame(list(map(lambda x: dict({
+            'id': x.id,
+            'spotify_id': x.spotify_id,
+            'name': x.name,
+            'distributor': x.evaluation.distributor,
+            'distributor_type': 'Unknown' if x.evaluation is None or x.evaluation.distributor_type is None else 'DIY' if x.evaluation.distributor_type == 0 else 'Major' if x.evaluation.distributor_type == 2 else 'Indie',
+            'back_catalog': 'Clean' if x.evaluation.back_catalog == 0 else 'Dirty',
+            'label': x.evaluation.label,
+            'spotify_listeners': pop_default(list(map(lambda x: x.latest, filter(lambda x: x.statistic_type_id == 30, x.statistics))), 'N/A'),
+            'spotify_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 1, x.links))), 'N/A'),
+            'soundcloud_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 5, x.links))),'N/A'),
+            'youtube_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 4, x.links))),'N/A'),
+            'insta_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 8, x.links))), 'N/A'),
+            'tags': ''
+        }), filter(lambda x: x.evaluation is None or ((x.evaluation.distributor_type == 0 or x.evaluation.distributor_type is None) and (x.evaluation.back_catalog == 0 or x.evaluation.back_catalog is None)) ,artists))))
+        df.to_csv('data.csv', index=False)
+        return {
+                "count": len(df.all()),
+        }
 
     @v2_api.post("/add-ingest-update-artist")
     def add_ingest_update_artist():
@@ -514,3 +577,18 @@ def get_existing_tags(req: https_fn.CallableRequest):
             cors_methods=["get", "post", "options"]))
 def get_artists(req: https_fn.CallableRequest):
     return artists.get_artists(req.auth.uid, req.data, app)
+
+@https_fn.on_call()
+def sms_setup(req: https_fn.CallableRequest):
+    db = firestore.client(app)
+    uid = req.auth.uid
+
+    code = req.data.get('code', None)
+    if code is not None:
+        success, status = twilio.verify_code(uid, db, req.data.get('number'), code)
+        return {
+            "success": success,
+            "reason": status
+        }
+    else:
+        return twilio.send_code(uid, db, req.data.get('number'))

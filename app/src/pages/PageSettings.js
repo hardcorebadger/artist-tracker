@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {
   AlertIcon,
   Text,
@@ -13,17 +13,20 @@ import {
   HStack,
   Avatar,
   Link,
-  Badge,
+  Badge, useToast,
 } from '@chakra-ui/react';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import { updateEmail, updatePassword } from "firebase/auth";
-import { signInWithEmailAndPassword, signInWithGoogle, auth, db } from '../firebase';
+import {signInWithEmailAndPassword, signInWithGoogle, auth, db, useAuth, functions} from '../firebase';
 import { useUser } from '../routing/AuthGuard';
 import { updateDoc, doc, startAfter } from 'firebase/firestore';
 import { products } from '../config';
 import { Link as RouterLink } from 'react-router-dom';
 import AnnotadedSection from '../components/AnnotatedSection';
-
+import {signInWithPhoneNumber, updatePhoneNumber} from "@firebase/auth";
+import { getAuth, RecaptchaVerifier, PhoneAuthProvider } from "firebase/auth";
+import {PhoneNumberInput} from "../components/PhoneNumberInput";
+import {httpsCallable} from "firebase/functions";
 function ChangeNameSection({disabled}) {
   const user = useUser()
 
@@ -80,6 +83,132 @@ function ChangeNameSection({disabled}) {
         }
       </VStack>
     </AnnotadedSection>
+  )
+}
+
+function ChangePhoneSection({disabled}) {
+  const [verify, setVerify] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const toast = useToast()
+  const auth = getAuth()
+  const user = useUser()
+  const now = new Date();
+  const tenMinutesAgo = new Date(now.getTime() - 10 * 59 * 1000); // 10 minutes = 10 * 60 seconds * 1000 milliseconds
+  const [verifyId, setVerifyId] = useState(((user.profile?.sms?.verified === false && user.profile?.sms.code_sent_at > tenMinutesAgo.getTime()) ? (user?.profile?.sms?.verify_id ?? null) : ""))
+
+  const [curPhone, setCurPhone] = useState( user.profile?.sms?.number ?? "")
+  const canSave = curPhone !== "" && (curPhone !== user.profile?.sms?.number && "+"+curPhone !== user.profile?.sms?.number)
+
+  const reset = () => {
+    setCurPhone("")
+    // setPhone("")
+    setVerifyId(null)
+    setVerify("")
+    setLoading(false)
+    setError(null)
+
+  }
+
+
+  const verifyPhone = async () => {
+    setLoading(true)
+    if(user.profile && (user.profile?.sms?.number !== curPhone) && (user.profile?.sms?.number !== '+'+curPhone)) {
+      try {
+        const sendCode = httpsCallable(functions, 'sms_setup')
+        const resp = await sendCode({number: '+'+curPhone})
+        console.log(resp);
+        if (resp?.data) {
+          setVerifyId(resp.data)
+        }
+        setLoading(false)
+      } catch(e) {
+        setLoading(false)
+        console.error(e);
+        toast({
+          title: 'Phone validation failed.',
+          description: "We were unable to verify your phone number, please confirm the information or try again.",
+          status: 'error',
+          duration: 9000,
+          isClosable: true,
+        })
+      }
+    }
+
+  }
+  const savePhone = async () => {
+    setLoading(true)
+    try {
+      const verifyCode = httpsCallable(functions, 'sms_setup')
+
+      const resp = await verifyCode({number: '+'+curPhone, code: verify})
+      console.log(resp)
+
+      toast({
+        title: 'Phone number updated',
+        description: "Your phone number has been successfully updated.",
+        status: 'success',
+        duration: 9000,
+        isClosable: true,
+      })
+      setLoading(false)
+      setVerifyId(null)
+
+    } catch (e) {
+      setLoading(false)
+      console.error(e);
+
+      toast({
+        title: 'Failed to validate code',
+        description: "We were unable to verify your one time code, please confirm the information or try again.",
+        status: 'error',
+        duration: 9000,
+        isClosable: true,
+      })
+    }
+  }
+  useEffect(() => {
+
+  }, [verifyId]);
+  return (
+      <AnnotadedSection
+          title="Update phone"
+          description={
+            disabled ? "Your login method does not support changing email" :
+                "Enter your phone number to receive a verification code. Text HELP for how to use the mobile features."
+          }
+      >
+        <VStack spacing={2} align="left">
+          <HStack spacing={2} align="center">
+            <PhoneNumberInput disabled={disabled} placeholder='Phone' value={curPhone} onChange={(e) => {
+              setCurPhone(e)
+            }}/>
+          </HStack>
+          <Text color={'text.subtle'} fontSize={'10px'}>This phone number will be used for 2FA purposes, and to reply to texts we receive asking for information or requesting imports.</Text>
+          {verifyId ? (
+              <Input disabled={disabled} w="100%" placeholder='Code' autoComplete={'one-time-code'} value={verify}
+                     onChange={(e) => setVerify(e.target.value)}/>) : null}
+          {error &&
+              <Alert status='error'>
+                <AlertIcon/>
+                {error}
+              </Alert>
+          }
+          {(canSave || verifyId) &&
+              <HStack justify="right">
+                <Button colorScheme='primary' isLoading={loading} onClick={() => {
+                  if (verifyId) {
+                    savePhone();
+                  } else {
+                    verifyPhone()
+                  }
+                }}>{verifyId ? "Verify" : "Save"}</Button>
+                <Button colorScheme='gray' disabled={loading} onClick={reset}>Reset</Button>
+              </HStack>
+          }
+
+        </VStack>
+      </AnnotadedSection>
   )
 }
 
@@ -266,7 +395,7 @@ function ChangePasswordSection({disabled}) {
 
 function AccountSummarySection() {
   const user = useUser()
-  
+
   let sub_id = null
   for (const p in user.products) {
     if (user.products[p].recurring)
@@ -306,18 +435,24 @@ function AccountSummarySection() {
 }
 
 export default function PageSettings() {
+  const auth = getAuth()
   const disableEmailPass = auth.currentUser.providerData[0].providerId !== 'password'
   return (
       <PageLayoutContained size="md">
         <VStack spacing={8} align="left">
+          <div id={"recaptcha-container"}></div>
+
+
           <Heading mb={8}>Settings</Heading>
           <AccountSummarySection/>
           <Divider/>
           <ChangeNameSection/>
           <Divider/>
-          <ChangeEmailSection disabled={disableEmailPass} />
+          <ChangeEmailSection disabled={disableEmailPass}/>
           <Divider/>
-          <ChangePasswordSection disabled={disableEmailPass} />
+          <ChangePhoneSection disabled={false}/>
+          <Divider/>
+          <ChangePasswordSection disabled={disableEmailPass}/>
           <Divider/>
         </VStack>
       </PageLayoutContained>

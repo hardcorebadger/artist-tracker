@@ -8,3 +8,4 @@ pandas
 cloud-sql-python-connector
 sqlalchemy
 pg8000
+twilio
