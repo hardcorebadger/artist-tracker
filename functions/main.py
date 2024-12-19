@@ -47,7 +47,7 @@ sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD,
 artists = ArtistController(PROJECT_ID, LOCATION, sql)
 stat_types = None
 link_sources = None
-twilio = TwilioController(sql)
+twilio = TwilioController(sql, spotify)
 
 tag_types = dict({
     1: {
@@ -130,7 +130,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     db = firestore.client(app)
     tracking_controller = TrackingController(spotify, songstats, sql, db)
-    twilio = TwilioController(sql)
+    twilio = TwilioController(sql, spotify)
 
     eval_controller = EvalController(spotify, youtube, db, sql, tracking_controller)
     artist_controller = ArtistController(PROJECT_ID, LOCATION, sql)
@@ -159,7 +159,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         from_number = data.get('From', None)
         message = data.get('Body', None)
 
-        return twilio.receive_message(db, from_number, message) if from_number is not None else {"error": "Malformed request"}
+        return twilio.receive_message(db, from_number, message, process_spotify_link) if from_number is not None else {"error": "Malformed request"}
 
     @v2_api.post("/reimport-artists")
     def reimport_artists():
@@ -434,84 +434,11 @@ def add_artist(req: https_fn.CallableRequest):
         return {'message': 'success', 'status': 200}
 
     # Message text passed from the client.
-    try:
-        spotify_url = req.data["spotify_url"]
-        spotify_id = spotify.url_to_id(spotify_url)
-        tags = req.data.get('tags')
-        if spotify_id == 'invalid':
-            spotify_id = spotify.url_to_id(spotify_url, 'playlist')
-            if spotify_id == 'invalid':
-                return {'message': 'Invalid URL, try copy pasting an artist or playlist URL from Spotify directly.', 'status': 400, 'added_count': 0}
-            else:
-                uid = req.auth.uid
-                user_data = get_user(uid, db)
-                try:
-                    aids, playlist_name, playlist_picture = spotify.get_playlist_artists(spotify_id)
-                    if preview:
-                        return {
-                            "found": True,
-                            "type": "playlist",
-                            "name": playlist_name,
-                            "avatar": playlist_picture,
-                            "url": spotify_url.split('?')[0]
-                        }
-                    sql_session = sql.get_session()
-                    sql_playlist = sql_session.scalars(select(Playlist).where(Playlist.spotify_id == spotify_id)).first()
-                    if sql_playlist is None:
-                        sql_playlist = Playlist(
-                            spotify_id=spotify_id,
-                            name=playlist_name,
-                        )
-                        sql_session.add(sql_playlist)
-                        sql_session.commit()
-                        sql_session.refresh(sql_playlist)
-                    sql_session.close()
+    spotify_url = req.data["spotify_url"]
+    tags = req.data.get('tags')
 
-                    for a in aids:
-                        tracking_controller.add_artist(a, uid, user_data['organization'], sql_playlist.id, tags)
-                    return {'message': 'sucess', 'status': 200, 'added_count': len(aids)}
-                except Exception as e:
-                    print(e)
-                    if preview:
-                        return {
-                            "found": False,
-                            "url": spotify_url.split('?')[0],
-                            "error": e
-                        }
-                    return {
-                        'message': 'failed', 'status': 500, 'error': traceback.format_exc()
-                    }
-        else:
-            user_data = get_user(uid, db)
-            if preview:
-                try:
-                    artist = spotify.get_artist(spotify_id)
-                    image = None
-                    if len(artist.get('images', list())) > 0:
-                        image = artist.get('images')[0]['url']
-                    return {
-                        "found": True,
-                        "type": "artist",
-                        "name": artist['name'],
-                        "avatar": image,
-                        "url": spotify_url.split('?')[0]
-                    }
-                except Exception as e:
-                    return {
-                        "found": False,
-                        "url": spotify_url.split('?')[0],
-                        "error": e
-                    }
+    return process_spotify_link(req.auth.uid, spotify_url, tags, preview)
 
-            msg, status = tracking_controller.add_ingest_update_artist(spotify_id, uid, user_data['organization'], tags)
-            return {'message': msg, 'status': status, 'added_count': 1}
-    except ErrorResponse as e:
-        if preview:
-            return {
-                "found": False
-            }
-
-        raise e.to_https_fn_error()
 
 
 def sort_ordered(l):
@@ -592,3 +519,108 @@ def sms_setup(req: https_fn.CallableRequest):
         }
     else:
         return twilio.send_code(uid, db, req.data.get('number'))
+
+def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
+    try:
+        db = firestore.client(app)
+        tracking_controller = TrackingController(spotify, songstats, sql, db)
+
+        spotify_id = spotify.url_to_id(spotify_url)
+        if spotify_id == 'invalid':
+            spotify_id = spotify.url_to_id(spotify_url, 'playlist')
+            if spotify_id == 'invalid':
+                return {'message': 'Invalid URL, try copy pasting an artist or playlist URL from Spotify directly.',
+                        'status': 400, 'added_count': 0}
+            else:
+                user_data = get_user(uid, db)
+                try:
+                    aids, playlist_name, playlist_picture = spotify.get_playlist_artists(spotify_id)
+                    sql_session = sql.get_session()
+                    sql_playlist = sql_session.scalars(
+                        select(Playlist).where(Playlist.spotify_id == spotify_id).where(Playlist.organization_id == user_data.get('organization'))).first()
+                    if preview:
+                        return {
+                            "found": True,
+                            "type": "playlist",
+                            "name": playlist_name,
+                            "avatar": playlist_picture,
+                            "url": spotify_url.split('?')[0],
+                            "existing": sql_playlist.id if sql_playlist else None,
+                            "existing_created_at": sql_playlist.created_at if sql_playlist else None,
+                        }
+
+                    if sql_playlist is None:
+                        sql_playlist = Playlist(
+                            spotify_id=spotify_id,
+                            name=playlist_name,
+                            organization_id=user_data.get('organization'),
+                        )
+                        sql_session.add(sql_playlist)
+                        sql_session.commit()
+                        sql_session.refresh(sql_playlist)
+                    sql_session.close()
+
+                    for a in aids:
+                        tracking_controller.add_artist(a, uid, user_data['organization'], sql_playlist.id, tags)
+                    return {'message': 'sucess', 'status': 200, 'added_count': len(aids)}
+                except Exception as e:
+                    print(e)
+                    if preview:
+                        return {
+                            "found": False,
+                            "spotify_id": spotify_id,
+                            "url": spotify_url.split('?')[0],
+                            "error": e
+                        }
+                    return {
+                        'message': 'failed', 'status': 500, 'error': traceback.format_exc()
+                    }
+        else:
+            user_data = get_user(uid, db)
+            if preview:
+                try:
+                    sql_session = sql.get_session()
+                    artist = spotify.get_artist(spotify_id)
+                    image = None
+                    if len(artist.get('images', list())) > 0:
+                        image = artist.get('images')[0]['url']
+
+                    artist_query = (select(Artist)
+                        .options(
+                            joinedload(Artist.organizations, innerjoin=True),
+                        )
+                        .where(Artist.spotify_id == spotify_id)
+                        .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
+                    artist_existing = sql_session.scalars(artist_query).unique().first()
+                    org = None
+                    if artist_existing is not None:
+                        org = list(filter(lambda x: x.organization_id == user_data.get('organization'), artist_existing.organizations)).pop()
+                    sql_session.close()
+
+                    return {
+                        "found": True,
+                        "type": "artist",
+                        "name": artist['name'],
+                        "avatar": image,
+                        "url": spotify_url.split('?')[0],
+                        "existing": artist_existing.id if artist_existing else None,
+                        "existing_created_at": org.created_at if org else None,
+                    }
+                except Exception as e:
+                    return {
+                        "found": False,
+                        "url": spotify_url.split('?')[0],
+                        "error": e,
+                        "spotify_id": spotify_id,
+
+                    }
+
+            msg, status = tracking_controller.add_ingest_update_artist(spotify_id, uid, user_data['organization'], tags)
+            return {'message': msg, 'status': status, 'added_count': 1}
+    except ErrorResponse as e:
+        if preview:
+            return {
+                "found": False
+            }
+
+        raise e.to_https_fn_error()

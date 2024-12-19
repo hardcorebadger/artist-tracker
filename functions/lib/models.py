@@ -292,6 +292,7 @@ class Playlist(Base):
     spotify_id = Column(String(22), nullable=False)
     created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
     updated_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
+    organization_id = Column(String(28), nullable=False)
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
