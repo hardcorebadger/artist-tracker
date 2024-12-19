@@ -15,7 +15,7 @@ class TwilioController():
   def __init__(self, sql, spotify: SpotifyClient):
     self.sql = sql
     self.spotify = spotify
-    account_sid = 'AC0e6af46378b5bfa7347d4aaba73709f6'
+    account_sid = TWILIO_ACCOUNT
     self.client = Client(account_sid, TWILIO_TOKEN)
 
   def load_user_ref(self, uid, db):
