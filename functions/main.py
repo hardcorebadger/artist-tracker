@@ -38,7 +38,7 @@ app = initialize_app()
 # Globals
 #################################
 
-spotify = SpotifyClient(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET)
+spotify = SpotifyClient(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_ALT_CLIENT_ID, SPOTIFY_ALT_CLIENT_SECRET)
 spotify.authorize()
 airtable = AirtableClient(AIRTABLE_TOKEN, AIRTABLE_BASE, AIRTABLE_TABLES)
 youtube = YoutubeClient(YOUTUBE_TOKEN)
@@ -580,7 +580,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
             if preview:
                 try:
                     sql_session = sql.get_session()
-                    artist = spotify.get_artist(spotify_id)
+                    artist = spotify.get_artist(spotify_id, True)
                     image = None
                     if len(artist.get('images', list())) > 0:
                         image = artist.get('images')[0]['url']
@@ -623,4 +623,4 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
                 "found": False
             }
 
-        raise e.to_https_fn_error()
+        raise e

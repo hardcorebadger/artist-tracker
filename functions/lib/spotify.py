@@ -3,32 +3,44 @@ import json
 from .errors import ErrorResponse
 from requests.exceptions import JSONDecodeError
 
+spotify_artists = dict()
+spotify_playlists = dict()
+
 class SpotifyClient():
-  def __init__(self, client_id, client_secret):
+  def __init__(self, client_id, client_secret, alt_client_id, alt_client_secret):
     self.client_id = client_id
     self.client_secret = client_secret
+    self.alt_client_id = alt_client_id
+    self.alt_client_secret = alt_client_secret
     self.access_token = None
+    self.alt_token = None
     self.root_uri = "https://api.spotify.com/v1"
 
-  def authorize(self):
+  def authorize(self, alt_token=False):
     headers = {
       "Content-Type": "application/x-www-form-urlencoded"
     }
     data = {
       "grant_type": "client_credentials",
-      "client_id": self.client_id,
-      "client_secret": self.client_secret
+      "client_id": self.alt_client_id if alt_token else self.client_id,
+      "client_secret": self.alt_client_secret if alt_token else self.client_secret
     }
 
     response = requests.post(f"https://accounts.spotify.com/api/token", headers=headers, data=data).json()
     if 'error' in response:
-      self.access_token = None
+      if alt_token:
+        self.alt_token = None
+      else:
+        self.access_token = None
     else:
-      self.access_token = response['access_token']
+      if alt_token:
+        self.alt_token = response['access_token']
+      else:
+        self.access_token = response['access_token']
 
-  def get(self, path, data=None):
+  def get(self, path, data=None, alt_token=False):
     res = requests.get(f"{self.root_uri}{path}", headers= {
-      "Authorization": f"Bearer {self.access_token}"
+      "Authorization": f"Bearer {self.alt_token if alt_token else self.access_token}"
     },
     params=data)
 
@@ -37,12 +49,12 @@ class SpotifyClient():
 
       # Catch token expiration and get a new one
       if res.status_code == 401:
-        before = self.access_token
+        before = self.alt_token if alt_token else self.access_token
         print("Spotify Access Token Expired, Refreshing")
-        self.authorize()
+        self.authorize(alt_token)
         # If it worked, retry
-        if self.access_token != before:
-          return self.get(path, data)
+        if (alt_token and self.alt_token != before) or (self.access_token != before and ~alt_token):
+          return self.get(path, data, alt_token=alt_token)
       
       # Catch rate limits and switch to a 299 so the task doesn't restart
       if res.status_code == 429:
@@ -60,9 +72,17 @@ class SpotifyClient():
       
     return res.json()
   
-  def get_artist(self, id):
-    return self.get(f"/artists/{id}")
-  
+  def get_artist(self, id, alt_token=False):
+    global spotify_artists
+    if id in spotify_artists:
+      return spotify_artists[id]
+    try:
+      artist = self.get(path=f"/artists/{id}", alt_token=alt_token)
+      spotify_artists[id] = artist
+      return artist
+    except ErrorResponse:
+      raise ErrorResponse
+
   def get_artist_top_tracks(self, id):
     return self.get(f"/artists/{id}/top-tracks", data={"market":"US"})
 
@@ -76,8 +96,16 @@ class SpotifyClient():
     idp = ",".join(id for id in ids)
     return self.get(f"/albums", data={'ids':idp})
   
-  def get_playlist(self, id):
-    return self.get(f"/playlists/{id}")
+  def get_playlist(self, id, alt_token=False):
+    global spotify_playlists
+    if id in spotify_playlists:
+      return spotify_playlists[id]
+    try:
+      playlist = self.get(f"/playlists/{id}", alt_token=alt_token)
+      spotify_playlists[id] = playlist
+      return playlist
+    except ErrorResponse:
+      raise ErrorResponse
 
   def trim_link_id(self, url):
     return url.split('/')[-1]
@@ -118,8 +146,8 @@ class SpotifyClient():
           plines.append({'line': c['text'], 'date': album['release_date']})
     return plines
   
-  def get_playlist_artists(self, id):
-    p = self.get_playlist(id)
+  def get_playlist_artists(self, id, alt_token=False):
+    p = self.get_playlist(id, alt_token=alt_token)
     artist_ids = []
     dedupe_set = set()
     for i in p['tracks']['items']:
