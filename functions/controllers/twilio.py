@@ -107,7 +107,15 @@ class TwilioController():
           artist_existing = sql_session.scalars(artist_query).unique().first()
           if artist_existing is None:
             data = link_proc(user.id, message, None, False)
+            artist_existing = sql_session.scalars(artist_query).unique().first()
             print("new found data", data)
+            if artist_existing is not None:
+              data = {
+                "found": True,
+                "type": "artist",
+                "name": artist_existing.name,
+                "new": artist_existing.id
+              }
           else:
             org = None
             if artist_existing is not None:
@@ -121,7 +129,7 @@ class TwilioController():
               "existing_created_at": org.created_at
             }
             print("new data", data)
-        if data is not None and data.get('found', False) == False:
+        if data is not None and data.get('found', False) == False and ~sent:
           sent = self.send_message(user_data, "We were unable to process the link you provided. Please double check or try again in a minute.")
         elif data is not None:
           if data.get('type') == 'artist':
@@ -129,11 +137,10 @@ class TwilioController():
               sent = self.send_template(user_data, "HXabba02580e40f6bbf0e0c1ddac752a36", dict({"1": data.get("name"), "2": "https://indiestack.app/app/artists/" + str(data.get('existing'))}))
               # sent = self.send_template(user_data, "HXabba02580e40f6bbf0e0c1ddac752a36", dict({"1": data.get("name"), "2": "https://google.com"}))
             else:
-              artist_sql = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id)).first()
-              sent = self.send_template(user_data, "HXf2f85e6870b94efefd58e668c95008ce", dict({"1": data.get("name"), "2": "https://indiestack.app/app/artists/" + str(artist_sql.id)}))
+              sent = self.send_template(user_data, "HXf2f85e6870b94efefd58e668c95008ce", dict({"1": data.get("name"), "2": "https://indiestack.app/app/artists/" + str(data.get("new"))}))
           else:
             if data.get('existing') is not None:
-              sent = self.send_message(user_data, "Successfully found playlist: " + data.get("name") + ". This playlist was already imported on " + data.get('existing_created_at') + ".")
+              sent = self.send_message(user_data, "Successfully found playlist: " + data.get("name") + ". This playlist was already imported on " + data.get('existing_created_at').strftime('%Y-%m-%d') + ".")
             else:
               user.update({
                 "pending_import": data
@@ -147,7 +154,10 @@ class TwilioController():
       if ~sent:
         sent = self.send_message(user_data, "There was an unexpected error while processing your request. Please try again in a little while.")
 
-      raise e
+      return {
+        "processed": False,
+        "sent": sent
+      }
     return {
       "processed": True,
       "sent": sent
