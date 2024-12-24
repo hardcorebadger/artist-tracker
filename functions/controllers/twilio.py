@@ -85,7 +85,8 @@ class TwilioController():
     print("Received twilio text", message, lowered)
     try:
       if lowered == 'help':
-        sent = self.send_message(user_data, "Send a Spotify artist or playlist link to add to your organization or retrieve stats!")
+        sent = False
+        # sent = self.send_message(user_data, "Send a Spotify artist or playlist link to add to your organization or retrieve stats!")
       elif 'open.spotify.com' in lowered:
         print("Spotify link detected")
         spotify_id = self.spotify.url_to_id(message)
