@@ -140,8 +140,13 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
+        sql_session = sql.get_session()
+        records = select(ArtistTag).distinct(ArtistTag.tag_type_id, ArtistTag.tag)
+        records = sql_session.scalars(records).all()
+        records = list(map(lambda type: type.as_tag_dict(), records))
+        sql_session.close()
         return {
-            'response': twilio.send_code('+19493385918')
+            'response': records
         }
 
     @v2_api.post("/twilio")

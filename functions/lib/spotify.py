@@ -3,7 +3,7 @@ import json
 from .errors import ErrorResponse
 from requests.exceptions import JSONDecodeError
 
-spotify_artists = dict()
+# spotify_artists = dict()
 spotify_playlists = dict()
 
 class SpotifyClient():
@@ -27,7 +27,7 @@ class SpotifyClient():
       "client_id": self.alt_client_id if alt_token else self.client_id,
       "client_secret": self.alt_client_secret if alt_token else self.client_secret
     }
-    print("Shopify authorize", alt_token)
+    print("Spotify Auth:" + (' alt' if alt_token else ' default'))
 
     response = requests.post(f"https://accounts.spotify.com/api/token", headers=headers, data=data).json()
     if 'error' in response:
@@ -43,12 +43,12 @@ class SpotifyClient():
         self.authorized = True
         self.access_token = response['access_token']
 
-  def get(self, path, data=None, alt_token=False):
+  def get(self, path, data=None, alt_token=False, attempt=1):
     if ~self.authorized and not alt_token:
       self.authorize()
     if ~self.authorizedAlt and alt_token:
       self.authorize(alt_token=alt_token)
-    print("Shopify Request: ", path, alt_token)
+    print("Spotify Request: " + path + (' alt' if alt_token else ' default'))
     res = requests.get(f"{self.root_uri}{path}", headers= {
       "Authorization": f"Bearer {self.alt_token if alt_token else self.access_token}"
     },
@@ -72,6 +72,9 @@ class SpotifyClient():
         print("Spotify Rate Limiting")
         if 'retry-after' in res.headers:
           print(f"Retry After: {res.headers['retry-after']}")
+        if attempt == 1:
+          print("trying with opposite token")
+          return self.get(path, data, alt_token=~alt_token, attempt=attempt + 1)
         raise ErrorResponse({"error":res.text}, 299, "Spotify")
       
       # Throw back the errors
@@ -84,9 +87,9 @@ class SpotifyClient():
     return res.json()
   
   def get_artist(self, id, alt_token=False):
-    global spotify_artists
-    if id in spotify_artists:
-      return spotify_artists[id]
+    # global spotify_artists
+    # if id in spotify_artists:
+    #   return spotify_artists[id]
     try:
       artist = self.get(path=f"/artists/{id}", alt_token=alt_token)
       # spotify_artists[id] = artist
