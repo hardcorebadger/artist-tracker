@@ -4,16 +4,12 @@ import time
 import copy
 import traceback
 from datetime import datetime
-from itertools import count
 
-from firebase_admin import firestore, initialize_app
-from firebase_functions import https_fn
-from sqlalchemy import select, func, and_, not_, or_
-from sqlalchemy.dialects.mssql.information_schema import columns
-from sqlalchemy.orm import subqueryload, joinedload, contains_eager, defer, aliased
+from firebase_admin import firestore
+from sqlalchemy import select, and_, not_, or_
+from sqlalchemy.orm import joinedload, contains_eager, aliased
 
-from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
-    CloudSQLClient, LinkSource, ArtistLink, ArtistTag, OrganizationArtist, Evaluation, StatisticType, Statistic, \
+from lib import Artist, get_user, LinkSource, ArtistLink, ArtistTag, OrganizationArtist, Evaluation, StatisticType, Statistic, \
     UserArtist, Attribution, pop_default
 
 count_by_query = None
@@ -91,7 +87,6 @@ class ArtistController():
                 "error": None
             }
         except Exception as e:
-            print (traceback.format_exc())
             if id_lookup is not None:
                 return {
                     "artist": None,

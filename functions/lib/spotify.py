@@ -14,6 +14,8 @@ class SpotifyClient():
     self.alt_client_secret = alt_client_secret
     self.access_token = None
     self.alt_token = None
+    self.authorized = False
+    self.authorizedAlt = False
     self.root_uri = "https://api.spotify.com/v1"
 
   def authorize(self, alt_token=False):
@@ -25,6 +27,7 @@ class SpotifyClient():
       "client_id": self.alt_client_id if alt_token else self.client_id,
       "client_secret": self.alt_client_secret if alt_token else self.client_secret
     }
+    print("Shopify authorize", alt_token)
 
     response = requests.post(f"https://accounts.spotify.com/api/token", headers=headers, data=data).json()
     if 'error' in response:
@@ -34,14 +37,22 @@ class SpotifyClient():
         self.access_token = None
     else:
       if alt_token:
+        self.authorizedAlt = True
         self.alt_token = response['access_token']
       else:
+        self.authorized = True
         self.access_token = response['access_token']
 
   def get(self, path, data=None, alt_token=False):
+    if ~self.authorized and not alt_token:
+      self.authorize()
+    if ~self.authorizedAlt and alt_token:
+      self.authorize(alt_token=alt_token)
+    print("Shopify Request: ", path, alt_token)
     res = requests.get(f"{self.root_uri}{path}", headers= {
       "Authorization": f"Bearer {self.alt_token if alt_token else self.access_token}"
     },
+
     params=data)
 
     # error handling
@@ -78,7 +89,9 @@ class SpotifyClient():
       return spotify_artists[id]
     try:
       artist = self.get(path=f"/artists/{id}", alt_token=alt_token)
-      spotify_artists[id] = artist
+      # spotify_artists[id] = artist
+      # if len(spotify_artists) > 10:
+      #   spotify_artists = dict({id: artist})
       return artist
     except ErrorResponse:
       raise ErrorResponse
