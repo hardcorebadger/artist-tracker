@@ -1,17 +1,18 @@
 import requests
-import json
 from .errors import ErrorResponse
 from requests.exceptions import JSONDecodeError
 
+from spotify_keys import *
+
 # spotify_artists = dict()
-spotify_playlists = dict()
+# spotify_playlists = dict()
 
 class SpotifyClient():
-  def __init__(self, client_id, client_secret, alt_client_id, alt_client_secret):
-    self.client_id = client_id
-    self.client_secret = client_secret
-    self.alt_client_id = alt_client_id
-    self.alt_client_secret = alt_client_secret
+  def __init__(self):
+    self.client_id = SPOTIFY_CLIENT_ID
+    self.client_secret = SPOTIFY_CLIENT_SECRET
+    self.alt_client_id = SPOTIFY_ALT_CLIENT_ID
+    self.alt_client_secret = SPOTIFY_ALT_CLIENT_SECRET
     self.access_token = None
     self.alt_token = None
     self.authorized = False
@@ -44,16 +45,12 @@ class SpotifyClient():
         self.access_token = response['access_token']
 
   def get(self, path, data=None, alt_token=False, attempt=1):
-    if ~self.authorized and not alt_token:
-      self.authorize()
-    if ~self.authorizedAlt and alt_token:
+    if (self.authorizedAlt == False and alt_token) or (self.authorized == False and alt_token == False):
       self.authorize(alt_token=alt_token)
     print("Spotify Request: " + path + (' alt' if alt_token else ' default'))
     res = requests.get(f"{self.root_uri}{path}", headers= {
       "Authorization": f"Bearer {self.alt_token if alt_token else self.access_token}"
-    },
-
-    params=data)
+    }, params=data)
 
     # error handling
     if res.status_code > 299:
@@ -113,12 +110,12 @@ class SpotifyClient():
     return self.get(f"/albums", data={'ids':idp})
   
   def get_playlist(self, id, alt_token=False):
-    global spotify_playlists
-    if id in spotify_playlists:
-      return spotify_playlists[id]
+    # global spotify_playlists
+    # if id in spotify_playlists:
+    #   return spotify_playlists[id]
     try:
       playlist = self.get(f"/playlists/{id}", alt_token=alt_token)
-      spotify_playlists[id] = playlist
+      # spotify_playlists[id] = playlist
       return playlist
     except ErrorResponse:
       raise ErrorResponse

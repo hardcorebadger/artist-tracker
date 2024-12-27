@@ -1,6 +1,8 @@
 # Custom
 local_scripts
 tmp_keys.py
+spotify_keys.py
+twilio_keys.py
 
 # Python
 # Byte-compiled / optimized Python files

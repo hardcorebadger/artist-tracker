@@ -1,5 +1,4 @@
 import json
-import os
 import time
 
 from google.cloud.firestore_v1 import FieldFilter
@@ -8,7 +7,7 @@ from sqlalchemy.orm import joinedload
 from twilio.rest import Client
 
 from lib import SpotifyClient, Artist, OrganizationArtist, ErrorResponse
-from tmp_keys import *
+from twilio_keys import *
 
 
 class TwilioController():

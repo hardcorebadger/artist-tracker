@@ -1,20 +1,19 @@
 import math
 
-import pandas
 from firebase_admin import initialize_app, firestore, functions
-from firebase_functions import https_fn, scheduler_fn, tasks_fn, params, logger, options
-from firebase_functions.options import RetryConfig, RateLimits, MemoryOption
+from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
+from firebase_functions.options import RetryConfig, MemoryOption
 from google.cloud.firestore_v1 import FieldFilter
 from sqlalchemy import select, or_
-from sqlalchemy.orm import joinedload, aliased
+from sqlalchemy.orm import joinedload
 
-from controllers.artists import ArtistController, artist_joined_query
+from controllers.artists import ArtistController
 from controllers.twilio import TwilioController
 from cron_jobs import eval_cron, stats_cron, onboarding_cron
-from lib.utils import get_function_url, pop_default
+from lib.utils import get_function_url
 from tmp_keys import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
-    CloudSQLClient, LinkSource, OrganizationArtist, Evaluation, StatisticType, Statistic, \
+    CloudSQLClient, LinkSource, OrganizationArtist, StatisticType, \
     ArtistTag, Playlist
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController
 import flask
@@ -32,23 +31,31 @@ app = initialize_app()
 # Globals
 #################################
 
-spotify = SpotifyClient(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_ALT_CLIENT_ID, SPOTIFY_ALT_CLIENT_SECRET)
-sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD, SQL_DB)
+spotify_client = None
 stat_types = None
 link_sources = None
 
-tag_types = dict({
-    1: {
-        "id": 1,
-        "name": "User Tag",
-        "key": "user"
-    },
-    2: {
-        "id": 2,
-        "name": "Genre",
-        "key": "genre"
-    }
-})
+sql = None
+
+def get_tag_types():
+    return dict({
+        1: {
+            "id": 1,
+            "name": "User Tag",
+            "key": "user"
+        },
+        2: {
+            "id": 2,
+            "name": "Genre",
+            "key": "genre"
+        }
+    })
+
+def get_sql() -> CloudSQLClient:
+    global sql
+    if sql is None:
+        sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD, SQL_DB)
+    return sql
 
 @tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, min_backoff_seconds=60), memory=MemoryOption.MB_512)
 def reimportsql(req: tasks_fn.CallableRequest) -> str:
@@ -63,13 +70,14 @@ def reimportsql(req: tasks_fn.CallableRequest) -> str:
 def reimport_artists_eval(page = 0, page_size = 50):
     db = firestore.client(app)
     songstats = SongstatsClient(SONGSTATS_API_KEY)
+    spotify = get_spotify_client()
 
-    tracking_controller = TrackingController(spotify, songstats, sql, db)
+    tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
     offset = page * page_size
     old_artists = db.collection("artists_v2").limit(page_size).offset(offset).get()
     spotifys = list(map(lambda x: x.get('spotify_id'), old_artists))
 
-    sql_session = sql.get_session()
+    sql_session = get_sql().get_session()
     found = 0
     updated = 0
     new = 0
@@ -120,12 +128,13 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     db = firestore.client(app)
     songstats = SongstatsClient(SONGSTATS_API_KEY)
+    spotify = get_spotify_client()
 
-    tracking_controller = TrackingController(spotify, songstats, sql, db)
-    twilio = TwilioController(sql, spotify)
+    tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
+    twilio = TwilioController(get_sql(), spotify)
     youtube = YoutubeClient(YOUTUBE_TOKEN)
-    eval_controller = EvalController(spotify, youtube, db, sql, tracking_controller)
-    artist_controller = ArtistController(PROJECT_ID, LOCATION, sql)
+    eval_controller = EvalController(spotify, youtube, db, get_sql(), tracking_controller)
+    # artist_controller = ArtistController(PROJECT_ID, LOCATION, get_sql())
 
     v2_api = flask.Flask(__name__)
 
@@ -140,7 +149,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        sql_session = sql.get_session()
+        sql_session = get_sql().get_session()
         records = select(ArtistTag).distinct(ArtistTag.tag_type_id, ArtistTag.tag)
         records = sql_session.scalars(records).all()
         records = list(map(lambda type: type.as_tag_dict(), records))
@@ -242,60 +251,60 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         limit = data.get('limit', 100)
         return eval_controller.find_needs_eval_refresh(limit)
 
-    @v2_api.post('/import-artists-csv')
-    def import_artists_csv():
-        df = pandas.read_csv('/Users/qrcf/Downloads/tagged 2.csv')
-        sql_session = sql.get_session()
-        tags = list()
-        for index, row in df.iterrows():
-            tags.append(ArtistTag(
-                artist_id=row.get('id'),
-                tag=row.get('genre'),
-                tag_type_id=1,
-                organization_id='0dhwhAKcEVTX4kQILMZD',
-            ))
-            if len(tags) > 500:
-                print("Adding tags", len(tags))
-                sql_session.add_all(tags)
-                sql_session.commit()
-                tags.clear()
-        if len(tags) > 0:
-            print("Adding tags", len(tags))
-            sql_session.add_all(tags)
-            sql_session.commit()
-            tags.clear()
-        sql_session.close()
-        return {}
+    # @v2_api.post('/import-artists-csv')
+    # def import_artists_csv():
+    #     df = pandas.read_csv('/Users/qrcf/Downloads/tagged 2.csv')
+    #     sql_session = get_sql().get_session()
+    #     tags = list()
+    #     for index, row in df.iterrows():
+    #         tags.append(ArtistTag(
+    #             artist_id=row.get('id'),
+    #             tag=row.get('genre'),
+    #             tag_type_id=1,
+    #             organization_id='0dhwhAKcEVTX4kQILMZD',
+    #         ))
+    #         if len(tags) > 500:
+    #             print("Adding tags", len(tags))
+    #             sql_session.add_all(tags)
+    #             sql_session.commit()
+    #             tags.clear()
+    #     if len(tags) > 0:
+    #         print("Adding tags", len(tags))
+    #         sql_session.add_all(tags)
+    #         sql_session.commit()
+    #         tags.clear()
+    #     sql_session.close()
+    #     return {}
 
-    @v2_api.post("/get-artists-csv")
-    def get_artists_csv():
-        sql_session = sql.get_session()
-        artists_query = artist_joined_query()
-        artists_query = artists_query.outerjoin(Statistic, Artist.statistics).filter(Statistic.statistic_type_id == 30)
-        dynamic_eval = aliased(Evaluation)
-        artists_query = artists_query.outerjoin(dynamic_eval, Artist.evaluation_id == dynamic_eval.id)
-
-        artists_query = artists_query.where(or_(dynamic_eval.distributor_type == 0, dynamic_eval.distributor_type == None))
-        artists = sql_session.scalars(artists_query).unique()
-        df = pandas.DataFrame(list(map(lambda x: dict({
-            'id': x.id,
-            'spotify_id': x.spotify_id,
-            'name': x.name,
-            'distributor': x.evaluation.distributor,
-            'distributor_type': 'Unknown' if x.evaluation is None or x.evaluation.distributor_type is None else 'DIY' if x.evaluation.distributor_type == 0 else 'Major' if x.evaluation.distributor_type == 2 else 'Indie',
-            'back_catalog': 'Clean' if x.evaluation.back_catalog == 0 else 'Dirty',
-            'label': x.evaluation.label,
-            'spotify_listeners': pop_default(list(map(lambda x: x.latest, filter(lambda x: x.statistic_type_id == 30, x.statistics))), 'N/A'),
-            'spotify_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 1, x.links))), 'N/A'),
-            'soundcloud_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 5, x.links))),'N/A'),
-            'youtube_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 4, x.links))),'N/A'),
-            'insta_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 8, x.links))), 'N/A'),
-            'tags': ''
-        }), filter(lambda x: x.evaluation is None or ((x.evaluation.distributor_type == 0 or x.evaluation.distributor_type is None) and (x.evaluation.back_catalog == 0 or x.evaluation.back_catalog is None)) ,artists))))
-        df.to_csv('data.csv', index=False)
-        return {
-                "count": len(df.all()),
-        }
+    # @v2_api.post("/get-artists-csv")
+    # def get_artists_csv():
+    #     sql_session = get_sql().get_session()
+    #     artists_query = artist_joined_query()
+    #     artists_query = artists_query.outerjoin(Statistic, Artist.statistics).filter(Statistic.statistic_type_id == 30)
+    #     dynamic_eval = aliased(Evaluation)
+    #     artists_query = artists_query.outerjoin(dynamic_eval, Artist.evaluation_id == dynamic_eval.id)
+    #
+    #     artists_query = artists_query.where(or_(dynamic_eval.distributor_type == 0, dynamic_eval.distributor_type == None))
+    #     artists = sql_session.scalars(artists_query).unique()
+    #     df = pandas.DataFrame(list(map(lambda x: dict({
+    #         'id': x.id,
+    #         'spotify_id': x.spotify_id,
+    #         'name': x.name,
+    #         'distributor': x.evaluation.distributor,
+    #         'distributor_type': 'Unknown' if x.evaluation is None or x.evaluation.distributor_type is None else 'DIY' if x.evaluation.distributor_type == 0 else 'Major' if x.evaluation.distributor_type == 2 else 'Indie',
+    #         'back_catalog': 'Clean' if x.evaluation.back_catalog == 0 else 'Dirty',
+    #         'label': x.evaluation.label,
+    #         'spotify_listeners': pop_default(list(map(lambda x: x.latest, filter(lambda x: x.statistic_type_id == 30, x.statistics))), 'N/A'),
+    #         'spotify_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 1, x.links))), 'N/A'),
+    #         'soundcloud_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 5, x.links))),'N/A'),
+    #         'youtube_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 4, x.links))),'N/A'),
+    #         'insta_link': pop_default(list(map(lambda x: x.url, filter(lambda x: x.link_source_id == 8, x.links))), 'N/A'),
+    #         'tags': ''
+    #     }), filter(lambda x: x.evaluation is None or ((x.evaluation.distributor_type == 0 or x.evaluation.distributor_type is None) and (x.evaluation.back_catalog == 0 or x.evaluation.back_catalog is None)) ,artists))))
+    #     df.to_csv('data.csv', index=False)
+    #     return {
+    #             "count": len(df.all()),
+    #     }
 
     @v2_api.post("/add-ingest-update-artist")
     def add_ingest_update_artist():
@@ -340,6 +349,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 def fn_v1_api(req: https_fn.Request) -> https_fn.Response:
     youtube = YoutubeClient(YOUTUBE_TOKEN)
     airtable = AirtableClient(AIRTABLE_TOKEN, AIRTABLE_BASE, AIRTABLE_TABLES)
+    spotify = get_spotify_client()
 
     v1_controller = AirtableV1Controller(airtable, spotify, youtube)
     v1_api = flask.Flask(__name__)
@@ -402,9 +412,10 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     db = firestore.client(app)
     youtube = YoutubeClient(YOUTUBE_TOKEN)
     songstats = SongstatsClient(SONGSTATS_API_KEY)
+    spotify = get_spotify_client()
 
-    tracking_controller = TrackingController(spotify, songstats, sql, db)
-    eval_controller = EvalController(spotify, youtube, db, sql, tracking_controller)
+    tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
+    eval_controller = EvalController(spotify, youtube, db, get_sql(), tracking_controller)
     task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT)
 
     # does 300 evals per hours, doesn't care where they are in OB, TODO prios by oldest first so new artists go first
@@ -425,8 +436,9 @@ def add_artist(req: https_fn.CallableRequest):
     db = firestore.client(app)
     uid = req.auth.uid
     songstats = SongstatsClient(SONGSTATS_API_KEY)
+    spotify = get_spotify_client()
 
-    tracking_controller = TrackingController(spotify, songstats, sql, db)
+    tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
     preview = req.data.get('preview', False)
     identifier = req.data.get('id', False)
     if identifier:
@@ -449,7 +461,7 @@ def sort_ordered(l):
     return l.get('order', 0)
 
 def load_link_sources():
-    sql_session = sql.get_session()
+    sql_session = get_sql().get_session()
     sources = sql_session.scalars(select(LinkSource)).all()
     list_sorted_sources = list(map(lambda type: type.as_dict(), sources))
     sql_session.close()
@@ -457,7 +469,7 @@ def load_link_sources():
     return list_sorted_sources
 
 def load_stat_types():
-    sql_session = sql.get_session()
+    sql_session = get_sql().get_session()
     types = sql_session.scalars(select(StatisticType)).all()
     list_sorted = list(map(lambda type: type.as_dict(), types))
     sql_session.close()
@@ -467,16 +479,17 @@ def load_stat_types():
 def load_users(organization_id):
     db = firestore.client(app)
     users = db.collection('users').where(filter=FieldFilter('organization', '==', organization_id)).get()
-    return list(map(lambda user: {
+    return ({
         "id": user.id,
         "first_name": user.get('first_name'),
         "last_name": user.get('last_name')
-    }, users))
+    } for user in users)
 
 
 @https_fn.on_call(min_instances=1)
 def get_type_definitions(req: https_fn.CallableRequest):
-    global stat_types, link_sources, tag_types
+    global stat_types, link_sources
+
     if link_sources is None:
         link_sources = load_link_sources()
     if stat_types is None:
@@ -484,42 +497,44 @@ def get_type_definitions(req: https_fn.CallableRequest):
     return {
         "statistic_types": stat_types,
         "link_sources": link_sources,
-        "tag_types": tag_types
+        "tag_types": get_tag_types()
     }
 
 @https_fn.on_call(min_instances=1)
 def get_existing_tags(req: https_fn.CallableRequest):
     db = firestore.client(app)
+    if req.auth is None:
+        return {
+            "tags": [],
+            "users": []
+        }
     uid = req.auth.uid
     user_data = get_user(uid, db)
-    sql_session = sql.get_session()
+    sql_session = get_sql().get_session()
     records = select(ArtistTag).distinct(ArtistTag.tag_type_id, ArtistTag.tag).filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))
     records = sql_session.scalars(records).all()
-    records = list(map(lambda type: type.as_tag_dict(), records))
+    records = (tag_type.as_tag_dict() for tag_type in records)
     sql_session.close()
     return {
-        "tags": records,
-        "users": load_users(user_data.get('organization'))
+        "tags": list(records),
+        "users": list(load_users(user_data.get('organization')))
     }
 
-artists = None
 
 @https_fn.on_call(min_instances=1,cors=options.CorsOptions(
         cors_origins="*",
             cors_methods=["get", "post", "options"]), memory=MemoryOption.MB_512)
 def get_artists(req: https_fn.CallableRequest):
-    global artists
-    if artists is None:
-        artists = ArtistController(PROJECT_ID, LOCATION, sql)
-
-    return artists.get_artists(req.auth.uid, req.data, app)
+    artists_controller = ArtistController(PROJECT_ID, LOCATION, get_sql())
+    return artists_controller.get_artists(req.auth.uid, req.data, app)
 
 @https_fn.on_call()
 def sms_setup(req: https_fn.CallableRequest):
     db = firestore.client(app)
     uid = req.auth.uid
+    spotify = get_spotify_client()
 
-    twilio = TwilioController(sql, spotify)
+    twilio = TwilioController(get_sql(), spotify)
     code = req.data.get('code', None)
     if code is not None:
         success, status = twilio.verify_code(uid, db, req.data.get('number'), code)
@@ -530,12 +545,20 @@ def sms_setup(req: https_fn.CallableRequest):
     else:
         return twilio.send_code(uid, db, req.data.get('number'))
 
+def get_spotify_client():
+    global spotify_client
+    if spotify_client is None:
+        spotify_client = SpotifyClient()
+
+    return spotify_client
+
 def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
+    spotify = get_spotify_client()
     try:
         db = firestore.client(app)
         songstats = SongstatsClient(SONGSTATS_API_KEY)
 
-        tracking_controller = TrackingController(spotify, songstats, sql, db)
+        tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
 
         spotify_id = spotify.url_to_id(spotify_url)
         if spotify_id == 'invalid':
@@ -547,7 +570,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
                 user_data = get_user(uid, db)
                 try:
                     aids, playlist_name, playlist_picture = spotify.get_playlist_artists(spotify_id)
-                    sql_session = sql.get_session()
+                    sql_session = get_sql().get_session()
                     sql_playlist = sql_session.scalars(
                         select(Playlist).where(Playlist.spotify_id == spotify_id).where(Playlist.organization_id == user_data.get('organization'))).first()
                     if preview:
@@ -591,7 +614,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
             user_data = get_user(uid, db)
             if preview:
                 try:
-                    sql_session = sql.get_session()
+                    sql_session = get_sql().get_session()
                     artist = spotify.get_artist(spotify_id, True)
                     image = None
                     if len(artist.get('images', list())) > 0:
@@ -619,6 +642,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
                         "existing_created_at": org.created_at if org else None,
                     }
                 except Exception as e:
+                    print('Exception from link proc', e)
                     return {
                         "found": False,
                         "url": spotify_url.split('?')[0],
@@ -630,6 +654,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
             msg, status = tracking_controller.add_ingest_update_artist(spotify_id, uid, user_data['organization'], tags)
             return {'message': msg, 'status': status, 'added_count': 1}
     except ErrorResponse as e:
+        print("error response from link proc", e)
         if preview:
             return {
                 "found": False
