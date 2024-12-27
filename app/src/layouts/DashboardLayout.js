@@ -282,10 +282,16 @@ const bakeNavItems = (config, reports) => {
   return navItems
 }
 export default function DashboardLayout() {
+
   const [isDesktop] = useMediaQuery('(min-width: 900px)')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const {refreshFilters} = useContext(ColumnDataContext)
 
   const user = useUser()
+  useEffect(() => {
+
+    refreshFilters(user)
+  }, []);
   const [reports, reportsLoading, reportError] = useCollection(
     query(collection(db, 'reports'), 
       where("organization", "==", user.org.id),

@@ -7,6 +7,7 @@ import {ChakraProvider} from '@chakra-ui/react';
 import {theme} from './theme'
 import {httpsCallable} from "firebase/functions";
 import {functions} from "./firebase";
+import {useUser} from "./routing/AuthGuard";
 
 export const ColumnDataContext = React.createContext(null);
 export const CurrentReportContext = React.createContext(null);
@@ -25,7 +26,10 @@ function App() {
     const [currentQueryModel, setCurrentQueryModel] = useState(getInitialState('currentQueryModel'))
 
     const [users, setUsers] = useState(null)
-    const loadOrgFilters = async () => {
+    const loadOrgFilters = async (user) => {
+        if (!user) {
+            return;
+        }
         if (statisticTypes == null || statisticTypes?.length === 0 || linkSources == null || linkSources?.length === 0 || tagTypes === null) {
             const getTypes = httpsCallable(functions, 'get_type_definitions')
             getTypes().then((response) => {
@@ -49,10 +53,6 @@ function App() {
             });
         }
     }
-    useEffect(() => {
-
-        loadOrgFilters()
-    }, []);
     useEffect(() => {
         if (currentQueryModel) {
             localStorage.setItem('currentQueryModel', JSON.stringify(currentQueryModel))
