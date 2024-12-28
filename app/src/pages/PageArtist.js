@@ -3,24 +3,29 @@ import ArtistDetailNew from "../components/ArtistDetailNew";
 import {PageLayoutContained} from "../layouts/DashboardLayout";
 import LoadingScreen from "../routing/LoadingScreen";
 import {useNavigate, useParams} from "react-router-dom";
-import {ColumnDataContext, CurrentReportContext} from "../App";
+import {ColumnDataContext, CurrentReportContext, goFetch} from "../App";
 import {httpsCallable} from "firebase/functions";
 import {functions} from "../firebase";
 import {useToast} from "@chakra-ui/react";
+import {useUser} from "../routing/AuthGuard";
 
 function PageArtist() {
     const { artistId } = useParams()
+    const user = useUser()
+
     const {  setActiveArtist, activeArtist, linkSources, statisticTypes } = useContext(ColumnDataContext);
     const {currentQueryModel} = useContext(CurrentReportContext);
     const toast = useToast();
     const navigate = useNavigate()
     const loadArtist = async (force = false) => {
-        const getArtist = httpsCallable(functions, 'get_artists')
+        const getArtist = (data) => {
+            return goFetch(user, 'GET', 'artists', data)
+        }
         if (force || !activeArtist?.hasOwnProperty('attributions') || activeArtist === null || activeArtist.id !== artistId) {
             getArtist({"id": artistId}).then((response) => {
                 // console.log(response);
-                if (!response.data.error) {
-                    setActiveArtist(response.data.artist)
+                if (!response.error) {
+                    setActiveArtist(response.artist)
                 } else {
                     toast({
                         title: 'Failed to load artist',

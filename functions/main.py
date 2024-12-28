@@ -1,8 +1,11 @@
+import json
 import math
 
-from firebase_admin import initialize_app, firestore, functions
+from firebase_admin import initialize_app, firestore, functions, auth
+from firebase_admin.auth import UserRecord
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
 from firebase_functions.options import RetryConfig, MemoryOption
+from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter
 from sqlalchemy import select, or_
 from sqlalchemy.orm import joinedload
@@ -437,7 +440,6 @@ def add_artist(req: https_fn.CallableRequest):
     uid = req.auth.uid
     songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
-
     tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
     preview = req.data.get('preview', False)
     identifier = req.data.get('id', False)
@@ -463,7 +465,7 @@ def sort_ordered(l):
 def load_link_sources():
     sql_session = get_sql().get_session()
     sources = sql_session.scalars(select(LinkSource)).all()
-    list_sorted_sources = list(map(lambda type: type.as_dict(), sources))
+    list_sorted_sources = list((source.as_dict() for source in sources))
     sql_session.close()
     list_sorted_sources.sort(key=sort_ordered)
     return list_sorted_sources
@@ -471,7 +473,7 @@ def load_link_sources():
 def load_stat_types():
     sql_session = get_sql().get_session()
     types = sql_session.scalars(select(StatisticType)).all()
-    list_sorted = list(map(lambda type: type.as_dict(), types))
+    list_sorted = list((stat_type.as_dict() for stat_type in types))
     sql_session.close()
     list_sorted.sort(key=sort_ordered)
     return list_sorted
@@ -485,14 +487,70 @@ def load_users(organization_id):
         "last_name": user.get('last_name')
     } for user in users)
 
+def user_from_request(request: https_fn.Request) -> None|UserRecord:
+    auth_header = request.headers.get('Authorization', "")
+    auth_token = auth_header.split("Bearer ")
+    id_token = auth_token[1] if len(auth_token) > 1 else None
+    try:
+        decoded_token = auth.verify_id_token(id_token)
+        user_id = decoded_token['uid']
+        # Access user data
+        return auth.get_user(user_id)
+    except ValueError as e:
+        return None
 
-@https_fn.on_call(min_instances=1)
-def get_type_definitions(req: https_fn.CallableRequest):
+@https_fn.on_request(min_instances=2, memory=MemoryOption.MB_512, cors=options.CorsOptions(
+        cors_origins="*",
+            cors_methods=["get", "post", "options"]))
+def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
+    user = user_from_request(request)
+    v3_api = flask.Flask(__name__)
+
+    if user is None:
+        return 'Unauthorized', 401
+
+    @v3_api.get('/get-type-defs')
+    def get_type_definitions_request():
+        response = jsonify(get_type_definitions())
+        response.headers.add('Cache-Control', 'public, max-age=600')
+        return response
+
+    @v3_api.get('/get-existing-tags')
+    def get_existing_tags_request():
+        response = jsonify(get_existing_tags(user))
+        response.headers.add('Cache-Control', 'public, max-age=60')
+        response.headers.add('X-Organization', request.headers.get('X-Organization'))
+        response.headers.add('Vary', 'X-Organization')
+        return response
+
+    @v3_api.get('/artists')
+    def get_artists_request():
+        artists_controller = ArtistController(PROJECT_ID, LOCATION, get_sql())
+        args = request.args.to_dict()
+        filterModel = json.loads(args.get('filterModel', ''))
+        sortModel = json.loads(args.get('sortModel', ''))
+        args['sortModel'] = sortModel
+        args['filterModel'] = filterModel
+        artists = artists_controller.get_artists(user.uid, args, app)
+        response = jsonify(artists )
+        if artists.get('error', None) is not None:
+            response.status_code = 500
+        else:
+            response.headers.add('Cache-Control', 'public, max-age=30')
+        response.headers.add('X-Organization', request.headers.get('X-Organization'))
+        response.headers.add('Vary', 'X-Organization')
+        return response
+    with v3_api.request_context(request.environ):
+        return v3_api.full_dispatch_request()
+
+def get_type_definitions():
     global stat_types, link_sources
-
+    print("get type defs")
     if link_sources is None:
+        print("load link defs")
         link_sources = load_link_sources()
     if stat_types is None:
+        print("load stat type")
         stat_types = load_stat_types()
     return {
         "statistic_types": stat_types,
@@ -500,15 +558,14 @@ def get_type_definitions(req: https_fn.CallableRequest):
         "tag_types": get_tag_types()
     }
 
-@https_fn.on_call(min_instances=1)
-def get_existing_tags(req: https_fn.CallableRequest):
+def get_existing_tags(user):
     db = firestore.client(app)
-    if req.auth is None:
+    if user is None:
         return {
             "tags": [],
             "users": []
         }
-    uid = req.auth.uid
+    uid = user.uid
     user_data = get_user(uid, db)
     sql_session = get_sql().get_session()
     records = select(ArtistTag).distinct(ArtistTag.tag_type_id, ArtistTag.tag).filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))
@@ -520,13 +577,6 @@ def get_existing_tags(req: https_fn.CallableRequest):
         "users": list(load_users(user_data.get('organization')))
     }
 
-
-@https_fn.on_call(min_instances=1,cors=options.CorsOptions(
-        cors_origins="*",
-            cors_methods=["get", "post", "options"]), memory=MemoryOption.MB_512)
-def get_artists(req: https_fn.CallableRequest):
-    artists_controller = ArtistController(PROJECT_ID, LOCATION, get_sql())
-    return artists_controller.get_artists(req.auth.uid, req.data, app)
 
 @https_fn.on_call()
 def sms_setup(req: https_fn.CallableRequest):

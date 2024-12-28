@@ -106,8 +106,15 @@ class TwilioController():
                           .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
           artist_existing = sql_session.scalars(artist_query).unique().first()
           if artist_existing is None:
-            data = link_proc(user.id, message, None, False)
-            artist_existing = sql_session.scalars(artist_query).unique().first()
+            try:
+              data = link_proc(user.id, message, None, False)
+              artist_existing = sql_session.scalars(artist_query).unique().first()
+            except ErrorResponse as e:
+              artist_existing = sql_session.scalars(artist_query).unique().first()
+              if artist_existing is None:
+                data = None
+                raise e
+
             print("new found data", data)
             if artist_existing is not None:
               data = {
@@ -140,7 +147,10 @@ class TwilioController():
               sent = self.send_template(user_data, "HXf2f85e6870b94efefd58e668c95008ce", dict({"1": data.get("name"), "2": "https://indiestack.app/app/artists/" + str(data.get("new"))}))
           else:
             if data.get('existing') is not None:
-              sent = self.send_message(user_data, "Successfully found playlist: " + data.get("name") + ". This playlist was already imported on " + data.get('existing_created_at').strftime('%Y-%m-%d') + ".")
+              user.update({
+                "pending_import": data
+              })
+              sent = self.send_message(user_data, "Successfully found playlist: " + data.get("name") + ". This playlist was already imported on " + data.get('existing_created_at').strftime('%Y-%m-%d') + ". Reimport anyways? (Y/N)")
             else:
               user.update({
                 "pending_import": data

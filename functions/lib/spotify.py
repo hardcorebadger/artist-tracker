@@ -4,7 +4,8 @@ from requests.exceptions import JSONDecodeError
 
 from spotify_keys import *
 
-# spotify_artists = dict()
+last_artist = None
+last_playlist = None
 # spotify_playlists = dict()
 
 class SpotifyClient():
@@ -84,14 +85,13 @@ class SpotifyClient():
     return res.json()
   
   def get_artist(self, id, alt_token=False):
-    # global spotify_artists
-    # if id in spotify_artists:
-    #   return spotify_artists[id]
+
+    global last_artist
+    if last_artist is not None and last_artist['id'] == id:
+      return last_artist
     try:
       artist = self.get(path=f"/artists/{id}", alt_token=alt_token)
-      # spotify_artists[id] = artist
-      # if len(spotify_artists) > 10:
-      #   spotify_artists = dict({id: artist})
+      last_artist = artist
       return artist
     except ErrorResponse:
       raise ErrorResponse
@@ -110,12 +110,12 @@ class SpotifyClient():
     return self.get(f"/albums", data={'ids':idp})
   
   def get_playlist(self, id, alt_token=False):
-    # global spotify_playlists
-    # if id in spotify_playlists:
-    #   return spotify_playlists[id]
+    global last_playlist
+    if last_playlist is not None and last_playlist['id'] == id:
+      return last_playlist
     try:
       playlist = self.get(f"/playlists/{id}", alt_token=alt_token)
-      # spotify_playlists[id] = playlist
+      last_playlist = playlist
       return playlist
     except ErrorResponse:
       raise ErrorResponse

@@ -21,6 +21,7 @@ import {
 import TagInput from "./TagInput";
 import {httpsCallable} from "firebase/functions";
 import {functions} from "../firebase";
+import {useUser} from "../routing/AuthGuard";
 
 export default
 function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
@@ -35,6 +36,7 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
     }, [])
 
     const setTags = async () => {
+        const user = useUser()
         console.log("attempting callable")
         setLoading(true);
         try {
@@ -45,7 +47,7 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
             setLoading(false)
             if (resp.data.status === 200) {
                 onTagSave()
-                refreshFilters()
+                refreshFilters(user)
                 onClose()
                 toast({
                     title: 'Tags saved!',

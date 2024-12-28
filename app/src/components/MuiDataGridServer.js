@@ -13,8 +13,9 @@ import Iconify from "./Iconify";
 import { deepCompare, deepCopy } from "../util/objectUtil";
 import { httpsCallable } from "firebase/functions";
 import { functions } from '../firebase';
-import {ColumnDataContext, CurrentReportContext} from "../App";
+import {ColumnDataContext, CurrentReportContext, goFetch} from "../App";
 import { buildColumnOptions, buildColumns } from "./ColumnConfig";
+import {useUser} from "../routing/AuthGuard";
 
 // const ChakraDataGrid = chakra(DataGrid);
 
@@ -67,9 +68,12 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     // contexts
     const { statisticTypes, linkSources, tagTypes, users, existingTags } = useContext(ColumnDataContext);
     const { currentRows, setCurrentRows, currentQueryModel, setCurrentQueryModel } = useContext(CurrentReportContext);
-
+    const user = useUser()
     // data
-    const getArtists = httpsCallable(functions, 'get_artists')
+    const getArtists = (data) => {
+        console.log(data)
+        return goFetch(user, 'GET', 'artists', data)
+    }
     const [dataIsLoading, setDataIsLoading] = useState(false)
 
     // report state
@@ -108,21 +112,21 @@ export default function MuiDataGridController({initialReportName, initialColumnO
 
             setDataIsLoading(false)
 
-            if (resp.data.page !== paginationModel.page || resp.data.pageSize !== paginationModel.pageSize) {
+            if (resp.page !== paginationModel.page || resp.pageSize !== paginationModel.pageSize) {
                 return
             }
             
-            if (!arraysEqual(resp.data.filterModel?.items ?? [], filterModel?.items ?? [])) {
+            if (!arraysEqual(resp.filterModel?.items ?? [], filterModel?.items ?? [])) {
                 
                 return
             }
-            if (JSON.stringify(resp.data.sortModel) !== JSON.stringify(sortModel) && !objectsEqual(resp.data.sortModel, sortModel)) {
+            if (JSON.stringify(resp.sortModel) !== JSON.stringify(sortModel) && !objectsEqual(resp.sortModel, sortModel)) {
                 return
             }
             setCurrentRows({
                 time: startTime,
-                rows: resp.data.rows,
-                rowCount: resp.data.rowCount
+                rows: resp.rows,
+                rowCount: resp.rowCount
             });
         };
         let refreshNeeded = false;

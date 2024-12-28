@@ -6,8 +6,9 @@ import {
 import {ChakraProvider} from '@chakra-ui/react';
 import {theme} from './theme'
 import {httpsCallable} from "firebase/functions";
-import {functions} from "./firebase";
+import {functions, useAuth} from "./firebase";
 import {useUser} from "./routing/AuthGuard";
+import * as admin from "./firebase";
 
 export const ColumnDataContext = React.createContext(null);
 export const CurrentReportContext = React.createContext(null);
@@ -25,31 +26,30 @@ function App() {
     const [currentRows, setCurrentRows] = useState(null)
     const [currentQueryModel, setCurrentQueryModel] = useState(getInitialState('currentQueryModel'))
 
+
     const [users, setUsers] = useState(null)
     const loadOrgFilters = async (user) => {
         if (!user) {
             return;
         }
+        console.log(user)
         if (statisticTypes == null || statisticTypes?.length === 0 || linkSources == null || linkSources?.length === 0 || tagTypes === null) {
-            const getTypes = httpsCallable(functions, 'get_type_definitions')
-            getTypes().then((response) => {
-                setStatisticTypes(response.data.statistic_types)
-                setLinkSources(response.data.link_sources)
-                setTagTypes(response.data.tag_types)
+            goFetch(user, 'GET', 'get-type-defs').then((response) => {
+                console.log(response)
+                setStatisticTypes(response?.statistic_types)
+                setLinkSources(response?.link_sources)
+                setTagTypes(response?.tag_types)
             });
         }
-        const getTags = httpsCallable(functions, 'get_existing_tags')
         if (existingTags === null) {
-            getTags().then((response) => {
-                setExistingTags(response.data.tags)
+            goFetch(user, 'GET','get-existing-tags').then((response) => {
+                setExistingTags(response.tags)
                 const newUsers = {}
-                for (const index in response.data.users) {
-                    const user = response.data.users[index]
+                for (const index in response.users) {
+                    const user = response.users[index]
                     newUsers[user.id] = user
                 }
-
                 setUsers(newUsers)
-
             });
         }
     }
@@ -107,3 +107,30 @@ function App() {
 }
 
 export default App;
+
+export async function goFetch (user, method, path, body) {
+    const token = await user?.auth?.getIdToken()
+
+    var requestOptions = {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+            'X-Organization': user?.profile?.organization ?? 'NA'
+        },
+        body: method === 'GET' ? null : JSON.stringify(body),
+    }
+    if (body) {
+        console.log(body)
+        for (let key in body) {
+            console.log(key, typeof(body[key]))
+            if (typeof (body[key]) === 'object') {
+                body[key] = JSON.stringify(body[key])
+            }
+        }
+    }
+
+    return fetch('http://127.0.0.1:5001/artist-tracker-e5cce/us-central1/fn_v3_api/' + path + ((method === 'GET' && body) ? '?' + new URLSearchParams(body).toString() : ''), requestOptions)
+        .then(res => res.json())
+
+}

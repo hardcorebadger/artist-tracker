@@ -64,13 +64,14 @@ function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
   const addArtistURL = async () => {
     console.log("attempting callable")
     setLoading(true);
+    const user = useUser()
     const addArtist = httpsCallable(functions, 'add_artist')
     const resp = await addArtist({spotify_url:addPreview?.url, tags:selectedTags});
     console.log(resp.data)
     setLoading(false)
     if (resp.data.status === 200) {
       setAddPreview(null)
-      refreshFilters()
+      refreshFilters(user)
       onClose()
       toast({
         title: resp.data.added_count + ' artist(s) added!',
