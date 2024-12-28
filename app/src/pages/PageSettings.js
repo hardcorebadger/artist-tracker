@@ -99,8 +99,7 @@ function ChangePhoneSection({disabled}) {
   const [verifyId, setVerifyId] = useState(((user.profile?.sms?.verified === false && user.profile?.sms.code_sent_at > tenMinutesAgo.getTime()) ? (user?.profile?.sms?.verify_id ?? null) : ""))
 
   const [curPhone, setCurPhone] = useState( user.profile?.sms?.number ?? "")
-  const canSave = true
-      // curPhone !== "" && (curPhone !== user.profile?.sms?.number && "+"+curPhone !== user.profile?.sms?.number)
+  const canSave =  curPhone !== "" && (curPhone !== user.profile?.sms?.number && "+"+curPhone !== user.profile?.sms?.number)
 
   const reset = () => {
     setCurPhone("")
@@ -178,8 +177,11 @@ function ChangePhoneSection({disabled}) {
       <AnnotadedSection
           title="Update phone"
           description={
-            disabled ? "Your login method does not support changing email" :
-                "Enter your phone number to receive a verification code. Text HELP for how to use the mobile features."
+            disabled ? "Your login method does not support changing phone" :
+                <>Enter your phone number to receive a verification code. Text HELP for how to use the mobile features.<br/>{(user?.profile?.sms?.number && user?.profile?.sms?.verified) ?
+                    <a
+                        href="sms:+18333712184">Text: <span
+                        style={{textDecoration: 'underline'}}>+1 (833) 371-2184</span></a> : null}</>
           }
       >
         <VStack spacing={2} align="left">

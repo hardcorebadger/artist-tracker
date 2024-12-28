@@ -21,7 +21,7 @@ import {
   ModalCloseButton,
   ModalBody,
   ModalFooter,
-  WrapItem, Wrap, Avatar, Flex, FormHelperText, FormLabel, FormControl
+  WrapItem, Wrap, Avatar, Flex, FormHelperText, FormLabel, FormControl, Link
 } from '@chakra-ui/react';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import { Link as RouterLink } from 'react-router-dom';
@@ -190,6 +190,14 @@ function PageDefault() {
             {/* <StatCard title="Total Unsigned" value={3813}></StatCard>
             <StatCard title="Total Tracked" value={3813}></StatCard> */}
             <AddLinkCard setAddPreview={setAddPreview} onOpen={onOpen}/>
+              <Card p={25}>
+                <Stack w="100%" spacing={3}>
+                  <Heading size="xs">Text Us</Heading>
+                  <Text>Send in artist or playlist links to import or get information on your phone.{(user?.profile?.sms?.verified ? ' Send HELP for instructions.' : '')}</Text>
+
+                  <Link href={user?.profile?.sms?.verified ? 'sms:+18333712184' : '/app/settings/account'} isExternal={user?.profile?.sms?.verified ?? false}><Button colorScheme='primary'>{user?.profile?.sms?.verified ? 'Text +1 833 371-2184' : 'Add + Verify # In Settings'}</Button></Link>
+                </Stack>
+              </Card>
             </Stack>
           </GridItem>
             <AddTagsModal
