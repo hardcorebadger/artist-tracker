@@ -6,7 +6,7 @@ import {
 import {ChakraProvider} from '@chakra-ui/react';
 import {theme} from './theme'
 import {httpsCallable} from "firebase/functions";
-import {functions, useAuth} from "./firebase";
+import {functions, useAuth, v3_url} from "./firebase";
 import {useUser} from "./routing/AuthGuard";
 import * as admin from "./firebase";
 
@@ -121,16 +121,14 @@ export async function goFetch (user, method, path, body) {
         body: method === 'GET' ? null : JSON.stringify(body),
     }
     if (body) {
-        console.log(body)
         for (let key in body) {
-            console.log(key, typeof(body[key]))
             if (typeof (body[key]) === 'object') {
                 body[key] = JSON.stringify(body[key])
             }
         }
     }
 
-    return fetch('http://127.0.0.1:5001/artist-tracker-e5cce/us-central1/fn_v3_api/' + path + ((method === 'GET' && body) ? '?' + new URLSearchParams(body).toString() : ''), requestOptions)
+    return fetch(v3_url + path + ((method === 'GET' && body) ? '?' + new URLSearchParams(body).toString() : ''), requestOptions)
         .then(res => res.json())
 
 }

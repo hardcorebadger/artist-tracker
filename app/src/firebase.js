@@ -18,6 +18,7 @@ const app = initializeApp(firebaseConfig);
 export const analytics = getAnalytics(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
+export const v3_url = is_dev ? 'http://127.0.0.1:5001/artist-tracker-e5cce/us-central1/fn_v3_api/' : 'https://fn-v3-api-wfsh2ttvrq-uc.a.run.app/'
 
 if (is_dev) {
   console.log("Localhost detected. Using emulators.")

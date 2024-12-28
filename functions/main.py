@@ -540,6 +540,26 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         response.headers.add('X-Organization', request.headers.get('X-Organization'))
         response.headers.add('Vary', 'X-Organization')
         return response
+
+    @v3_api.post('/sms')
+    def sms_setup():
+        db = firestore.client(app)
+        uid = user.uid
+        spotify = get_spotify_client()
+        data = flask.request.get_json()
+        twilio = TwilioController(get_sql(), spotify)
+        code = data.get('code', None)
+        if code is not None:
+            success, status = twilio.verify_code(uid, db, data.get('number'), code)
+            return {
+                "success": success,
+                "reason": status
+            }
+        else:
+            return {
+                "id": twilio.send_code(uid, db, data.get('number'))
+            }
+
     with v3_api.request_context(request.environ):
         return v3_api.full_dispatch_request()
 
@@ -576,24 +596,6 @@ def get_existing_tags(user):
         "tags": list(records),
         "users": list(load_users(user_data.get('organization')))
     }
-
-
-@https_fn.on_call()
-def sms_setup(req: https_fn.CallableRequest):
-    db = firestore.client(app)
-    uid = req.auth.uid
-    spotify = get_spotify_client()
-
-    twilio = TwilioController(get_sql(), spotify)
-    code = req.data.get('code', None)
-    if code is not None:
-        success, status = twilio.verify_code(uid, db, req.data.get('number'), code)
-        return {
-            "success": success,
-            "reason": status
-        }
-    else:
-        return twilio.send_code(uid, db, req.data.get('number'))
 
 def get_spotify_client():
     global spotify_client

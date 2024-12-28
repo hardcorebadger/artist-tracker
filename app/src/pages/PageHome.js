@@ -41,7 +41,7 @@ import {
   AutoCompleteList,
   AutoCompleteTag
 } from "@choc-ui/chakra-autocomplete";
-import {ColumnDataContext} from "../App";
+import {ColumnDataContext, goFetch} from "../App";
 import TagInput from "../components/TagInput";
 
 function StatCard({title, value}) {
@@ -160,7 +160,9 @@ function PageDefault() {
   const user = useUser()
   const [artistCount, setArtistCount] = useState(null)
   const [addPreview, setAddPreview] = useState(null);
-  const getArtists = httpsCallable(functions, 'get_artists')
+  const getArtists = (data) => {
+    return goFetch(user, 'GET', 'artists', data)
+  }
   const { isOpen, onOpen, onClose } = useDisclosure()
 
   useEffect( () => {

@@ -27,6 +27,7 @@ import {signInWithPhoneNumber, updatePhoneNumber} from "@firebase/auth";
 import { getAuth, RecaptchaVerifier, PhoneAuthProvider } from "firebase/auth";
 import {PhoneNumberInput} from "../components/PhoneNumberInput";
 import {httpsCallable} from "firebase/functions";
+import {goFetch} from "../App";
 function ChangeNameSection({disabled}) {
   const user = useUser()
 
@@ -98,7 +99,8 @@ function ChangePhoneSection({disabled}) {
   const [verifyId, setVerifyId] = useState(((user.profile?.sms?.verified === false && user.profile?.sms.code_sent_at > tenMinutesAgo.getTime()) ? (user?.profile?.sms?.verify_id ?? null) : ""))
 
   const [curPhone, setCurPhone] = useState( user.profile?.sms?.number ?? "")
-  const canSave = curPhone !== "" && (curPhone !== user.profile?.sms?.number && "+"+curPhone !== user.profile?.sms?.number)
+  const canSave = true
+      // curPhone !== "" && (curPhone !== user.profile?.sms?.number && "+"+curPhone !== user.profile?.sms?.number)
 
   const reset = () => {
     setCurPhone("")
@@ -113,13 +115,14 @@ function ChangePhoneSection({disabled}) {
 
   const verifyPhone = async () => {
     setLoading(true)
-    if(user.profile && (user.profile?.sms?.number !== curPhone) && (user.profile?.sms?.number !== '+'+curPhone)) {
+    if(user.profile && (user.profile?.sms?.number + '1' !== curPhone) && (user.profile?.sms?.number + 1 !== '+'+curPhone)) {
       try {
-        const sendCode = httpsCallable(functions, 'sms_setup')
+        const sendCode = (data) => {
+          return goFetch(user, 'POST', 'sms', data)
+        }
         const resp = await sendCode({number: '+'+curPhone})
-        console.log(resp);
-        if (resp?.data) {
-          setVerifyId(resp.data)
+        if (resp?.id) {
+          setVerifyId(resp.id)
         }
         setLoading(false)
       } catch(e) {
@@ -139,8 +142,9 @@ function ChangePhoneSection({disabled}) {
   const savePhone = async () => {
     setLoading(true)
     try {
-      const verifyCode = httpsCallable(functions, 'sms_setup')
-
+      const verifyCode = (data) => {
+        return goFetch(user, 'POST', 'sms', data)
+      }
       const resp = await verifyCode({number: '+'+curPhone, code: verify})
       console.log(resp)
 
