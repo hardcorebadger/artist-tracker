@@ -527,10 +527,12 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     def get_artists_request():
         artists_controller = ArtistController(PROJECT_ID, LOCATION, get_sql())
         args = request.args.to_dict()
-        filterModel = json.loads(args.get('filterModel', ''))
-        sortModel = json.loads(args.get('sortModel', ''))
-        args['sortModel'] = sortModel
-        args['filterModel'] = filterModel
+        filterModel = json.loads(args.get('filterModel', None)) if args.get('filterModel', None) else None
+        if filterModel is not None:
+            args['filterModel'] = filterModel
+        sortModel = json.loads(args.get('sortModel', None)) if args.get('sortModel', None) else None
+        if sortModel is not None:
+            args['sortModel'] = sortModel
         artists = artists_controller.get_artists(user.uid, args, app)
         response = jsonify(artists )
         if artists.get('error', None) is not None:

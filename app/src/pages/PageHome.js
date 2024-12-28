@@ -169,7 +169,7 @@ function PageDefault() {
     const loadArtists = async () => {
       const resp = await getArtists({page: 0});
       console.log(resp)
-      setArtistCount(resp?.data?.rowCount ?? null)
+      setArtistCount(resp?.rowCount ?? null)
     }
     loadArtists()
   }, []);
