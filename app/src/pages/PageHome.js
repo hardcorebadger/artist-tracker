@@ -60,11 +60,11 @@ function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
   const [loading, setLoading] = useState(false)
   const toast = useToast();
   const {refreshFilters} = useContext(ColumnDataContext)
+  const user = useUser()
 
   const addArtistURL = async () => {
-    console.log("attempting callable")
+    console.log("attempting callable add")
     setLoading(true);
-    const user = useUser()
     const addArtist = httpsCallable(functions, 'add_artist')
     const resp = await addArtist({spotify_url:addPreview?.url, tags:selectedTags});
     console.log(resp.data)
