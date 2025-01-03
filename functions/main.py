@@ -60,6 +60,22 @@ def get_sql() -> CloudSQLClient:
         sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD, SQL_DB)
     return sql
 
+@tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, max_backoff_seconds=60), memory=MemoryOption.MB_512)
+def addartisttask(req: tasks_fn.CallableRequest) -> str:
+    db = firestore.client(app)
+    songstats = SongstatsClient(SONGSTATS_API_KEY)
+    spotify = get_spotify_client()
+    tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
+    uid = req.data.get('uid')
+    spotify_id = req.data.get('spotify_id')
+    playlist_id = req.data.get('playlist_id', None)
+    tags = req.data.get('tags', None)
+    user_data = get_user(uid, db)
+
+    message, code = tracking_controller.add_artist(spotify_id, uid, user_data['organization'], playlist_id, tags)
+    return message
+
+
 @tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, min_backoff_seconds=60), memory=MemoryOption.MB_512)
 def reimportsql(req: tasks_fn.CallableRequest) -> str:
 
@@ -445,7 +461,7 @@ def add_artist(req: https_fn.CallableRequest):
     identifier = req.data.get('id', False)
     if identifier:
         tags = req.data.get('tags', None)
-        
+
         user_data = get_user(uid, db)
         if tags is not None:
             tracking_controller.set_tags(user_data['organization'], identifier, tags)
@@ -651,10 +667,15 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
                     sql_session.close()
 
                     for a in aids:
-                        tracking_controller.add_artist(a, uid, user_data['organization'], sql_playlist.id, tags)
+                        task_queue = functions.task_queue("addartisttask")
+                        target_uri = get_function_url("addartisttask")
+                        body = {"data": {"spotify_id": a, "uid": uid, "playlist_id": sql_playlist.id, "tags": tags}}
+                        task_options = functions.TaskOptions(schedule_time=datetime.now(), uri=target_uri)
+                        task_queue.enqueue(body, task_options)
                     return {'message': 'sucess', 'status': 200, 'added_count': len(aids)}
                 except Exception as e:
                     print(e)
+               
                     if preview:
                         return {
                             "found": False,
