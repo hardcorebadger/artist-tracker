@@ -449,18 +449,12 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
 #################################
 # App Function Definitions
 #################################
-
-@https_fn.on_call()
-def add_artist(req: https_fn.CallableRequest):
+def add_artist(uid, spotify_url = None, identifier = False, tags = None, preview = False):
     db = firestore.client(app)
-    uid = req.auth.uid
     songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
     tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
-    preview = req.data.get('preview', False)
-    identifier = req.data.get('id', False)
     if identifier:
-        tags = req.data.get('tags', None)
 
         user_data = get_user(uid, db)
         if tags is not None:
@@ -469,10 +463,8 @@ def add_artist(req: https_fn.CallableRequest):
         return {'message': 'success', 'status': 200}
 
     # Message text passed from the client.
-    spotify_url = req.data["spotify_url"]
-    tags = req.data.get('tags')
 
-    return process_spotify_link(req.auth.uid, spotify_url, tags, preview)
+    return process_spotify_link(uid, spotify_url, tags, preview)
 
 
 
@@ -559,6 +551,12 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         response.headers.add('X-Organization', request.headers.get('X-Organization'))
         response.headers.add('Vary', 'X-Organization')
         return response
+
+    @v3_api.post('/add-artist')
+    def add_artist_request():
+        data = flask.request.get_json()
+        return add_artist(user.uid, data.get('spotify_url', None), data.get('id', False), data.get('tags', None), data.get('preview', False))
+
 
     @v3_api.post('/sms')
     def sms_setup():
@@ -675,7 +673,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
                     return {'message': 'sucess', 'status': 200, 'added_count': len(aids)}
                 except Exception as e:
                     print(e)
-               
+
                     if preview:
                         return {
                             "found": False,

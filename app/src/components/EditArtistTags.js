@@ -1,5 +1,5 @@
 import {useContext, useEffect, useState} from "react";
-import {ColumnDataContext} from "../App";
+import {ColumnDataContext, goFetch} from "../App";
 import {
     Avatar,
     Box, Button,
@@ -40,12 +40,14 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
         console.log("attempting callable")
         setLoading(true);
         try {
-            const addArtist = httpsCallable(functions, 'add_artist')
+            const addArtist = (body) => {
+                return goFetch(user, 'POST', 'add-artist', body)
+            }
             console.log(selectedTags)
             const resp = await addArtist({id: artist?.id, tags: selectedTags ?? []});
-            console.log(resp.data)
+            console.log(resp)
             setLoading(false)
-            if (resp.data.status === 200) {
+            if (resp.status === 200) {
                 onTagSave()
                 refreshFilters(user)
                 onClose()
@@ -61,7 +63,7 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
                 onClose()
                 toast({
                     title: 'Failed to save artist tags.',
-                    description: resp.data.status == 400 ? resp.data.message : "Something went wrong while saving, try refreshing and add again.",
+                    description: resp.status == 400 ? resp.data.message : "Something went wrong while saving, try refreshing and add again.",
                     status: 'error',
                     duration: 9000,
                     isClosable: true,
@@ -72,7 +74,7 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
             onClose()
             toast({
                 title: 'Failed to save artist tags.',
-                description: resp.data.status == 400 ? resp.data.message : "Something went wrong while saving, try refreshing and add again.",
+                description: resp.status == 400 ? resp.message : "Something went wrong while saving, try refreshing and add again.",
                 status: 'error',
                 duration: 9000,
                 isClosable: true,

@@ -65,16 +65,18 @@ function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
   const addArtistURL = async () => {
     console.log("attempting callable add")
     setLoading(true);
-    const addArtist = httpsCallable(functions, 'add_artist')
+    const addArtist = (body) => {
+      return goFetch(user, 'POST', 'add-artist', body)
+    }
     const resp = await addArtist({spotify_url:addPreview?.url, tags:selectedTags});
-    console.log(resp.data)
+    console.log(resp)
     setLoading(false)
-    if (resp.data.status === 200) {
+    if (resp.status === 200) {
       setAddPreview(null)
       refreshFilters(user)
       onClose()
       toast({
-        title: resp.data.added_count + ' artist(s) added!',
+        title: resp.added_count + ' artist(s) added!',
         description: "We're running some analysis, the new artist(s) will be available soon.",
         status: 'success',
         duration: 9000,
@@ -85,7 +87,7 @@ function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
       onClose()
       toast({
         title: 'Failed to add artists',
-        description: resp.data.status == 400 ? resp.data.message : "Something went wrong while adding, try refrshing and add again.",
+        description: resp.status == 400 ? resp.message : "Something went wrong while adding, try refrshing and add again.",
         status: 'error',
         duration: 9000,
         isClosable: true,
@@ -122,22 +124,26 @@ function AddLinkCard({setAddPreview, onOpen}) {
   const toast = useToast()
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
+  const user = useUser()
+
   const addArtist = async () => {
     console.log("attempting callable")
-    const addArtist = httpsCallable(functions, 'add_artist')
+    const addArtist = (body) => {
+      return goFetch(user, 'POST', 'add-artist', body)
+    }
     setLoading(true)
     const resp = await addArtist({spotify_url:url, preview: true});
     setLoading(false)
     setUrl('')
-    console.log(resp.data)
+    console.log(resp)
 
-    if (resp.data.found) {
-      setAddPreview(resp.data)
+    if (resp.found) {
+      setAddPreview(resp)
       onOpen()
     } else {
       toast({
         title: 'Failed to find artist or playlist',
-        description: resp.data?.found === false ? "Make sure to get the URL directly from Spotify" : "Something went wrong",
+        description: resp?.found === false ? "Make sure to get the URL directly from Spotify" : "Something went wrong",
         status: 'error',
         duration: 9000,
         isClosable: true,

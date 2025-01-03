@@ -171,13 +171,14 @@ class TrackingController():
       else:
           if len(list(filter(lambda x: x.user_id == user_id, sqlRef.users))) == 0:
               sqlRef.users.append(UserArtist(
-                  user_id,
+                  user_id=user_id,
                   organization_id=org_id,
               ))
           if len(list(filter(lambda x: x.organization_id == org_id, sqlRef.organizations))) == 0:
               sqlRef.organizations.append(OrganizationArtist(
                   organization_id=org_id,
-                  last_playlist_id=sql_playlist_id
+                  last_playlist_id=sql_playlist_id,
+                  added_by=user_id
               ))
           else:
               org = list(filter(lambda x: x.organization_id == org_id, sqlRef.organizations)).pop()
