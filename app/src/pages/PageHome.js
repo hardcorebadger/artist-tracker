@@ -136,14 +136,14 @@ function AddLinkCard({setAddPreview, onOpen}) {
     setLoading(false)
     setUrl('')
     console.log(resp)
-
+    const type = (resp?.type ?? null)
     if (resp.found) {
       setAddPreview(resp)
       onOpen()
     } else {
       toast({
-        title: 'Failed to find artist or playlist',
-        description: resp?.found === false ? "Make sure to get the URL directly from Spotify" : "Something went wrong",
+        title: 'Failed to find ' + (type === 'playlist' ? 'playlist' : (type === 'artist' ? 'artist' : 'artist or playlist')),
+        description: resp?.found === false ? (type === 'playlist' ? "Make sure it is a standard public playlist on your account" : "Make sure to get the URL directly from Spotify") : "Something went wrong",
         status: 'error',
         duration: 9000,
         isClosable: true,

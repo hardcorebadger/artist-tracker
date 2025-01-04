@@ -1,3 +1,5 @@
+import traceback
+
 import requests
 from .errors import ErrorResponse
 from requests.exceptions import JSONDecodeError
@@ -64,7 +66,7 @@ class SpotifyClient():
         # If it worked, retry
         if (alt_token and self.alt_token != before) or (self.access_token != before and ~alt_token):
           return self.get(path, data, alt_token=alt_token)
-      
+
       # Catch rate limits and switch to a 299 so the task doesn't restart
       if res.status_code == 429:
         print("Spotify Rate Limiting")
@@ -113,12 +115,9 @@ class SpotifyClient():
     global last_playlist
     if last_playlist is not None and last_playlist['id'] == id:
       return last_playlist
-    try:
-      playlist = self.get(f"/playlists/{id}", alt_token=alt_token)
-      last_playlist = playlist
-      return playlist
-    except ErrorResponse:
-      raise ErrorResponse
+    playlist = self.get(f"/playlists/{id}", alt_token=alt_token)
+    last_playlist = playlist
+    return playlist
 
   def trim_link_id(self, url):
     return url.split('/')[-1]

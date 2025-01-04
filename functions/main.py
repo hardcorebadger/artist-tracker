@@ -454,6 +454,7 @@ def add_artist(uid, spotify_url = None, identifier = False, tags = None, preview
     songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
     tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
+    print(uid, spotify_url, tags, preview)
     if identifier:
 
         user_data = get_user(uid, db)
@@ -463,9 +464,13 @@ def add_artist(uid, spotify_url = None, identifier = False, tags = None, preview
         return {'message': 'success', 'status': 200}
 
     # Message text passed from the client.
-
-    return process_spotify_link(uid, spotify_url, tags, preview)
-
+    try:
+        return process_spotify_link(uid, spotify_url, tags, preview)
+    except Exception as e:
+        return {
+            "found": False,
+            "error": e
+        }
 
 
 def sort_ordered(l):
@@ -578,7 +583,8 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             }
 
     with v3_api.request_context(request.environ):
-        return v3_api.full_dispatch_request()
+        resp = v3_api.full_dispatch_request()
+        return resp
 
 def get_type_definitions():
     global stat_types, link_sources
@@ -639,6 +645,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
                 user_data = get_user(uid, db)
                 try:
                     aids, playlist_name, playlist_picture = spotify.get_playlist_artists(spotify_id)
+
                     sql_session = get_sql().get_session()
                     sql_playlist = sql_session.scalars(
                         select(Playlist).where(Playlist.spotify_id == spotify_id).where(Playlist.organization_id == user_data.get('organization'))).first()
@@ -670,16 +677,15 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
                         body = {"data": {"spotify_id": a, "uid": uid, "playlist_id": sql_playlist.id, "tags": tags}}
                         task_options = functions.TaskOptions(schedule_time=datetime.now(), uri=target_uri)
                         task_queue.enqueue(body, task_options)
-                    return {'message': 'sucess', 'status': 200, 'added_count': len(aids)}
-                except Exception as e:
-                    print(e)
-
+                    return {'message': 'success', 'status': 200, 'added_count': len(aids)}
+                except ErrorResponse as e:
                     if preview:
                         return {
                             "found": False,
+                            "type": "playlist",
                             "spotify_id": spotify_id,
                             "url": spotify_url.split('?')[0],
-                            "error": e
+                            "error": "failed"
                         }
                     return {
                         'message': 'failed', 'status': 500, 'error': traceback.format_exc()
@@ -727,7 +733,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
 
             msg, status = tracking_controller.add_ingest_update_artist(spotify_id, uid, user_data['organization'], tags)
             return {'message': msg, 'status': status, 'added_count': 1}
-    except ErrorResponse as e:
+    except Exception as e:
         print("error response from link proc", e)
         if preview:
             return {
