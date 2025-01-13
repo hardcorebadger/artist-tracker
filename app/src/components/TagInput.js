@@ -8,6 +8,7 @@ import {
     AutoCompleteList,
     AutoCompleteTag
 } from "@choc-ui/chakra-autocomplete";
+import LoadingScreen, {LoadingWidget} from "../routing/LoadingScreen";
 
 export default
 function TagInput({setSelectedTags, initialTags, disabled}) {
@@ -21,6 +22,13 @@ function TagInput({setSelectedTags, initialTags, disabled}) {
     const options = existingTags?.map((tag) => {
         return tag.tag
     }) ?? []
+
+    if (existingTags === null) {
+        return (
+            <LoadingWidget/>
+        )
+    }
+
     return (
 
         <FormControl id="tags" w="100">

@@ -16,10 +16,14 @@ class SpotifyClient():
     self.client_secret = SPOTIFY_CLIENT_SECRET
     self.alt_client_id = SPOTIFY_ALT_CLIENT_ID
     self.alt_client_secret = SPOTIFY_ALT_CLIENT_SECRET
+    self.user_client_id = SPOTIFY_USER_FACING_CLIENT_ID
+    self.user_client_secret = SPOTIFY_USER_FACING_CLIENT_SECRET
     self.access_token = None
     self.alt_token = None
+    self.user_token = None
     self.authorized = False
     self.authorizedAlt = False
+    self.authorizedUser = False
     self.root_uri = "https://api.spotify.com/v1"
 
   def authorize(self, alt_token=False):
@@ -31,28 +35,33 @@ class SpotifyClient():
       "client_id": self.alt_client_id if alt_token else self.client_id,
       "client_secret": self.alt_client_secret if alt_token else self.client_secret
     }
-    print("Spotify Auth:" + (' alt' if alt_token else ' default'))
+    print("Spotify Auth:" + (alt_token if alt_token else ' default'))
 
     response = requests.post(f"https://accounts.spotify.com/api/token", headers=headers, data=data).json()
     if 'error' in response:
-      if alt_token:
+      if alt_token == 'alt':
         self.alt_token = None
+      elif alt_token == 'user':
+        self.user_token = None
       else:
         self.access_token = None
     else:
-      if alt_token:
+      if alt_token == 'alt':
         self.authorizedAlt = True
         self.alt_token = response['access_token']
+      elif alt_token == 'user':
+        self.authorizedUser = True
+        self.user_token = response['access_token']
       else:
         self.authorized = True
         self.access_token = response['access_token']
 
   def get(self, path, data=None, alt_token=False, attempt=1):
-    if (self.authorizedAlt == False and alt_token) or (self.authorized == False and alt_token == False):
+    if (self.authorizedAlt == False and alt_token == 'alt') or (self.authorized == False and alt_token == False) or (self.authorizedUser == False and alt_token == 'user'):
       self.authorize(alt_token=alt_token)
-    print("Spotify Request: " + path + (' alt' if alt_token else ' default'))
+    print("Spotify Request: " + path + ' ' + (alt_token if alt_token else 'default'))
     res = requests.get(f"{self.root_uri}{path}", headers= {
-      "Authorization": f"Bearer {self.alt_token if alt_token else self.access_token}"
+      "Authorization": f"Bearer {self.alt_token if alt_token == 'alt' else (self.user_token if alt_token == 'user' else self.access_token)}"
     }, params=data)
 
     # error handling
@@ -60,11 +69,11 @@ class SpotifyClient():
 
       # Catch token expiration and get a new one
       if res.status_code == 401:
-        before = self.alt_token if alt_token else self.access_token
+        before = self.alt_token if alt_token == 'alt' else ( self.user_token if alt_token == 'user' else self.access_token)
         print("Spotify Access Token Expired, Refreshing")
         self.authorize(alt_token)
         # If it worked, retry
-        if (alt_token and self.alt_token != before) or (self.access_token != before and ~alt_token):
+        if (alt_token == 'alt' and self.alt_token != before) or (self.access_token != before and alt_token == False) or (self.user_token != before and alt_token == 'user'):
           return self.get(path, data, alt_token=alt_token)
 
       # Catch rate limits and switch to a 299 so the task doesn't restart
@@ -74,7 +83,7 @@ class SpotifyClient():
           print(f"Retry After: {res.headers['retry-after']}")
         if attempt == 1:
           print("trying with opposite token")
-          return self.get(path, data, alt_token=~alt_token, attempt=attempt + 1)
+          return self.get(path, data, alt_token=('alt' if alt_token == False else False), attempt=attempt + 1)
         raise ErrorResponse({"error":res.text}, 299, "Spotify")
       
       # Throw back the errors

@@ -29,6 +29,7 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
     const [loading, setLoading] = useState(false)
     const toast = useToast();
     const {refreshFilters} = useContext(ColumnDataContext)
+    const user = useUser()
 
     useEffect(() => {
         setLoading(false)
@@ -36,7 +37,6 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
     }, [])
 
     const setTags = async () => {
-        const user = useUser()
         console.log("attempting callable")
         setLoading(true);
         try {

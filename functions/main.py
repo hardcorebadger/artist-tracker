@@ -644,7 +644,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
             else:
                 user_data = get_user(uid, db)
                 try:
-                    aids, playlist_name, playlist_picture = spotify.get_playlist_artists(spotify_id)
+                    aids, playlist_name, playlist_picture = spotify.get_playlist_artists(spotify_id, "user")
 
                     sql_session = get_sql().get_session()
                     sql_playlist = sql_session.scalars(
@@ -695,7 +695,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
             if preview:
                 try:
                     sql_session = get_sql().get_session()
-                    artist = spotify.get_artist(spotify_id, True)
+                    artist = spotify.get_artist(spotify_id, 'user')
                     image = None
                     if len(artist.get('images', list())) > 0:
                         image = artist.get('images')[0]['url']
