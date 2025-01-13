@@ -27,6 +27,9 @@ class Artist(Base):
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     evaluation_id: Mapped[int] = mapped_column(Integer, ForeignKey('evaluations.id'), nullable=False)
     onboarded = Column(Boolean, default=False)
+    eval_queued_at = Column(TIMESTAMP)
+    stats_queued_at = Column(TIMESTAMP)
+    onboard_queued_at = Column(TIMESTAMP)
 
     links: Mapped[List["ArtistLink"]] = relationship(
         back_populates = "artist", cascade = "all, delete-orphan"

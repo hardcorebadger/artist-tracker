@@ -48,7 +48,15 @@ class EvalController():
     self.sql = sql
     self.tracking_controller = tracking_controller
 
-  def evaluate_copyrights(self, spotify_id: str):
+  def evaluate_copyrights(self, spotify_id: str, artist_id: str = None):
+    sql_session = self.sql.get_session()
+    sql_ref = None
+    if spotify_id is None:
+        sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(
+        Artist.id == artist_id)).first()
+        if sql_ref is None:
+            raise ErrorResponse('Artist not found', 404, 'Tracking')
+        spotify_id = sql_ref.spotify_id
     # Get the record
     ref = self.db.collection("artists_v2").document(spotify_id)
     doc = ref.get()
@@ -56,12 +64,12 @@ class EvalController():
     if not doc.exists:
         raise ErrorResponse('Artist not found', 404, 'Tracking')
 
-    sql_session = self.sql.get_session()
-    sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()
     if sql_ref is None:
-        print('Artist needs migration; importing to SQL')
-        self.tracking_controller.import_sql(doc)
-    sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()
+        sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()
+        if sql_ref is None:
+            print('Artist needs migration; importing to SQL')
+            self.tracking_controller.import_sql(doc)
+            sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()
     sql_session.close()
 
     # check the artist is ingested
@@ -340,8 +348,9 @@ class EvalController():
   
   def find_needs_eval_refresh(self, limit: int):
     sql_session = self.sql.get_session()
-    sql_ids = (select(Artist.spotify_id).outerjoin(Evaluation, Artist.evaluation)
+    sql_ids = (select(Artist.id).outerjoin(Evaluation, Artist.evaluation)
                .filter(or_(Evaluation.updated_at <= func.now() - timedelta(days=7), Evaluation.id == None))
+               .filter(or_(Artist.eval_queued_at == None, Artist.eval_queued_at <= func.now() - timedelta(hours=12)))
                .filter(Artist.active == True)).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()
     sql_session.close()

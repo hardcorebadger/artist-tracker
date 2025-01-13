@@ -329,8 +329,14 @@ class TrackingController():
   # Stats
   # #####################
   
-  def update_artist(self, spotify_id : str, is_ob=False):
-
+  def update_artist(self, spotify_id : str = None, artist_id: str = None, is_ob=False):
+    sql_session = self.sql.get_session()
+    sql_ref = None
+    if spotify_id is None:
+      sql_ref = artist_with_meta(sql_session, None, artist_id)
+      if sql_ref is None:
+          raise ErrorResponse('Artist not found', 404, 'Tracking')
+      spotify_id = sql_ref.spotify_id
     ref = self.db.collection("artists_v2").document(spotify_id)
     doc = ref.get()
     print("[INGEST] has update doc")
@@ -339,8 +345,8 @@ class TrackingController():
     if not doc.exists:
       raise ErrorResponse('Artist not found', 404, 'Tracking')
 
-    sql_session = self.sql.get_session()
-    sql_ref = artist_with_meta(sql_session, spotify_id)
+    if sql_ref is None:
+        sql_ref = artist_with_meta(sql_session, spotify_id)
     sql_session.close()
     if sql_ref is None:
         print('Artist needs migration; importing to SQL')
@@ -495,9 +501,10 @@ class TrackingController():
   
   def find_needs_stats_refresh(self, limit: int):
     sql_session = self.sql.get_session()
-    sql_ids = (select(Artist.spotify_id)
+    sql_ids = (select(Artist.id)
                .filter(Artist.evaluation.has())
                .filter(Artist.statistics.any(Statistic.updated_at <  func.now() - timedelta(days=1)))
+               .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
                .filter(Artist.active == True)).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()
     sql_session.close()

@@ -6,15 +6,16 @@ from lib import ErrorResponse
 
 
 class TaskController():
-  def __init__(self, project_id, location, v1_api_root, v2_api_root):
+  def __init__(self, project_id, location, v1_api_root, v2_api_root, v3_api_root):
     self.project_id = project_id
     self.location = location
     self.v1_api_root = v1_api_root
     self.v2_api_root = v2_api_root
+    self.v3_api_root = v3_api_root
     
   
   def enqueue_task(self, queue_name, version, path, data={}):
-    api_root = self.v1_api_root if version == 1 else self.v2_api_root
+    api_root = self.v1_api_root if version == 1 else (self.v2_api_root if version == 2 else self.v3_api_root)
     try:
         tasks_client = tasks_v2.CloudTasksClient()
         queue = f"projects/{self.project_id}/locations/{self.location}/queues/{queue_name}"

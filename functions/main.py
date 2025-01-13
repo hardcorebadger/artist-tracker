@@ -259,10 +259,10 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/eval-artist")
     def eval_artist():
         data = flask.request.get_json()
-        if 'spotify_id' not in data:
-            raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
+        if 'spotify_id' not in data and 'id' not in data:
+            raise ErrorResponse("Invalid payload. Must include 'spotify_id' or 'id'", 500)
 
-        return eval_controller.evaluate_copyrights(data['spotify_id'])
+        return eval_controller.evaluate_copyrights(spotify_id=data['spotify_id'] if 'spotify_id' in data else None, artist_id=data['id'] if 'id' in data else None)
 
     @v2_api.post("/eval-artists-lookup")
     def eval_artist_lookup():
@@ -352,69 +352,14 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/update-artist")
     def update_artist():
         data = flask.request.get_json()
-        if 'spotify_id' not in data:
-            raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
+        if 'spotify_id' not in data and 'id' not in data:
+            raise ErrorResponse("Invalid payload. Must include 'spotify_id' or 'id'", 500)
         
-        return tracking_controller.update_artist(data['spotify_id'], datetime.now() - timedelta(days=1))
+        return tracking_controller.update_artist(data['spotify_id'] if 'spotify_id' in data else None, data['id'] if 'id' in data else None, datetime.now() - timedelta(days=1))
 
     with v2_api.request_context(req.environ):
         return v2_api.full_dispatch_request()
 
-##############################
-# V1 API 
-# ###########################
-
-@https_fn.on_request()
-def fn_v1_api(req: https_fn.Request) -> https_fn.Response:
-    youtube = YoutubeClient(YOUTUBE_TOKEN)
-    airtable = AirtableClient(AIRTABLE_TOKEN, AIRTABLE_BASE, AIRTABLE_TABLES)
-    spotify = get_spotify_client()
-
-    v1_controller = AirtableV1Controller(airtable, spotify, youtube)
-    v1_api = flask.Flask(__name__)
-
-    @v1_api.errorhandler(Exception)
-    def invalid_api_usage(e : Exception):
-        print(e)
-        if isinstance(e, ErrorResponse):
-            print(e.to_json())
-            return e.respond()
-        traceback.print_exc()
-        return flask.jsonify({'error': "An unknown error occurred (500, responding 299 to cancel retry)"}), 299
-
-    @v1_api.get("/debug")
-    def get_debug():
-        record = v1_controller.find_new_evals()[0]
-        v1_controller.copyright_eval(record['id'])
-        return 'success', 200
-
-    @v1_api.post("/link-spotify")
-    def post_link_spotify():
-        data = flask.request.get_json()
-
-        if 'record_id' not in data:
-            raise ErrorResponse("Invalid payload. Must include 'record_id'", 500)
-        
-        record_id = data['record_id']
-        v1_controller.artist_link_spotify(record_id)
-        
-        return 'Success', 200
-
-    @v1_api.post("/copyright-eval")
-    def post_copyright_eval():
-        data = flask.request.get_json()
-
-        if 'record_id' not in data:
-            raise ErrorResponse("Invalid payload. Must include 'record_id'", 500)
-        
-        record_id = data['record_id']
-        v1_controller.copyright_eval(record_id)
-        
-        return 'Success', 200
-
-    with v1_api.request_context(req.environ):
-        return v1_api.full_dispatch_request()
-    
 #################################
 # Cron Job Definitions
 #################################
@@ -435,12 +380,12 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
 
     tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
     eval_controller = EvalController(spotify, youtube, db, get_sql(), tracking_controller)
-    task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT)
+    task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT, V3_API_ROOT)
 
     # does 300 evals per hours, doesn't care where they are in OB, TODO prios by oldest first so new artists go first
-    eval_cron(task_controller, eval_controller, 10)
+    eval_cron(task_controller, eval_controller, 10, sql)
     # only looks at artists who are ingested, updates 750 stats per hour
-    stats_cron(task_controller, tracking_controller, 25)
+    stats_cron(task_controller, tracking_controller, 25, sql)
 
     # deals with messiness of waiting for songstats to ingest, pulls info and stats for the artist for first time, 1.5k per hr
     onboarding_cron(task_controller, tracking_controller, 50)
@@ -741,3 +686,47 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
             }
 
         raise e
+
+
+##############################
+# V1 API
+# ###########################
+#
+# @https_fn.on_request()
+# def fn_v1_api(req: https_fn.Request) -> https_fn.Response:
+#     youtube = YoutubeClient(YOUTUBE_TOKEN)
+#     airtable = AirtableClient(AIRTABLE_TOKEN, AIRTABLE_BASE, AIRTABLE_TABLES)
+#     spotify = get_spotify_client()
+#
+#     v1_controller = AirtableV1Controller(airtable, spotify, youtube)
+#     v1_api = flask.Flask(__name__)
+#
+#     @v1_api.errorhandler(Exception)
+#     def invalid_api_usage(e: Exception):
+#         print(e)
+#         if isinstance(e, ErrorResponse):
+#             print(e.to_json())
+#             return e.respond()
+#         traceback.print_exc()
+#         return flask.jsonify({'error': "An unknown error occurred (500, responding 299 to cancel retry)"}), 299
+#
+#     @v1_api.get("/debug")
+#     def get_debug():
+#         record = v1_controller.find_new_evals()[0]
+#         v1_controller.copyright_eval(record['id'])
+#         return 'success', 200
+#
+#     @v1_api.post("/copyright-eval")
+#     def post_copyright_eval():
+#         data = flask.request.get_json()
+#
+#         if 'record_id' not in data:
+#             raise ErrorResponse("Invalid payload. Must include 'record_id'", 500)
+#
+#         record_id = data['record_id']
+#         v1_controller.copyright_eval(record_id)
+#
+#         return 'Success', 200
+#
+#     with v1_api.request_context(req.environ):
+#         return v1_api.full_dispatch_request()
