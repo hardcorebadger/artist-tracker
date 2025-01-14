@@ -201,7 +201,7 @@ class TwilioController():
 
   def send_artist_stats(self, user: dict, artist: Artist):
     print("Converting stats to text")
-    text = "Stats for " + artist.name + ":\n"
+    text = "Audience Stats for \"" + artist.name + "\":\n"
     for stat in artist.statistics:
       text += stat.type.source.title() + " " + stat.type.name + ": " + self.format_number(stat.latest) + " " + ("+" if stat.week_over_week > 0 else "") + f"{round(stat.week_over_week * 100, 2):,}" + "%\n"
     self.send_message(user, text)
