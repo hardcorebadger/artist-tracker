@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 from twilio.rest import Client
 
+from controllers.artists import artist_with_meta
 from lib import SpotifyClient, Artist, OrganizationArtist, ErrorResponse
 from twilio_keys import *
 
@@ -60,6 +61,7 @@ class TwilioController():
       return False, verification_check.status
 
   def receive_message(self, db, from_number, message, link_proc):
+    print(str(from_number) + ": " + str(message))
     user = db.collection("users").where(filter=FieldFilter("sms.number", "==", from_number)).where(filter=FieldFilter("sms.verified", "==", True)).limit(1)
     user = user.get()
     if len(user) == 0:
@@ -142,6 +144,8 @@ class TwilioController():
           if data.get('type') == 'artist':
             if data.get('existing') is not None:
               sent = self.send_template(user_data, "HXabba02580e40f6bbf0e0c1ddac752a36", dict({"1": data.get("name"), "2": "https://indiestack.app/app/artists/" + str(data.get('existing'))}))
+              artist_data = artist_with_meta(sql_session=sql_session, spotify_id=None, id=data.get('existing'))
+              self.send_artist_stats(user_data, artist_data)
               # sent = self.send_template(user_data, "HXabba02580e40f6bbf0e0c1ddac752a36", dict({"1": data.get("name"), "2": "https://google.com"}))
             else:
               sent = self.send_template(user_data, "HXf2f85e6870b94efefd58e668c95008ce", dict({"1": data.get("name"), "2": "https://indiestack.app/app/artists/" + str(data.get("new"))}))
@@ -185,8 +189,22 @@ class TwilioController():
     )
     return True
 
+  def format_number(self, num):
+    if num >= 1e9:
+      return f"{num / 1e9:.1f}B"
+    elif num >= 1e6:
+      return f"{num / 1e6:.1f}M"
+    elif num >= 1e3:
+      return f"{num / 1e3:.1f}K"
+    else:
+      return str(num)
 
-
+  def send_artist_stats(self, user: dict, artist: Artist):
+    print("Converting stats to text")
+    text = "Stats for " + artist.name + ":\n"
+    for stat in artist.statistics:
+      text += stat.type.source.title() + " " + stat.type.name + ": " + self.format_number(stat.latest) + " " + ("+" if stat.week_over_week > 0 else "") + f"{round(stat.week_over_week * 100, 2):,}" + "%\n"
+    self.send_message(user, text)
 
   def send_message(self, user: dict, message: str):
     print(message)

@@ -65,7 +65,8 @@ def addartisttask(req: tasks_fn.CallableRequest) -> str:
     db = firestore.client(app)
     songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
-    tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
+    twilio = TwilioController(get_sql(), spotify)
+    tracking_controller = TrackingController(spotify, songstats, get_sql(), db, twilio)
     uid = req.data.get('uid')
     spotify_id = req.data.get('spotify_id')
     playlist_id = req.data.get('playlist_id', None)
@@ -148,9 +149,9 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     db = firestore.client(app)
     songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
-
-    tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
     twilio = TwilioController(get_sql(), spotify)
+
+    tracking_controller = TrackingController(spotify, songstats, get_sql(), db, twilio)
     youtube = YoutubeClient(YOUTUBE_TOKEN)
     eval_controller = EvalController(spotify, youtube, db, get_sql(), tracking_controller)
     # artist_controller = ArtistController(PROJECT_ID, LOCATION, get_sql())
@@ -377,8 +378,8 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     youtube = YoutubeClient(YOUTUBE_TOKEN)
     songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
-
-    tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
+    twilio = TwilioController(get_sql(), spotify)
+    tracking_controller = TrackingController(spotify, songstats, get_sql(), db, twilio)
     eval_controller = EvalController(spotify, youtube, db, get_sql(), tracking_controller)
     task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT, V3_API_ROOT)
 
@@ -578,7 +579,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
         db = firestore.client(app)
         songstats = SongstatsClient(SONGSTATS_API_KEY)
 
-        tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
+        tracking_controller = TrackingController(spotify, songstats, get_sql(), db, None)
 
         spotify_id = spotify.url_to_id(spotify_url)
         if spotify_id == 'invalid':

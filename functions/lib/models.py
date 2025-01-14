@@ -311,7 +311,7 @@ class Attribution(Base):
 
     playlist_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('playlists.id'), nullable=True)
     created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
-
+    notified = Column(Boolean, nullable=False, default=False)
     playlist: Mapped[Optional["Playlist"]] = relationship(foreign_keys=[playlist_id])
     artist: Mapped["Artist"] = relationship(back_populates="attributions", foreign_keys=[artist_id])
 
@@ -327,6 +327,7 @@ class Attribution(Base):
             "artist_id": self.artist_id,
             "created_at": self.created_at,
             "playlist": playlist,
+            "notified": self.notified,
         }
 
     def __repr__(self):

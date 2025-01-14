@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 
 from sqlalchemy import bindparam, update
 
@@ -22,8 +23,8 @@ def eval_cron(task_controller : TaskController, eval_controller: EvalController,
     artist_ids = eval_controller.find_needs_eval_refresh(batch_size)
     maps = []
     for artist_id in artist_ids:
-        maps.append({'id': artist_id, 'eval_queued_at': time.time()})
-        body = {"id": artist_id}
+        maps.append({'id': artist_id, 'eval_queued_at': datetime.now()})
+        body = {"id": str(artist_id)}
         task_controller.enqueue_task('EvalQueue', 2, '/eval-artist', body)
     sql_session = sql.get_session()
     sql_session.execute(
@@ -37,8 +38,8 @@ def stats_cron(task_controller : TaskController, tracking_controller: TrackingCo
     artist_ids = tracking_controller.find_needs_stats_refresh(batch_size)
     maps = []
     for artist_id in artist_ids:
-        maps.append({'id': artist_id, 'stats_queued_at': time.time()})
-        body = {"id": artist_id}
+        maps.append({'id': artist_id, 'stats_queued_at': datetime.now()})
+        body = {"id": str(artist_id)}
         task_controller.enqueue_task('StatsQueue', 2, '/update-artist', body)       
     sql_session = sql.get_session()
     sql_session.execute(

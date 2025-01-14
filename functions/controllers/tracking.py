@@ -1,7 +1,8 @@
 import time
 
+from google.cloud.firestore_v1 import Client
 from google.cloud.firestore_v1.query_results import QueryResultsList
-from sqlalchemy import select, or_, func
+from sqlalchemy import select, or_, func, and_
 from sqlalchemy.orm import joinedload, contains_eager
 import traceback
 
@@ -35,13 +36,14 @@ DEPRECATED_STATS = {
 
 
 class TrackingController():
-  def __init__(self, spotify: SpotifyClient, songstats : SongstatsClient, sql: CloudSQLClient, db):
+  def __init__(self, spotify: SpotifyClient, songstats : SongstatsClient, sql: CloudSQLClient, db: Client, twilio = None):
     self.spotify = spotify
     self.songstats = songstats
     self.db = db
     self.sql = sql
     self.statistic_types = None
     self.users = None
+    self.twilio = twilio
 
   def get_statistic_type_from_field(self, field: str):
       types = self.get_statistic_types()
@@ -333,7 +335,7 @@ class TrackingController():
     sql_session = self.sql.get_session()
     sql_ref = None
     if spotify_id is None:
-      sql_ref = artist_with_meta(sql_session, None, artist_id)
+      sql_ref = artist_with_meta(sql_session, None, artist_id, (and_(Attribution.notified == False, Attribution.playlist_id == None)))
       if sql_ref is None:
           raise ErrorResponse('Artist not found', 404, 'Tracking')
       spotify_id = sql_ref.spotify_id
@@ -346,13 +348,13 @@ class TrackingController():
       raise ErrorResponse('Artist not found', 404, 'Tracking')
 
     if sql_ref is None:
-        sql_ref = artist_with_meta(sql_session, spotify_id)
+        sql_ref = artist_with_meta(sql_session, spotify_id, None,  (and_(Attribution.notified == False, Attribution.playlist_id == None)))
     sql_session.close()
     if sql_ref is None:
         print('Artist needs migration; importing to SQL')
         self.import_sql(doc)
         sql_session = self.sql.get_session()
-        sql_ref = artist_with_meta(sql_session, spotify_id)
+        sql_ref = artist_with_meta(sql_session, spotify_id, None,  (and_(Attribution.notified == False, Attribution.playlist_id == None)))
         sql_session.close()
 
     # check the artist is ingested - not needed
@@ -388,6 +390,7 @@ class TrackingController():
     try:
         #  update the hot tracking stats on the artist
         update = {"stat_dates": stats['as_of'], "stats_as_of": datetime.now()}
+        allNewStats = True
         for s in HOT_TRACKING_FIELDS:
           sql_statistic_type = self.get_statistic_type_from_field(s)
           values = stats['stats'][s] if s in stats['stats'] else []
@@ -395,12 +398,23 @@ class TrackingController():
               if sql_statistic_type.id == 30:
                   values = stats['stats']["spotify__monthly_listeners_current"] if "spotify__monthly_listeners_current" in stats['stats'] else []
           update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = values
-          self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
+          wasUpdate = self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
+          if wasUpdate:
+              allNewStats = False
 
         self.update_sql_meta(sql_ref, doc)
-
-
         ref.update(update)
+        if len(sql_ref.attributions) > 0 and self.twilio is not None:
+            user_ids = []
+            for attr in sql_ref.attributions:
+                if attr.user_id not in user_ids:
+                    user_ids.append(attr.user_id)
+            users = self.db.collection('users').where(filter=FieldFilter(
+    "id", "array_contains_any", user_ids
+            )).where(filter=FieldFilter("sms.verified", "==", True)).get()
+            for user in users:
+                self.twilio.send_artist_stats(user.to_dict(), sql_ref)
+
     except Exception as e:
         print(e)
         return 'error', 500
@@ -436,7 +450,7 @@ class TrackingController():
 
   def add_or_update_sql_stat(self, artist: Artist, statistic_type: StatisticType, date, values):
       if len(values) == 0:
-          return
+          return False
       if statistic_type.format == 'int':
           valueSet = list(map(int, values))
           latest: int = valueSet[len(valueSet) - 1]
@@ -462,6 +476,7 @@ class TrackingController():
               stat.last_date = date
               stat.updated_at = datetime.now()
               found_stat = stat
+              return True
 
       if found_stat is None:
           found_stat = Statistic(
@@ -477,6 +492,8 @@ class TrackingController():
               last_date=date,
           )
           artist.statistics.append(found_stat)
+          return False
+
 
   # ######################
   # Cron Support
