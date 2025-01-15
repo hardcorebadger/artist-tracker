@@ -80,9 +80,11 @@ class Artist(Base):
 
         return dict
 
-    def as_deep_dict(self):
+    def as_deep_dict(self, organization_id = None):
         dict = self.as_dict()
-        attr = list(map(lambda attribution: attribution.as_dict(), self.attributions))
+        for attr in self.attributions:
+            print(attr.organization_id + " " + organization_id)
+        attr = list(map(lambda attribution: attribution.as_dict(), filter(lambda attribution: attribution.organization_id == organization_id or organization_id is None, self.attributions)))
         attr.reverse()
         dict['attributions'] = attr
         return dict

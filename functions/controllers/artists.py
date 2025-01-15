@@ -65,7 +65,7 @@ class ArtistController():
             artists_set = sql_session.scalars(query).unique()
             artists = None
             if id_lookup is not None:
-                artists = list(map(lambda artist: artist.as_deep_dict(), artists_set))
+                artists = list(map(lambda artist: artist.as_deep_dict(user_data.get('organization')), artists_set))
             else:
                 artists = list(map(lambda artist: artist.as_dict(), artists_set))
 

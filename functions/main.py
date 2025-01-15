@@ -422,19 +422,15 @@ def add_artist(uid, spotify_url = None, identifier = False, tags = None, preview
 def sort_ordered(l):
     return l.get('order', 0)
 
-def load_link_sources():
-    sql_session = get_sql().get_session()
+def load_link_sources(sql_session):
     sources = sql_session.scalars(select(LinkSource)).all()
     list_sorted_sources = list((source.as_dict() for source in sources))
-    sql_session.close()
     list_sorted_sources.sort(key=sort_ordered)
     return list_sorted_sources
 
-def load_stat_types():
-    sql_session = get_sql().get_session()
+def load_stat_types(sql_session):
     types = sql_session.scalars(select(StatisticType)).all()
     list_sorted = list((stat_type.as_dict() for stat_type in types))
-    sql_session.close()
     list_sorted.sort(key=sort_ordered)
     return list_sorted
 
@@ -465,19 +461,19 @@ def user_from_request(request: https_fn.Request) -> None|UserRecord:
 def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     user = user_from_request(request)
     v3_api = flask.Flask(__name__)
-
+    sql_session = get_sql().get_session()
     if user is None:
         return 'Unauthorized', 401
 
     @v3_api.get('/get-type-defs')
     def get_type_definitions_request():
-        response = jsonify(get_type_definitions())
+        response = jsonify(get_type_definitions(sql_session))
         response.headers.add('Cache-Control', 'public, max-age=600')
         return response
 
     @v3_api.get('/get-existing-tags')
     def get_existing_tags_request():
-        response = jsonify(get_existing_tags(user))
+        response = jsonify(get_existing_tags(sql_session, user))
         response.headers.add('Cache-Control', 'public, max-age=60')
         response.headers.add('X-Organization', request.headers.get('X-Organization'))
         response.headers.add('Vary', 'X-Organization')
@@ -498,7 +494,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         if artists.get('error', None) is not None:
             response.status_code = 500
         else:
-            response.headers.add('Cache-Control', 'public, max-age=30')
+            response.headers.add('Cache-Control', 'public, max-age=15')
         response.headers.add('X-Organization', request.headers.get('X-Organization'))
         response.headers.add('Vary', 'X-Organization')
         return response
@@ -530,24 +526,25 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
 
     with v3_api.request_context(request.environ):
         resp = v3_api.full_dispatch_request()
+        sql_session.close()
         return resp
 
-def get_type_definitions():
+def get_type_definitions(sql_session):
     global stat_types, link_sources
     print("get type defs")
     if link_sources is None:
         print("load link defs")
-        link_sources = load_link_sources()
+        link_sources = load_link_sources(sql_session)
     if stat_types is None:
         print("load stat type")
-        stat_types = load_stat_types()
+        stat_types = load_stat_types(sql_session)
     return {
         "statistic_types": stat_types,
         "link_sources": link_sources,
         "tag_types": get_tag_types()
     }
 
-def get_existing_tags(user):
+def get_existing_tags(sql_session, user):
     db = firestore.client(app)
     if user is None:
         return {
@@ -556,11 +553,9 @@ def get_existing_tags(user):
         }
     uid = user.uid
     user_data = get_user(uid, db)
-    sql_session = get_sql().get_session()
     records = select(ArtistTag).distinct(ArtistTag.tag_type_id, ArtistTag.tag).filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))
     records = sql_session.scalars(records).all()
     records = (tag_type.as_tag_dict() for tag_type in records)
-    sql_session.close()
     return {
         "tags": list(records),
         "users": list(load_users(user_data.get('organization')))
