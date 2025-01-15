@@ -45,34 +45,31 @@ class TrackingController():
     self.users = None
     self.twilio = twilio
 
-  def get_statistic_type_from_field(self, field: str):
-      types = self.get_statistic_types()
+  def get_statistic_type_from_field(self, sql_session, field: str):
+      types = self.get_statistic_types(sql_session)
       for type in types:
           if field.startswith(type.source + '__'+type.key ):
               return type
       return None
 
-  def get_statistic_types(self):
+  def get_statistic_types(self, sql_session):
       if self.statistic_types is None:
-          sql_session = self.sql.get_session()
           self.statistic_types = sql_session.query(StatisticType).all()
-          sql_session.close()
       return self.statistic_types
 
   # #####################
   # Onboarding
   # #####################
   
-  def add_ingest_update_artist(self, spotify_id, user_id, org_id, tags = None):
+  def add_ingest_update_artist(self, sql_session, spotify_id, user_id, org_id, tags = None):
     msg, status = self.add_artist(spotify_id, user_id, org_id, None, tags)
     if status != 200:
       return msg, status
-    return self.ingest_artist(spotify_id)
+    return self.ingest_artist(sql_session, spotify_id)
 
   # def add_artist_sql(self, spotify_id, user_id, org_id):
 
-  def set_tags(self, organization_id, identifier, tags):
-      sql_session = self.sql.get_session()
+  def set_tags(self, sql_session, organization_id, identifier, tags):
       sql_ref = artist_with_meta(sql_session=sql_session, id=identifier)
       final = list()
       for tag in tags:
@@ -95,7 +92,6 @@ class TrackingController():
               sql_session.delete(tag)
       sql_session.add_all(final)
       sql_session.commit()
-      sql_session.close()
       return True
 
   def add_tags(self, sql_session, sql_ref: Artist, organization_id, tags):
@@ -118,11 +114,10 @@ class TrackingController():
         sql_session.add(sql_ref)
         sql_session.commit()
 
-  def add_artist(self, spotify_id, user_id, org_id, sql_playlist_id = None, tags = None):
+  def add_artist(self, sql_session, spotify_id, user_id, org_id, sql_playlist_id = None, tags = None):
     if tags is None:
         tags = list()
 
-    sql_session = self.sql.get_session()
     sqlRef = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id).options(
         joinedload(Artist.tags, innerjoin=False),
         joinedload(Artist.organizations, innerjoin=False),
@@ -255,12 +250,11 @@ class TrackingController():
         print(fails)
         return 'Artist failed to import, please try again', 500
     self.add_tags(sql_session, artist_with_meta(sql_session, spotify_id), org_id, tags)
-    sql_session.close()
 
 
     return 'success', 200
   
-  def ingest_artist(self, spotify_id : str):
+  def ingest_artist(self, sql_session, spotify_id : str):
 
     ref = self.db.collection("artists_v2").document(spotify_id)
     doc = ref.get()
@@ -269,7 +263,6 @@ class TrackingController():
     if not doc.exists:
       raise ErrorResponse('Artist not found', 404, 'Tracking')
 
-    sql_session = self.sql.get_session()
     sql_ref = artist_with_meta(sql_session, spotify_id)
 
     if sql_ref is None:
@@ -277,7 +270,6 @@ class TrackingController():
         self.import_sql(doc)
         sql_ref = artist_with_meta(sql_session, spotify_id)
 
-    sql_session.close()
     data = doc.to_dict()
 
     # hit SS for the info
@@ -290,17 +282,17 @@ class TrackingController():
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(minutes=10)
           })
-          self.set_onboard_wait(sql_ref, datetime.now() + timedelta(minutes=10))
+          self.set_onboard_wait(sql_session, sql_ref, datetime.now() + timedelta(minutes=10))
           return 'Waiting for data', 201
       elif e.status_code == 429:
           ref.update({
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(days=30)
           })
-          self.set_onboard_wait(sql_ref, datetime.now() + timedelta(minutes=10))
+          self.set_onboard_wait(sql_session, sql_ref, datetime.now() + timedelta(minutes=10))
           return 'Waiting for data', 201
       else:
-          self.set_onboard_wait(sql_ref, None)
+          self.set_onboard_wait(sql_session, sql_ref, None)
       raise e
 
     print("[INGEST] has info")
@@ -311,7 +303,7 @@ class TrackingController():
       "links": info['artist_info']['links'],
     })
     # get the stats now that we know the artist is in SS
-    self.update_artist(spotify_id, is_ob=True)
+    self.update_artist(sql_session, spotify_id, is_ob=True)
 
     ref.update({
       "ob_status": "onboarded"
@@ -321,18 +313,15 @@ class TrackingController():
 
     return 'success', 200
 
-  def set_onboard_wait(self, sql_ref, onboard_wait = None):
-      sql_session = self.sql.get_session()
+  def set_onboard_wait(self, sql_session, sql_ref, onboard_wait = None):
       sql_ref.onboard_wait_until = onboard_wait
       sql_session.add_all([sql_ref])
       sql_session.commit()
-      sql_session.close()
   # #####################
   # Stats
   # #####################
   
-  def update_artist(self, spotify_id : str = None, artist_id: str = None, is_ob=False):
-    sql_session = self.sql.get_session()
+  def update_artist(self, sql_session, spotify_id : str = None, artist_id: str = None, is_ob=False):
     sql_ref = None
     if spotify_id is None:
       sql_ref = artist_with_meta(sql_session, None, artist_id, (and_(Attribution.notified == False, Attribution.playlist_id == None)))
@@ -349,13 +338,10 @@ class TrackingController():
 
     if sql_ref is None:
         sql_ref = artist_with_meta(sql_session, spotify_id, None,  (and_(Attribution.notified == False, Attribution.playlist_id == None)))
-    sql_session.close()
     if sql_ref is None:
         print('Artist needs migration; importing to SQL')
         self.import_sql(doc)
-        sql_session = self.sql.get_session()
         sql_ref = artist_with_meta(sql_session, spotify_id, None,  (and_(Attribution.notified == False, Attribution.playlist_id == None)))
-        sql_session.close()
 
     # check the artist is ingested - not needed
     # data = doc.to_dict()
@@ -370,7 +356,7 @@ class TrackingController():
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(minutes=10)
           })
-          self.set_onboard_wait(sql_ref, datetime.now() + timedelta(minutes=10))
+          self.set_onboard_wait(sql_session, sql_ref, datetime.now() + timedelta(minutes=10))
 
           return 'Waiting for data', 201
       elif e.status_code == 429:
@@ -378,10 +364,10 @@ class TrackingController():
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(days=30)
           })
-          self.set_onboard_wait(sql_ref, datetime.now() + timedelta(minutes=10))
+          self.set_onboard_wait(sql_session, sql_ref, datetime.now() + timedelta(minutes=10))
           return 'Waiting for data', 201
       else:
-          self.set_onboard_wait(sql_ref, None)
+          self.set_onboard_wait(sql_session, sql_ref, None)
       raise e
     
 
@@ -392,7 +378,7 @@ class TrackingController():
         update = {"stat_dates": stats['as_of'], "stats_as_of": datetime.now()}
         allNewStats = True
         for s in HOT_TRACKING_FIELDS:
-          sql_statistic_type = self.get_statistic_type_from_field(s)
+          sql_statistic_type = self.get_statistic_type_from_field(sql_session, s)
           values = stats['stats'][s] if s in stats['stats'] else []
           if values is None or len(values) == 0:
               if sql_statistic_type.id == 30:
@@ -402,7 +388,7 @@ class TrackingController():
           if wasUpdate:
               allNewStats = False
 
-        self.update_sql_meta(sql_ref, doc)
+        self.update_sql_meta(sql_session, sql_ref, doc)
         ref.update(update)
         if len(sql_ref.attributions) > 0 and self.twilio is not None:
             user_ids = []
@@ -423,10 +409,9 @@ class TrackingController():
     # TODO Add the deep stats subcollection
     return 'success', 200
 
-  def update_sql_meta(self, sql_ref, doc):
+  def update_sql_meta(self, sql_session, sql_ref, doc):
       sql_ref.avatar = doc.get('avatar')
       sql_links = self.convert_links(doc, sql_ref.id)
-      sql_session = self.sql.get_session()
       if sql_ref.avatar is not None or len(sql_links) > 0:
           sql_ref.onboard_wait_until = None
       final = list()
@@ -506,7 +491,7 @@ class TrackingController():
   #   ids = [d.id for d in docs]
   #   return ids
 
-  def find_needs_ob_ingest(self, limit: int):
+  def find_needs_ob_ingest(self, sql_session, limit: int):
     sql_session = self.sql.get_session()
     sql_ids = (select(Artist.spotify_id)
                .filter(Artist.onboarded == False)
@@ -516,15 +501,13 @@ class TrackingController():
     sql_session.close()
     return list(sql_ids)
   
-  def find_needs_stats_refresh(self, limit: int):
-    sql_session = self.sql.get_session()
+  def find_needs_stats_refresh(self, sql_session, limit: int):
     sql_ids = (select(Artist.id)
                .filter(Artist.evaluation.has())
                .filter(Artist.statistics.any(Statistic.updated_at <  func.now() - timedelta(days=1)))
                .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
                .filter(Artist.active == True)).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()
-    sql_session.close()
     return list(sql_ids)
 
   def convert_artist_link(self, link, sources, artist_id = None):

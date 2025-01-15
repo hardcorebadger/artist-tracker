@@ -9,6 +9,7 @@ from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter
 from sqlalchemy import select, or_
 from sqlalchemy.orm import joinedload
+from sqlalchemy.util.preloaded import sql_dml
 
 from controllers.artists import ArtistController
 from controllers.twilio import TwilioController
@@ -145,7 +146,7 @@ def reimport_artists_eval(page = 0, page_size = 50):
 
 @https_fn.on_request(memory=512)
 def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
-
+    sql_session = get_sql().get_session()
     db = firestore.client(app)
     songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
@@ -169,11 +170,9 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        sql_session = get_sql().get_session()
         records = select(ArtistTag).distinct(ArtistTag.tag_type_id, ArtistTag.tag)
         records = sql_session.scalars(records).all()
         records = list(map(lambda type: type.as_tag_dict(), records))
-        sql_session.close()
         return {
             'response': records
         }
@@ -185,7 +184,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         from_number = data.get('From', None)
         message = data.get('Body', None)
 
-        return twilio.receive_message(db, from_number, message, process_spotify_link) if from_number is not None else {"error": "Malformed request"}
+        return twilio.receive_message(db, from_number, message, process_spotify_link, sql_session) if from_number is not None else {"error": "Malformed request"}
 
     @v2_api.post("/reimport-artists")
     def reimport_artists():
@@ -263,13 +262,13 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         if 'spotify_id' not in data and 'id' not in data:
             raise ErrorResponse("Invalid payload. Must include 'spotify_id' or 'id'", 500)
 
-        return eval_controller.evaluate_copyrights(spotify_id=data['spotify_id'] if 'spotify_id' in data else None, artist_id=data['id'] if 'id' in data else None)
+        return eval_controller.evaluate_copyrights(spotify_id=data['spotify_id'] if 'spotify_id' in data else None, sql_session=sql_session, artist_id=data['id'] if 'id' in data else None)
 
     @v2_api.post("/eval-artists-lookup")
     def eval_artist_lookup():
         data = flask.request.get_json()
         limit = data.get('limit', 100)
-        return eval_controller.find_needs_eval_refresh(limit)
+        return eval_controller.find_needs_eval_refresh(sql_session, limit)
 
     # @v2_api.post('/import-artists-csv')
     # def import_artists_csv():
@@ -332,7 +331,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         if 'spotify_id' not in data:
             raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
 
-        return tracking_controller.add_ingest_update_artist(data['spotify_id'], 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
+        return tracking_controller.add_ingest_update_artist(sql_session, data['spotify_id'], 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
 
     @v2_api.post("/add-artist")
     def add_artist():
@@ -348,7 +347,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         if 'spotify_id' not in data:
             raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
         
-        return tracking_controller.ingest_artist(data['spotify_id'])
+        return tracking_controller.ingest_artist(sql_session, data['spotify_id'])
 
     @v2_api.post("/update-artist")
     def update_artist():
@@ -356,9 +355,10 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         if 'spotify_id' not in data and 'id' not in data:
             raise ErrorResponse("Invalid payload. Must include 'spotify_id' or 'id'", 500)
         
-        return tracking_controller.update_artist(data['spotify_id'] if 'spotify_id' in data else None, data['id'] if 'id' in data else None, datetime.now() - timedelta(days=1))
+        return tracking_controller.update_artist(sql_session, data['spotify_id'] if 'spotify_id' in data else None, data['id'] if 'id' in data else None, datetime.now() - timedelta(days=1))
 
     with v2_api.request_context(req.environ):
+        sql_session.close()
         return v2_api.full_dispatch_request()
 
 #################################
@@ -395,7 +395,7 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
 #################################
 # App Function Definitions
 #################################
-def add_artist(uid, spotify_url = None, identifier = False, tags = None, preview = False):
+def add_artist(sql_session, uid, spotify_url = None, identifier = False, tags = None, preview = False):
     db = firestore.client(app)
     songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
@@ -405,13 +405,13 @@ def add_artist(uid, spotify_url = None, identifier = False, tags = None, preview
 
         user_data = get_user(uid, db)
         if tags is not None:
-            tracking_controller.set_tags(user_data['organization'], identifier, tags)
+            tracking_controller.set_tags(sql_session, user_data['organization'], identifier, tags)
 
         return {'message': 'success', 'status': 200}
 
     # Message text passed from the client.
     try:
-        return process_spotify_link(uid, spotify_url, tags, preview)
+        return process_spotify_link(sql_session, uid, spotify_url, tags, preview)
     except Exception as e:
         return {
             "found": False,
@@ -489,7 +489,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         sortModel = json.loads(args.get('sortModel', None)) if args.get('sortModel', None) else None
         if sortModel is not None:
             args['sortModel'] = sortModel
-        artists = artists_controller.get_artists(user.uid, args, app)
+        artists = artists_controller.get_artists(user.uid, args, app, sql_session)
         response = jsonify(artists )
         if artists.get('error', None) is not None:
             response.status_code = 500
@@ -502,7 +502,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     @v3_api.post('/add-artist')
     def add_artist_request():
         data = flask.request.get_json()
-        return add_artist(user.uid, data.get('spotify_url', None), data.get('id', False), data.get('tags', None), data.get('preview', False))
+        return add_artist(sql_session, user.uid, data.get('spotify_url', None), data.get('id', False), data.get('tags', None), data.get('preview', False))
 
 
     @v3_api.post('/sms')
@@ -568,7 +568,7 @@ def get_spotify_client():
 
     return spotify_client
 
-def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
+def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = False ):
     spotify = get_spotify_client()
     try:
         db = firestore.client(app)
@@ -587,7 +587,6 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
                 try:
                     aids, playlist_name, playlist_picture = spotify.get_playlist_artists(spotify_id, "user")
 
-                    sql_session = get_sql().get_session()
                     sql_playlist = sql_session.scalars(
                         select(Playlist).where(Playlist.spotify_id == spotify_id).where(Playlist.organization_id == user_data.get('organization'))).first()
                     if preview:
@@ -610,7 +609,6 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
                         sql_session.add(sql_playlist)
                         sql_session.commit()
                         sql_session.refresh(sql_playlist)
-                    sql_session.close()
 
                     for a in aids:
                         task_queue = functions.task_queue("addartisttask")
@@ -635,7 +633,6 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
             user_data = get_user(uid, db)
             if preview:
                 try:
-                    sql_session = get_sql().get_session()
                     artist = spotify.get_artist(spotify_id, 'user')
                     image = None
                     if len(artist.get('images', list())) > 0:
@@ -651,7 +648,6 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
                     org = None
                     if artist_existing is not None:
                         org = list(filter(lambda x: x.organization_id == user_data.get('organization'), artist_existing.organizations)).pop()
-                    sql_session.close()
 
                     return {
                         "found": True,
@@ -672,7 +668,7 @@ def process_spotify_link(uid, spotify_url, tags = None, preview = False ):
 
                     }
 
-            msg, status = tracking_controller.add_ingest_update_artist(spotify_id, uid, user_data['organization'], tags)
+            msg, status = tracking_controller.add_ingest_update_artist(sql_session, spotify_id, uid, user_data['organization'], tags)
             return {'message': msg, 'status': status, 'added_count': 1}
     except Exception as e:
         print("error response from link proc", e)

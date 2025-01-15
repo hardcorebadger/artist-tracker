@@ -60,7 +60,7 @@ class TwilioController():
     else:
       return False, verification_check.status
 
-  def receive_message(self, db, from_number, message, link_proc):
+  def receive_message(self, db, from_number, message, link_proc, sql_session):
     print(str(from_number) + ": " + str(message))
     user = db.collection("users").where(filter=FieldFilter("sms.number", "==", from_number)).where(filter=FieldFilter("sms.verified", "==", True)).limit(1)
     user = user.get()
@@ -69,18 +69,17 @@ class TwilioController():
         "processed": False,
       }
     else:
-      return self.process_message(user[0], from_number, message, link_proc)
+      return self.process_message(user[0], from_number, message, link_proc, sql_session)
 
-  def process_message(self, user, from_number: str, message: str, link_proc):
+  def process_message(self, user, from_number: str, message: str, link_proc, sql_session):
     lowered = message.lower().strip()
     sent = False
-    sql_session = self.sql.get_session()
     user_data = user.to_dict()
     pending_import = user_data.get('pending_import', None)
 
     if pending_import is not None:
       if lowered == 'y' or lowered == 'yes':
-        link_proc(user.id, pending_import.get('url'), None, False)
+        link_proc(sql_session, user.id, pending_import.get('url'), None, False)
       user.update({'pending_import': None})
     data = None
     print("Received twilio text", message, lowered)
@@ -99,7 +98,7 @@ class TwilioController():
             print("invalid link")
             data = None
           else:
-            data = link_proc(user.id, message, None, True)
+            data = link_proc(sql_session, user.id, message, None, True)
             print("link data", data)
         else:
           artist_query = (select(Artist)
@@ -109,7 +108,7 @@ class TwilioController():
           artist_existing = sql_session.scalars(artist_query).unique().first()
           if artist_existing is None:
             try:
-              data = link_proc(user.id, message, None, False)
+              data = link_proc(sql_session, user.id, message, None, False)
               artist_existing = sql_session.scalars(artist_query).unique().first()
             except ErrorResponse as e:
               artist_existing = sql_session.scalars(artist_query).unique().first()
@@ -162,7 +161,6 @@ class TwilioController():
               sent = self.send_message(user_data, "Successfully found playlist: " + data.get("name") + ". Import artists? (Y/N)")
 
 
-      sql_session.close()
     except ErrorResponse as e:
       print(e)
       if ~sent:

@@ -37,7 +37,7 @@ class CloudSQLClient():
 
         # create connection pool
 
-        engine = sqlalchemy.create_engine("postgresql+pg8000://", creator=getconn, pool_size=5, max_overflow=0)
+        engine = sqlalchemy.create_engine("postgresql+pg8000://", creator=getconn, pool_size=5, max_overflow=25)
         return engine
     
     def get_session(self):

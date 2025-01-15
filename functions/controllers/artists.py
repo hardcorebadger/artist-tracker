@@ -22,8 +22,8 @@ class ArtistController():
         self.sql = sql
 
     def get_artists_test(self, data, app):
-        return (self.get_artists('9sRMdvFDUKVKckwpzeARiG6x2LG2', data, app))
-    def get_artists(self, uid, data, app):
+        return (self.get_artists('9sRMdvFDUKVKckwpzeARiG6x2LG2', data, app, self.sql.get_session()))
+    def get_artists(self, uid, data, app, sql_session):
         id_lookup = data.get('id', None)
 
         try:
@@ -34,7 +34,6 @@ class ArtistController():
 
             page = int(data.get('page', 0))
             page_size = int(data.get('pageSize', 20))
-            sql_session = self.sql.get_session()
 
             filters = data.get('filterModel', [])
             user_data = get_user(uid, db)
@@ -69,7 +68,6 @@ class ArtistController():
             else:
                 artists = list(map(lambda artist: artist.as_dict(), artists_set))
 
-            sql_session.close()
             db.close()
             if id_lookup is not None:
                 return {

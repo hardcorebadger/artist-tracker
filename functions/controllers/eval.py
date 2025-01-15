@@ -48,8 +48,7 @@ class EvalController():
     self.sql = sql
     self.tracking_controller = tracking_controller
 
-  def evaluate_copyrights(self, spotify_id: str, artist_id: str = None):
-    sql_session = self.sql.get_session()
+  def evaluate_copyrights(self, spotify_id: str, sql_session, artist_id: str = None):
     sql_ref = None
     if spotify_id is None:
         sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(
@@ -70,7 +69,6 @@ class EvalController():
             print('Artist needs migration; importing to SQL')
             self.tracking_controller.import_sql(doc)
             sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()
-    sql_session.close()
 
     # check the artist is ingested
     data = doc.to_dict()
@@ -151,10 +149,8 @@ class EvalController():
             status=2,
             artist_id=sql_ref.id
         )
-        sql_session = self.sql.get_session()
         sql_session.add(sql_ref)
         sql_session.commit()
-        sql_session.close()
         return 'No evals found', 201
         
     # NEW
@@ -248,10 +244,8 @@ class EvalController():
         distributor=main_eval['distributor'] if main_eval['distributor'] != "" and main_eval['distributor'] != 'unknown' else None,
         label=main_eval['label'] if main_eval['label'] != "" and main_eval['label'] != 'unknown' else None,
     )
-    sql_session = self.sql.get_session()
     sql_session.add_all([sql_ref])
     sql_session.commit()
-    sql_session.close()
     # TODO save the full eval state to a subcollection
     return 'success', 200
   
@@ -346,12 +340,10 @@ class EvalController():
   def _is_probably_same_track(self, youtube_video_title, spotify_song_title, youtube_channel_title, spotify_artist_name, threshold=80):
       return self._fuzzy_equal(youtube_channel_title, spotify_artist_name, threshold) and self._fuzzy_equal(youtube_video_title, spotify_song_title, threshold)
   
-  def find_needs_eval_refresh(self, limit: int):
-    sql_session = self.sql.get_session()
+  def find_needs_eval_refresh(self, sql_session, limit: int):
     sql_ids = (select(Artist.id).outerjoin(Evaluation, Artist.evaluation)
                .filter(or_(Evaluation.updated_at <= func.now() - timedelta(days=7), Evaluation.id == None))
                .filter(or_(Artist.eval_queued_at == None, Artist.eval_queued_at <= func.now() - timedelta(hours=12)))
                .filter(Artist.active == True)).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()
-    sql_session.close()
     return list(sql_ids)
