@@ -153,7 +153,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     twilio = TwilioController(get_sql(), spotify)
 
     tracking_controller = TrackingController(spotify, songstats, get_sql(), db, twilio)
-    youtube = YoutubeClient(YOUTUBE_TOKEN)
+    youtube = YoutubeClient(YOUTUBE_TOKEN, YOUTUBE_TOKEN_ALT)
     eval_controller = EvalController(spotify, youtube, db, get_sql(), tracking_controller)
     # artist_controller = ArtistController(PROJECT_ID, LOCATION, get_sql())
 
@@ -357,10 +357,20 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         
         return tracking_controller.update_artist(sql_session, data['spotify_id'] if 'spotify_id' in data else None, data['id'] if 'id' in data else None, datetime.now() - timedelta(days=1))
 
-    with v2_api.request_context(req.environ):
+    # @v2_api.errorhandler(500)
+    # def internal_server_error(error):
+    #     return flask.Response(json.dumps({'error': error.description}), error.status_code, error.mimetype)
+    @v2_api.after_request
+    def after_request(response):
+        # Code to run after each request
         sql_session.close()
-        return v2_api.full_dispatch_request()
 
+        return response
+
+    with v2_api.request_context(req.environ):
+        resp = v2_api.full_dispatch_request()
+        sql_session.close()
+        return resp
 #################################
 # Cron Job Definitions
 #################################
@@ -375,22 +385,28 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 @scheduler_fn.on_schedule(schedule=f"*/2 * * * *", memory=512)
 def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     db = firestore.client(app)
-    youtube = YoutubeClient(YOUTUBE_TOKEN)
+    youtube = YoutubeClient(YOUTUBE_TOKEN, YOUTUBE_TOKEN_ALT)
     songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
     twilio = TwilioController(get_sql(), spotify)
     tracking_controller = TrackingController(spotify, songstats, get_sql(), db, twilio)
     eval_controller = EvalController(spotify, youtube, db, get_sql(), tracking_controller)
     task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT, V3_API_ROOT)
+    sql_session = get_sql().get_session()
 
-    # does 300 evals per hours, doesn't care where they are in OB, TODO prios by oldest first so new artists go first
-    eval_cron(task_controller, eval_controller, 10, sql)
-    # only looks at artists who are ingested, updates 750 stats per hour
-    stats_cron(task_controller, tracking_controller, 25, sql)
+    try:
+        # does 300 evals per hours, doesn't care where they are in OB, TODO prios by oldest first so new artists go first
+        eval_cron(sql_session, task_controller, eval_controller, 10)
+        # only looks at artists who are ingested, updates 750 stats per hour
+        stats_cron(sql_session, task_controller, tracking_controller, 25)
 
-    # deals with messiness of waiting for songstats to ingest, pulls info and stats for the artist for first time, 1.5k per hr
-    onboarding_cron(task_controller, tracking_controller, 50)
+        # deals with messiness of waiting for songstats to ingest, pulls info and stats for the artist for first time, 1.5k per hr
+        onboarding_cron(sql_session, task_controller, tracking_controller, 50)
+    except Exception as e:
+        print(e)
+        sql_session.close()
 
+    sql_session.close()
 
 #################################
 # App Function Definitions
@@ -523,6 +539,11 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             return {
                 "id": twilio.send_code(uid, db, data.get('number'))
             }
+    @v3_api.after_request
+    def after_request(response):
+        # Code to run after each request
+        sql_session.close()
+        return response
 
     with v3_api.request_context(request.environ):
         resp = v3_api.full_dispatch_request()

@@ -5,13 +5,14 @@ from .errors import ErrorResponse
 from .evaluation import is_probably_same_track
 
 class YoutubeClient():
-  def __init__(self, token):
+  def __init__(self, token, alt_token):
     self.token = token
+    self.alt_token = alt_token
     self.ytmusic = YTMusic()
     self.root_uri = "https://www.googleapis.com/youtube/v3"
   
-  def get(self, path, data=None):
-    data['key'] = self.token
+  def get(self, path, data=None, alt_token = False):
+    data['key'] = self.token if alt_token == False else self.alt_token
     res = requests.get(f"https://www.googleapis.com/youtube/v3{path}", headers= {
       "Content-Type": "application/json"
     },
@@ -19,6 +20,12 @@ class YoutubeClient():
     if res.status_code > 299:
       if res.status_code == 429:
         print("Youtube Rate Limiting")
+      if res.status_code == 403:
+        if alt_token == False:
+          print("Youtube Quota Limiting - trying again with token")
+          return self.get(path, data, True)
+        else:
+          print("Youtube Quota Limiting Alt - failed")
       raise ErrorResponse(res.json(), res.status_code, "Youtube")
     return res.json()
   

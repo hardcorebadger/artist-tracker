@@ -54,14 +54,14 @@ class EvalController():
         sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(
         Artist.id == artist_id)).first()
         if sql_ref is None:
-            raise ErrorResponse('Artist not found', 404, 'Tracking')
+            raise ErrorResponse('Artist not found: ' + str(artist_id), 404, 'Tracking')
         spotify_id = sql_ref.spotify_id
     # Get the record
     ref = self.db.collection("artists_v2").document(spotify_id)
     doc = ref.get()
     # check the artist exists
     if not doc.exists:
-        raise ErrorResponse('Artist not found', 404, 'Tracking')
+        raise ErrorResponse('Artist not found eval: ' + str(spotify_id) + " " + str(artist_id), 404, 'Tracking')
 
     if sql_ref is None:
         sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()

@@ -187,7 +187,6 @@ class TrackingController():
           sql_session.add(attribution)
           sql_session.commit()
       self.add_tags(sql_session, sqlRef, org_id, tags)
-      sql_session.close()
       return 'Artist exists, added to tracking', 200
     
     # check if the ID is valid (this will raise a 400 if the artist is invalid)
@@ -261,7 +260,7 @@ class TrackingController():
     print("[INGEST] has doc")
     # check the artist exists
     if not doc.exists:
-      raise ErrorResponse('Artist not found', 404, 'Tracking')
+      raise ErrorResponse('Artist not found ingest: ' + str(spotify_id), 404, 'Tracking')
 
     sql_ref = artist_with_meta(sql_session, spotify_id)
 
@@ -324,9 +323,9 @@ class TrackingController():
   def update_artist(self, sql_session, spotify_id : str = None, artist_id: str = None, is_ob=False):
     sql_ref = None
     if spotify_id is None:
-      sql_ref = artist_with_meta(sql_session, None, artist_id, (and_(Attribution.notified == False, Attribution.playlist_id == None)))
+      sql_ref = artist_with_meta(sql_session, None, artist_id, (or_(Attribution.artist_id == None, and_(Attribution.notified == False, Attribution.playlist_id == None))))
       if sql_ref is None:
-          raise ErrorResponse('Artist not found', 404, 'Tracking')
+          raise ErrorResponse('Artist not found: ' + str(artist_id) , 404, 'Tracking')
       spotify_id = sql_ref.spotify_id
     ref = self.db.collection("artists_v2").document(spotify_id)
     doc = ref.get()
@@ -334,14 +333,14 @@ class TrackingController():
 
     # check the artist exists
     if not doc.exists:
-      raise ErrorResponse('Artist not found', 404, 'Tracking')
+      raise ErrorResponse('Artist not found: ' + str(spotify_id) + ", " + str(artist_id), 404, 'Tracking')
 
     if sql_ref is None:
-        sql_ref = artist_with_meta(sql_session, spotify_id, None,  (and_(Attribution.notified == False, Attribution.playlist_id == None)))
+        sql_ref = artist_with_meta(sql_session, spotify_id, None,  (or_(Attribution.artist_id == None, and_(Attribution.notified == False, Attribution.playlist_id == None))))
     if sql_ref is None:
         print('Artist needs migration; importing to SQL')
         self.import_sql(doc)
-        sql_ref = artist_with_meta(sql_session, spotify_id, None,  (and_(Attribution.notified == False, Attribution.playlist_id == None)))
+        sql_ref = artist_with_meta(sql_session, spotify_id, None, (or_(Attribution.artist_id == None, and_(Attribution.notified == False, Attribution.playlist_id == None))))
 
     # check the artist is ingested - not needed
     # data = doc.to_dict()
@@ -393,6 +392,11 @@ class TrackingController():
         if len(sql_ref.attributions) > 0 and self.twilio is not None:
             user_ids = []
             for attr in sql_ref.attributions:
+                if attr.notified:
+                    continue
+                if attr.playlist_id is not None:
+                    continue
+
                 if attr.user_id not in user_ids:
                     user_ids.append(attr.user_id)
             users = self.db.collection('users').where(filter=FieldFilter(
@@ -492,13 +496,11 @@ class TrackingController():
   #   return ids
 
   def find_needs_ob_ingest(self, sql_session, limit: int):
-    sql_session = self.sql.get_session()
     sql_ids = (select(Artist.spotify_id)
                .filter(Artist.onboarded == False)
                .filter(or_(Artist.onboard_wait_until == None, Artist.onboard_wait_until < func.now()))
                .filter(Artist.active == True)).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()
-    sql_session.close()
     return list(sql_ids)
   
   def find_needs_stats_refresh(self, sql_session, limit: int):

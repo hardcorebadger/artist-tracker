@@ -13,14 +13,13 @@ from lib import Artist
 #         body = {"spotify_id": aritst_id}
 #         task_controller.enqueue_task('EvalQueue', 2, '/eval-artist', body)
 
-def onboarding_cron(task_controller : TaskController, tracking_controller: TrackingController, batch_size : int):
-   artist_ids = tracking_controller.find_needs_ob_ingest(batch_size)
+def onboarding_cron(sql_session, task_controller : TaskController, tracking_controller: TrackingController, batch_size : int):
+   artist_ids = tracking_controller.find_needs_ob_ingest(sql_session, batch_size)
    for aritst_id in artist_ids:
         body = {"spotify_id": aritst_id}
         task_controller.enqueue_task('StatsQueue', 2, '/ingest-artist', body)
 
-def eval_cron(task_controller : TaskController, eval_controller: EvalController, batch_size : int, sql):
-    sql_session = sql.get_session()
+def eval_cron(sql_session, task_controller : TaskController, eval_controller: EvalController, batch_size : int):
 
     artist_ids = eval_controller.find_needs_eval_refresh(sql_session, batch_size)
     maps = []
@@ -32,11 +31,9 @@ def eval_cron(task_controller : TaskController, eval_controller: EvalController,
         update(Artist),
         maps,
     )
-    sql_session.close()
 
 
-def stats_cron(task_controller : TaskController, tracking_controller: TrackingController, batch_size : int, sql):
-    sql_session = sql.get_session()
+def stats_cron(sql_session, task_controller : TaskController, tracking_controller: TrackingController, batch_size : int):
     artist_ids = tracking_controller.find_needs_stats_refresh(sql_session, batch_size)
     maps = []
     for artist_id in artist_ids:
@@ -47,7 +44,6 @@ def stats_cron(task_controller : TaskController, tracking_controller: TrackingCo
         update(Artist),
         maps,
     )
-    sql_session.close()
 
 def airtable_v1_cron(task_controller : TaskController, airtable_v1_controller: AirtableV1Controller):
     jobs_added = 0
