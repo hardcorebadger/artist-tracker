@@ -174,7 +174,7 @@ class SpotifyClient():
     ids = ids[:4]
     albums = self.get_albums(ids)
     plines=[]
-    for album in albums['albums']:
+    for album in albums:
       copyrights = album['copyrights']
       for c in copyrights:
         if c['type'] == 'P':
@@ -192,7 +192,7 @@ class SpotifyClient():
     ids = ids[:4]
     albums = self.get_albums(ids)
     plines=[]
-    for album in albums['albums']:
+    for album in albums:
       copyrights = album['copyrights']
       for c in copyrights:
         if c['type'] == 'P':
