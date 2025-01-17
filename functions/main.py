@@ -172,7 +172,8 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/debug")
     def debug():
         spotify = get_spotify_client()
-        return eval_controller.find_needs_eval_refresh(sql_session, 10)
+        return eval_controller.evaluate_copyrights('7uelPzv7TB20x3wtDt95E9', sql_session, None)
+        # return spotify.get_artist('55ZKRn4w3oNhBMV7sgG1PP')
 
     @v2_api.post("/twilio")
     def twilio_endpoint():

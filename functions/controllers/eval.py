@@ -1,3 +1,4 @@
+from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import joinedload
 
@@ -79,7 +80,27 @@ class EvalController():
 
     # get top tracks
     top_tracks = self.spotify.get_artist_top_tracks(spotify_id)['tracks']
+    top_track_ids = list(map(lambda x: x['id'], top_tracks))
+    check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
+        "spotify_id", "==", spotify_id
+    )).where(filter=FieldFilter(
+        'type', '==', 'top-tracks'
+    )).order_by('created_at', "DESCENDING").get()
 
+    cache_ref = check_cache.pop() if len(check_cache) > 0 else None
+
+    if cache_ref is None:
+        cache_data = {"data": top_tracks, "spotify_id": spotify_id, "type": "top-tracks", "processed": False, "created_at": SERVER_TIMESTAMP}
+        update_time, cache_ref = self.db.collection("spotify_cache").add(cache_data)
+    else:
+        if cache_ref.get('processed'):
+            previous_data = cache_ref.get('data')
+            previous_ids = list(map(lambda x: x['id'], previous_data))
+            if previous_ids == top_track_ids and sql_ref.evaluation_id is not None and sql_ref.evaluation.created_at > datetime.now() - timedelta(days=90):
+                print("Skipping artist re-evaluation as top tracks have not changed, and it has been less than 90 days.")
+                return "Skipping artists re-evaluation as top tracks have not changed and it has been less than 90 days.", 201
+
+        cache_ref.reference.set({"data": top_tracks, "spotify_id": spotify_id, "type": "top-tracks", "processed": False, "created_at": SERVER_TIMESTAMP})
     artist_name = data['name']
 
     # find tracks with matching videos and eval them
@@ -113,6 +134,8 @@ class EvalController():
     # sort by release date
     if len(yt_evals) > 0:
       yt_evals = sorted(yt_evals, key=lambda x: x['release'], reverse=True)
+
+    cache_ref.update({'processed': True})
 
     # eval spotify
     sp_evals = []
@@ -342,11 +365,20 @@ class EvalController():
   
   def find_needs_eval_refresh(self, sql_session, limit: int):
     sql_ids = ((select(Artist.id).outerjoin(Evaluation, Artist.evaluation)
-               .filter(and_(
-                            Artist.active == True,
-                            or_(Artist.eval_queued_at == None, Artist.eval_queued_at <= func.now() - timedelta(hours=12)),
-                            or_(Evaluation.updated_at <= func.now() - timedelta(days=10), Evaluation.id == None
-                        ))))
+               .filter(
+                    and_(
+                        Artist.active == True,
+                        or_(Artist.eval_queued_at == None, Artist.eval_queued_at <= func.now() - timedelta(hours=12)),
+                        or_(
+                            or_(
+                                and_(Evaluation.updated_at <= func.now() - timedelta(days=10), Evaluation.distributor_type != 1),
+                                and_(Evaluation.updated_at <= func.now() - timedelta(days=30), Evaluation.distributor_type == 1),
+                            ),
+                            Evaluation.id == None
+                        )
+                       )
+                    )
+               )
                 .order_by(Artist.evaluation_id.desc())
                .limit(limit))
     sql_ids = sql_session.scalars(sql_ids).unique()

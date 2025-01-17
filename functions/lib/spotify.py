@@ -1,6 +1,6 @@
 import base64
 import traceback
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 import requests
 from google.cloud.firestore_v1 import Client, FieldFilter, SERVER_TIMESTAMP
@@ -104,16 +104,25 @@ class SpotifyClient():
     return res.json()
   
   def get_artist(self, id, alt_token=False):
+      check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
+        "spotify_id", "==", id
+      )).where(filter=FieldFilter(
+        'type', '==', 'artist'
+      )).order_by('created_at', "DESCENDING").get()
 
-    global last_artist
-    if last_artist is not None and last_artist['id'] == id:
-      return last_artist
-    try:
-      artist = self.get(path=f"/artists/{id}", alt_token=alt_token)
-      last_artist = artist
-      return artist
-    except ErrorResponse:
-      raise ErrorResponse
+      existing = check_cache.pop() if len(check_cache) > 0 else None
+      if existing and existing.get('created_at') > datetime.now(existing.get('created_at').tzinfo) - timedelta(seconds=12):
+        return existing.to_dict().get('data')
+      else:
+        artist = self.get(path=f"/artists/{id}", alt_token=alt_token)
+        if existing:
+          existing.reference.set({"id": existing.id, "data": artist, "created_at": SERVER_TIMESTAMP, "type": "artist", "spotify_id": id})
+          print("Updated artist in cache: " + id)
+        else:
+          cache = {"data": artist, "spotify_id": id, "type": "artist", "created_at": SERVER_TIMESTAMP}
+          update_time, cache_ref = self.db.collection("spotify_cache").add(cache)
+          print("Added artist to cache: " + id)
+        return artist
 
   def get_artist_top_tracks(self, id):
     return self.get(f"/artists/{id}/top-tracks", data={"market":"US"})
