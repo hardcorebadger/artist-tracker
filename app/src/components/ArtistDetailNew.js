@@ -74,10 +74,10 @@ const bakeStats = (statisticTypes, linkSources) => {
 function CopyrightCard({artist, linkSources}) {
   const status =  artist.evaluation?.status === 0 ? 'Unsigned' :  artist.evaluation?.status === 1 ? 'Signed' : 'Unknown';
   const type = artist.evaluation?.distributor_type === 0 ? "DIY" : artist.evaluation?.distributor_type === 1 ? "Indie" : "Major";
-  const prios = (artist.evaluation?.status === 2 ? 'Dirty' : 'Clean')
+  const prios = (artist.evaluation?.back_catalog === 1 ? 'Dirty' : 'Clean')
   const statusColor = artist.evaluation?.status == 1 ? 'red' :  (artist.evaluation?.status == 0 ? 'green' : 'yellow')
   const typeColor = artist.evaluation?.distributor_type == 2 ? 'red' : (artist.evaluation?.distributor_type == 1 ? 'yellow' : 'green')
-  const priorsColor = artist.evaluation?.status == 2 ? 'yellow' : 'green'
+  const priorsColor = artist.evaluation?.back_catalog == 1 ? 'yellow' : 'green'
 
   const links =  Object.keys(artist).filter((key) => {
     if (!key.startsWith('link_')){

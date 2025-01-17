@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from dataclasses import dataclass
 from sqlalchemy import Column, Integer, SmallInteger, JSON, Float, Boolean, Text, String, TIMESTAMP, create_engine, \
-    ForeignKey, DateTime, select, func
+    ForeignKey, DateTime, select, func, and_
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, relationship, mapped_column
@@ -13,6 +13,36 @@ from sqlalchemy.dialects.postgresql import UUID
 from lib.utils import pop_default
 
 Base = declarative_base()
+class Attribution(Base):
+    __tablename__ = 'attribution'
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
+    artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
+    user_id = Column(String(28), nullable=False)
+    organization_id = Column(String(28), nullable=False)
+
+    playlist_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('playlists.id'), nullable=True)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
+    notified = Column(Boolean, nullable=False, default=False)
+    playlist: Mapped[Optional["Playlist"]] = relationship(foreign_keys=[playlist_id])
+    artist: Mapped["Artist"] = relationship(back_populates="attributions", foreign_keys=[artist_id])
+
+
+    def as_dict(self):
+        playlist = None
+        if self.playlist:
+            playlist = self.playlist.as_dict()
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "playlist_id": self.playlist_id,
+            "artist_id": self.artist_id,
+            "created_at": self.created_at,
+            "playlist": playlist,
+            "notified": self.notified,
+        }
+
+    def __repr__(self):
+        return f"<Attribution({self.id=}, {self.artist_id=}, {self.user_id=}, {self.playlist_id=}, {self.created_at})>"
 
 class Artist(Base):
     __tablename__ = 'artists'
@@ -51,6 +81,8 @@ class Artist(Base):
 
     tags: Mapped[List["ArtistTag"]] = relationship(back_populates='artist')
     attributions: Mapped[List["Attribution"]] = relationship(back_populates='artist')
+
+    attributions_needing_notified: Mapped[List["Attribution"]] = relationship(primaryjoin=and_(Attribution.artist_id == id, Attribution.notified == False, Attribution.playlist_id == None), overlaps="attributions,artist")
 
     def as_dict(self):
         dict = {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -304,33 +336,21 @@ class Playlist(Base):
     def __repr__(self):
         return f"<Playlist({self.id=}, {self.spotify_id=}, {self.name=}, {self.created_at=}, {self.updated_at})>"
 
-class Attribution(Base):
-    __tablename__ = 'attribution'
+class SpotifyToken(Base):
+    __tablename__ = 'spotify_tokens'
     id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
-    artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
-    user_id = Column(String(28), nullable=False)
-    organization_id = Column(String(28), nullable=False)
-
-    playlist_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('playlists.id'), nullable=True)
+    user_id = Column(String(28), nullable=True)
+    organization_id = Column(String(28), nullable=True)
+    client_id = Column(String(32), nullable=False)
+    token = Column(Text, nullable=False)
+    refresh_token = Column(Text, nullable=True)
+    expires_at = Column(TIMESTAMP, nullable=False)
     created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
-    notified = Column(Boolean, nullable=False, default=False)
-    playlist: Mapped[Optional["Playlist"]] = relationship(foreign_keys=[playlist_id])
-    artist: Mapped["Artist"] = relationship(back_populates="attributions", foreign_keys=[artist_id])
-
+    retry_at = Column(TIMESTAMP, nullable=True)
+    state = Column(String(38), nullable=False)
 
     def as_dict(self):
-        playlist = None
-        if self.playlist:
-            playlist = self.playlist.as_dict()
-        return {
-            "id": self.id,
-            "user_id": self.user_id,
-            "playlist_id": self.playlist_id,
-            "artist_id": self.artist_id,
-            "created_at": self.created_at,
-            "playlist": playlist,
-            "notified": self.notified,
-        }
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
     def __repr__(self):
-        return f"<Attribution({self.id=}, {self.artist_id=}, {self.user_id=}, {self.playlist_id=}, {self.created_at})>"
+        return f"<SpotifyToken({self.id=}, {self.client_id=}, {self.organization_id=}, {self.user_id=}, {self.created_at=}, {self.expires_at=})>"

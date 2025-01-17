@@ -1,4 +1,4 @@
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import joinedload
 
 from lib import SpotifyClient, YoutubeClient, ErrorResponse, Artist, Evaluation
@@ -341,9 +341,12 @@ class EvalController():
       return self._fuzzy_equal(youtube_channel_title, spotify_artist_name, threshold) and self._fuzzy_equal(youtube_video_title, spotify_song_title, threshold)
   
   def find_needs_eval_refresh(self, sql_session, limit: int):
-    sql_ids = (select(Artist.id).outerjoin(Evaluation, Artist.evaluation)
-               .filter(or_(Evaluation.updated_at <= func.now() - timedelta(days=7), Evaluation.id == None))
-               .filter(or_(Artist.eval_queued_at == None, Artist.eval_queued_at <= func.now() - timedelta(hours=12)))
-               .filter(Artist.active == True)).limit(limit)
+    sql_ids = ((select(Artist.id).outerjoin(Evaluation, Artist.evaluation)
+               .filter(and_(
+                            Artist.active == True,
+                            or_(Artist.eval_queued_at == None, Artist.eval_queued_at <= func.now() - timedelta(hours=12)),
+                            or_(Evaluation.updated_at <= func.now() - timedelta(days=10), Evaluation.id == None
+                        ))))
+               .limit(limit))
     sql_ids = sql_session.scalars(sql_ids).unique()
     return list(sql_ids)

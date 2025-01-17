@@ -323,7 +323,7 @@ class TrackingController():
   def update_artist(self, sql_session, spotify_id : str = None, artist_id: str = None, is_ob=False):
     sql_ref = None
     if spotify_id is None:
-      sql_ref = artist_with_meta(sql_session, None, artist_id, (or_(Attribution.artist_id == None, and_(Attribution.notified == False, Attribution.playlist_id == None))))
+      sql_ref = artist_with_meta(sql_session, None, artist_id)
       if sql_ref is None:
           raise ErrorResponse('Artist not found: ' + str(artist_id) , 404, 'Tracking')
       spotify_id = sql_ref.spotify_id
@@ -336,11 +336,11 @@ class TrackingController():
       raise ErrorResponse('Artist not found: ' + str(spotify_id) + ", " + str(artist_id), 404, 'Tracking')
 
     if sql_ref is None:
-        sql_ref = artist_with_meta(sql_session, spotify_id, None,  (or_(Attribution.artist_id == None, and_(Attribution.notified == False, Attribution.playlist_id == None))))
+        sql_ref = artist_with_meta(sql_session, spotify_id, None)
     if sql_ref is None:
         print('Artist needs migration; importing to SQL')
         self.import_sql(doc)
-        sql_ref = artist_with_meta(sql_session, spotify_id, None, (or_(Attribution.artist_id == None, and_(Attribution.notified == False, Attribution.playlist_id == None))))
+        sql_ref = artist_with_meta(sql_session, spotify_id, None)
 
     # check the artist is ingested - not needed
     # data = doc.to_dict()
@@ -399,11 +399,13 @@ class TrackingController():
 
                 if attr.user_id not in user_ids:
                     user_ids.append(attr.user_id)
-            users = self.db.collection('users').where(filter=FieldFilter(
-    "id", "array_contains_any", user_ids
-            )).where(filter=FieldFilter("sms.verified", "==", True)).get()
-            for user in users:
-                self.twilio.send_artist_stats(user.to_dict(), sql_ref)
+            if len(user_ids) > 0:
+                users = self.db.collection('users').where(filter=FieldFilter(
+        "id", "array_contains_any", user_ids
+                )).where(filter=FieldFilter("sms.verified", "==", True)).get()
+                for user in users:
+                    self.twilio.send_artist_stats(user.to_dict(), sql_ref)
+
 
     except Exception as e:
         print(e)

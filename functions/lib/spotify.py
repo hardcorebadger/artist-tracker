@@ -1,6 +1,13 @@
+import base64
 import traceback
+from datetime import timedelta
 
 import requests
+from google.cloud.firestore_v1 import Client, FieldFilter, SERVER_TIMESTAMP
+from sqlalchemy import func, select, and_
+from sqlalchemy.exc import DatabaseError
+
+from .models import SpotifyToken
 from .errors import ErrorResponse
 from requests.exceptions import JSONDecodeError
 
@@ -11,7 +18,7 @@ last_playlist = None
 # spotify_playlists = dict()
 
 class SpotifyClient():
-  def __init__(self):
+  def __init__(self, db: Client):
     self.client_id = SPOTIFY_CLIENT_ID
     self.client_secret = SPOTIFY_CLIENT_SECRET
     self.alt_client_id = SPOTIFY_ALT_CLIENT_ID
@@ -24,6 +31,7 @@ class SpotifyClient():
     self.authorized = False
     self.authorizedAlt = False
     self.authorizedUser = False
+    self.db = db
     self.root_uri = "https://api.spotify.com/v1"
 
   def authorize(self, alt_token=False):
@@ -117,8 +125,32 @@ class SpotifyClient():
     return self.get(f"/artists/{id}/albums", data={'include_groups':'album,single'})
   
   def get_albums(self, ids):
-    idp = ",".join(id for id in ids)
-    return self.get(f"/albums", data={'ids':idp})
+
+    check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
+        "spotify_id", "in", ids
+      )).where(filter=FieldFilter(
+      'type', '==', 'album'
+    )).get()
+    album_data = []
+    missing_ids = []
+    for id in ids:
+      found = False
+      for check in check_cache:
+        if check.get('spotify_id') == id:
+          found = True
+          album_data.append(check.get('data'))
+      if found == False:
+        missing_ids.append(id)
+    if len(missing_ids) > 0:
+      idp = ",".join(id for id in missing_ids)
+      albums = self.get(f"/albums", data={'ids': idp})
+      for album in albums['albums'] if 'albums' in albums else []:
+        album_data.append(album)
+        cache = {"data": album, "spotify_id": album.get('id'), "type": "album", "created_at": SERVER_TIMESTAMP}
+        update_time, cache_ref = self.db.collection("spotify_cache").add(cache)
+        print(f"Added cache with id {cache_ref.id}: " + album.get('id'))
+
+    return album_data
   
   def get_playlist(self, id, alt_token=False):
     global last_playlist
@@ -200,3 +232,47 @@ class SpotifyClient():
         return id_part
     else:
         return 'invalid'
+
+  def get_token_from_code(self, sql_session, uid, org_id, code, redirect_uri, state):
+    client_id = self.alt_client_id
+    existing = sql_session.scalars(select(SpotifyToken).where(and_(SpotifyToken.state == state, SpotifyToken.client_id == client_id))).first()
+    if existing is not None:
+      return existing.as_dict()
+    res = requests.post("https://accounts.spotify.com/api/token", headers= {
+      "Authorization": f"{self.encode_client_credentials(client_id, self.alt_client_secret)}",
+      'Content-Type': 'application/x-www-form-urlencoded',
+      "Accept": "application/json"
+    }, data={
+      "grant_type": "client_credentials",
+      "code": code,
+      "redirect_uri": redirect_uri,
+    })
+
+    json = res.json()
+    if 'access_token' in json:
+      try:
+        expires_in = json['expires_in']
+        expires_at = func.now() + timedelta(seconds=(int(expires_in) - 10))
+        refresh = json['refresh_token'] if 'refresh_token' in json else None
+        token_record = SpotifyToken(user_id=uid, organization_id=org_id, token=json['access_token'], refresh_token=refresh, expires_at=expires_at, client_id=client_id, state=state)
+        sql_session.add(token_record)
+        sql_session.commit()
+      except Exception as e:
+        sql_session.rollback()
+        existing = sql_session.scalars(
+          select(SpotifyToken).where(and_(SpotifyToken.state == state, SpotifyToken.client_id == client_id))).first()
+        if existing is not None:
+          return existing.as_dict()
+        else:
+          print(e)
+          return {'error': 'could not insert token'}
+      return token_record.as_dict()
+    else:
+      return json
+
+
+  def encode_client_credentials(self, client_id, client_secret):
+    credentials = f"{client_id}:{client_secret}"
+    credentials_bytes = credentials.encode('ascii')
+    base64_credentials = base64.b64encode(credentials_bytes).decode('ascii')
+    return "Basic " + base64_credentials

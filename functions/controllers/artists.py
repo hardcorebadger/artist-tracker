@@ -335,16 +335,13 @@ def artist_joined_query():
     return query
 
 
-def artist_with_meta(sql_session, spotify_id = None, artist_id = None, with_attribution = None):
+def artist_with_meta(sql_session, spotify_id = None, artist_id = None):
     query = select(Artist).options(
         joinedload(Artist.statistics, innerjoin=False).joinedload(Statistic.type, innerjoin=True),
         joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True),
         joinedload(Artist.tags, innerjoin=False),
-        contains_eager(Artist.attributions)
+        joinedload(Artist.attributions_needing_notified, innerjoin=False)
     )
-
-    if with_attribution is not None:
-        query = query.outerjoin(Attribution, Artist.attributions).filter(with_attribution)
 
     if spotify_id is not None:
         query = query.where(Artist.spotify_id == spotify_id)

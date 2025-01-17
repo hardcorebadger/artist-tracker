@@ -10,6 +10,7 @@ import GuestGuard from './GuestGuard';
 import AccessGuard from './AccessGuard';
 
 import LoadingScreen from './LoadingScreen';
+import PageCallback from "../pages/PageCallback";
 // ----------------------------------------------------------------------
 
 function path(root, sublink) {
@@ -47,6 +48,11 @@ export default function Router() {
         { path: 'home', element: <PageHome />},
         // { path: 'report/:id', element: <PageArtistReport />},
         { path: 'upgrade', element: <PageUpgrade />},
+        { path: 'callback', children: [
+            { path: 'spotify', element: <PageCallback /> },
+            // { path: '*', element: <Navigate to="/404" replace /> },
+          ]},
+
         { path: 'paywalled', element: <AccessGuard level="elite"><PagePaywalled /></AccessGuard> },
         { path: 'settings',
           children: [

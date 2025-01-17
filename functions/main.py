@@ -170,16 +170,11 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        records = select(ArtistTag).distinct(ArtistTag.tag_type_id, ArtistTag.tag)
-        records = sql_session.scalars(records).all()
-        records = list(map(lambda type: type.as_tag_dict(), records))
-        return {
-            'response': records
-        }
+        spotify = get_spotify_client()
+        return spotify.get_albums(["4yATru0hY3VgRHSreswbGj", "0yB9HR3y1wuHQidtmHMuJf"])
 
     @v2_api.post("/twilio")
     def twilio_endpoint():
-
         data = flask.request.form.to_dict()
         from_number = data.get('From', None)
         message = data.get('Body', None)
@@ -539,6 +534,19 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             return {
                 "id": twilio.send_code(uid, db, data.get('number'))
             }
+
+    @v3_api.post('/spotify-auth')
+    def spotify_auth():
+        spotify = get_spotify_client()
+        db = firestore.client(app)
+
+        data = flask.request.get_json()
+        code = data.get('code', None)
+        state = data.get('state', None)
+        user_data = get_user(user.uid, db)
+        redirect_uri = data.get('redirect_uri', None)
+        return spotify.get_token_from_code(sql_session, user.uid, user_data.get('organization'), code, redirect_uri, state)
+
     @v3_api.after_request
     def after_request(response):
         # Code to run after each request
@@ -585,7 +593,7 @@ def get_existing_tags(sql_session, user):
 def get_spotify_client():
     global spotify_client
     if spotify_client is None:
-        spotify_client = SpotifyClient()
+        spotify_client = SpotifyClient(firestore.client(app))
 
     return spotify_client
 

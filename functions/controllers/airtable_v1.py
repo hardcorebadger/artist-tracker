@@ -94,6 +94,7 @@ class AirtableV1Controller():
       }])
 
   def copyright_eval(self, record_id):
+      return
       # Get the record
       record = self.airtable.get_artist_by_id(record_id)
 

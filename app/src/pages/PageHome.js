@@ -30,7 +30,7 @@ import { AccessSkeleton, AccessOverlay } from '../components/AccessGates';
 import Iconify from '../components/Iconify';
 import ReportsList from '../components/ReportsList';
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '../firebase';
+import {functions, spotify_redirect} from '../firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { db } from '../firebase';
@@ -43,6 +43,8 @@ import {
 } from "@choc-ui/chakra-autocomplete";
 import {ColumnDataContext, goFetch} from "../App";
 import TagInput from "../components/TagInput";
+const client_id = 'aa08e3eb52f24d9a9f772e2c544b39b5';
+const scope = 'user-read-private user-read-email playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public user-library-read user-read-recently-played';
 
 function StatCard({title, value}) {
   return (
@@ -179,6 +181,15 @@ function PageDefault() {
     }
     loadArtists()
   }, []);
+  const state = user.auth.uid + ( new Date/1000 | 0);
+  const spotifyParams = new URLSearchParams({
+    response_type: 'code',
+    client_id: client_id,
+    scope: scope,
+    redirect_uri: spotify_redirect,
+    state: state
+  });
+
 
   return (
       <PageLayoutContained size="lg">
@@ -201,7 +212,15 @@ function PageDefault() {
                   <Heading size="xs">Text Us</Heading>
                   <Text>Send in artist or playlist links to import or get information on your phone.{(user?.profile?.sms?.verified ? ' Send HELP for instructions.' : '')}</Text>
 
-                  <Link href={user?.profile?.sms?.verified ? 'sms:+18333712184' : '/app/settings/account'} isExternal={user?.profile?.sms?.verified ?? false}><Button colorScheme='primary'>{user?.profile?.sms?.verified ? 'Text +1 833 371-2184' : 'Add + Verify # In Settings'}</Button></Link>
+                  <Link href={user?.profile?.sms?.verified ? 'sms:+18333712184' : '/app/settings/account'} isExternal={user?.profile?.sms?.verified ?? false}><Button colorScheme='primary'>{user?.profile?.sms?.verified ? 'Text +1 833 371-2184' : 'Get Started'}</Button></Link>
+                </Stack>
+              </Card>
+              <Card p={25}>
+                <Stack w="100%" spacing={3}>
+                  <Heading size="xs">Spotify</Heading>
+                  <Text></Text>
+
+                  <Link href={'https://accounts.spotify.com/authorize?'+spotifyParams.toString()} isExternal={true}><Button colorScheme='primary'>Link</Button></Link>
                 </Stack>
               </Card>
             </Stack>
