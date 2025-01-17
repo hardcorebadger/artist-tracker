@@ -6,10 +6,10 @@ import re
 from fuzzywuzzy import fuzz
 
 YT_DIY_DISTROS = [
-   "DistroKid", "Ditto", "TuneCore", "CDBaby", "United Masters", "Symphonic", "EVEARA", "SongCast", "Too Lost", "Amuseio", "Repost Network", "IIP-DDS", "N/A"
+   "DistroKid", "Ditto", "TuneCore", "CDBaby", "United Masters", "Symphonic", "EVEARA", "SongCast", "Too Lost", "Amuseio", "Repost Network", "IIP-DDS", "N/A", "CmdShft"
 ]
 YT_MAJOR_DISTROS = [
-   "The Orchard Enterprises", "Universal Music Group", "Warner Records Inc", "Sony Entertainment Group", "Atlantic Records", "Ingrooves", "Columbia", "Epic", "Alamo", "Arista Records", "300 Entertainment"
+   "The Orchard Enterprises", "Universal Music Group", "Warner Records Inc", "Sony Entertainment Group", "Atlantic Records", "Ingrooves", "Columbia", "Epic", "Alamo", "Arista Records", "300 Entertainment", "Virgin Music Group", "Sony Music Nashville", "RCA Records Label Nashville"
 ]
 YT_KNOWN_INDIE_DISTROS = [
    "Stem Disintermedia Inc.", "Vydia", "Foundation Media LLC"
@@ -24,7 +24,7 @@ SP_SIGNED_KEYWORDS = [
    "under exclusive license to"
 ]
 SP_DIY_KEYWORDS = [
-   "distrokid", "ditto", "tunecore", "cdbaby", "united masters", "symphonic", "records dk"
+   "distrokid", "ditto", "tunecore", "cdbaby", "united masters", "symphonic", "records dk", "cmdshft"
 ]
 
 CP_EVAL_SYS = """
