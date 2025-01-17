@@ -347,6 +347,7 @@ class EvalController():
                             or_(Artist.eval_queued_at == None, Artist.eval_queued_at <= func.now() - timedelta(hours=12)),
                             or_(Evaluation.updated_at <= func.now() - timedelta(days=10), Evaluation.id == None
                         ))))
+                .order_by(Artist.evaluation_id.desc())
                .limit(limit))
     sql_ids = sql_session.scalars(sql_ids).unique()
     return list(sql_ids)

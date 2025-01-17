@@ -73,8 +73,9 @@ def addartisttask(req: tasks_fn.CallableRequest) -> str:
     playlist_id = req.data.get('playlist_id', None)
     tags = req.data.get('tags', None)
     user_data = get_user(uid, db)
-
-    message, code = tracking_controller.add_artist(spotify_id, uid, user_data['organization'], playlist_id, tags)
+    sql_session = get_sql().get_session()
+    message, code = tracking_controller.add_artist(sql_session, spotify_id, uid, user_data['organization'], playlist_id, tags)
+    sql_session.close()
     return message
 
 
@@ -171,7 +172,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/debug")
     def debug():
         spotify = get_spotify_client()
-        return spotify.get_albums(["4yATru0hY3VgRHSreswbGj", "0yB9HR3y1wuHQidtmHMuJf"])
+        return eval_controller.find_needs_eval_refresh(sql_session, 10)
 
     @v2_api.post("/twilio")
     def twilio_endpoint():
@@ -334,7 +335,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         if 'spotify_id' not in data:
             raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
 
-        return tracking_controller.add_artist(data['spotify_id'], 'URTJbErZ7YTCwzSyoXvF4vBd9Xj1', '8AasHpt0Y2CNmogY6TpM')
+        return tracking_controller.add_artist(sql_session, data['spotify_id'], 'URTJbErZ7YTCwzSyoXvF4vBd9Xj1', '8AasHpt0Y2CNmogY6TpM')
 
     @v2_api.post("/ingest-artist")
     def ingest_artist():

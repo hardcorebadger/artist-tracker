@@ -62,7 +62,7 @@ class TrackingController():
   # #####################
   
   def add_ingest_update_artist(self, sql_session, spotify_id, user_id, org_id, tags = None):
-    msg, status = self.add_artist(spotify_id, user_id, org_id, None, tags)
+    msg, status = self.add_artist(sql_session, spotify_id, user_id, org_id, None, tags)
     if status != 200:
       return msg, status
     return self.ingest_artist(sql_session, spotify_id)
