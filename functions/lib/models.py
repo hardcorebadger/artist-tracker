@@ -84,7 +84,7 @@ class Artist(Base):
 
     attributions_needing_notified: Mapped[List["Attribution"]] = relationship(primaryjoin=and_(Attribution.artist_id == id, Attribution.notified == False, Attribution.playlist_id == None), overlaps="attributions,artist")
 
-    def as_dict(self):
+    def as_dict(self, organization_id = None):
         dict = {c.name: getattr(self, c.name) for c in self.__table__.columns}
         dict['evaluation'] = None
         if (self.evaluation != None):
@@ -93,11 +93,10 @@ class Artist(Base):
         for link in self.links:
             dict['link_' + link.source.key] = link.url
 
-        sorted_users = sorted(list(map(lambda user: user.as_dict(), self.users)), key=lambda x: x["created_at"])
-        dict['users'] = sorted_users
-        dict['organization'] = pop_default(list(map(lambda org: org.as_dict(), self.organizations)), None)
+        dict['organization'] = pop_default(list(map(lambda org: org.as_dict(), filter(lambda org: org.organization_id == organization_id or organization_id is None, self.organizations))), None)
         dict['statistics'] = list(map(lambda stat: stat.as_dict(), self.statistics))
-        dict['tags'] = list(map(lambda tag: tag.as_dict(), self.tags))
+        dict['users'] = sorted(list(map(lambda user: user.as_dict(), filter(lambda user: user.organization_id == organization_id or organization_id is None, self.users))), key=lambda x: x["created_at"])
+        dict['tags'] = list(map(lambda tag: tag.as_dict(), filter(lambda tag: tag.organization_id == organization_id or tag.organization_id is None, self.tags)))
 
         # for stat in self.statistics:
         #     dict['stat_' + stat.type.source + '__' + stat.type.key + '-latest'] = stat.latest
@@ -114,11 +113,13 @@ class Artist(Base):
 
     def as_deep_dict(self, organization_id = None):
         dict = self.as_dict()
-        for attr in self.attributions:
-            print(attr.organization_id + " " + organization_id)
+
         attr = list(map(lambda attribution: attribution.as_dict(), filter(lambda attribution: attribution.organization_id == organization_id or organization_id is None, self.attributions)))
         attr.reverse()
         dict['attributions'] = attr
+        dict['users'] = sorted(list(map(lambda user: user.as_dict(), filter(lambda user: user.organization_id == organization_id or organization_id is None, self.users))), key=lambda x: x["created_at"])
+        dict['tags'] = list(map(lambda tag: tag.as_dict(), filter(lambda tag: tag.organization_id == organization_id or tag.organization_id is None, self.tags)))
+
         return dict
 
     def __repr__(self):

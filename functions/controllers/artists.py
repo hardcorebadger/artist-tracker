@@ -66,7 +66,7 @@ class ArtistController():
             if id_lookup is not None:
                 artists = list(map(lambda artist: artist.as_deep_dict(user_data.get('organization')), artists_set))
             else:
-                artists = list(map(lambda artist: artist.as_dict(), artists_set))
+                artists = list(map(lambda artist: artist.as_dict(user_data.get('organization')), artists_set))
 
             db.close()
             if id_lookup is not None:
@@ -85,6 +85,7 @@ class ArtistController():
                 "error": None
             }
         except Exception as e:
+            print (e)
             if id_lookup is not None:
                 return {
                     "artist": None,
@@ -109,8 +110,8 @@ class ArtistController():
                 joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True).defer(LinkSource.logo),
                 joinedload(Artist.organizations, innerjoin=True),
                 contains_eager(Artist.evaluation),
-                contains_eager(Artist.users),
-                contains_eager(Artist.tags)
+                joinedload(Artist.users, innerjoin=False),
+                joinedload(Artist.tags, innerjoin=False),
             ))
 
         if id_lookup is not None:
@@ -121,17 +122,17 @@ class ArtistController():
                     LinkSource.logo),
                 joinedload(Artist.organizations, innerjoin=True),
                 contains_eager(Artist.evaluation),
-                contains_eager(Artist.users),
-                contains_eager(Artist.tags),
+                joinedload(Artist.users, innerjoin=False),
+                joinedload(Artist.tags, innerjoin=False),
                 joinedload(Artist.attributions).joinedload(Attribution.playlist)
             ))
             query = query.filter(Artist.id == id_lookup)
 
         query = query.filter(Artist.active == True)
-        query = query.outerjoin(Evaluation, Artist.evaluation).outerjoin(UserArtist, Artist.users).outerjoin(ArtistTag, Artist.tags)
+        query = query.outerjoin(Evaluation, Artist.evaluation)
         query = query.where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization')))
-        query = query.filter(UserArtist.organization_id == user_data.get('organization'))
-        query = query.filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))
+        # query = query.filter(UserArtist.organization_id == user_data.get('organization'))
+        # query = query.filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))
 
         query, eval_dynamic, org_dynamic  = self.build_filters(user_data, data, query)
 
