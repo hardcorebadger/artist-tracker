@@ -12,7 +12,7 @@ import {useUser} from "../routing/AuthGuard";
 function PageArtist() {
     const { artistId } = useParams()
     const user = useUser()
-
+    const [activeArtistId, setActiveArtistId] = useState(artistId)
     const {  setActiveArtist, activeArtist, linkSources, statisticTypes } = useContext(ColumnDataContext);
     const {currentQueryModel} = useContext(CurrentReportContext);
     const toast = useToast();
@@ -22,10 +22,13 @@ function PageArtist() {
             return goFetch(user, 'GET', 'artists', data)
         }
         if (force || !activeArtist?.hasOwnProperty('attributions') || activeArtist === null || activeArtist.id !== artistId) {
+
             getArtist({"id": artistId}).then((response) => {
                 // console.log(response);
                 if (!response.error) {
-                    setActiveArtist(response.artist)
+                    if (response.artist?.id === activeArtistId) {
+                        setActiveArtist(response.artist)
+                    }
                 } else {
                     toast({
                         title: 'Failed to load artist',
@@ -41,8 +44,10 @@ function PageArtist() {
     }
 
     useEffect(() => {
+
         if (!activeArtist?.hasOwnProperty('attributions') || activeArtist === null || activeArtist.id !== artistId) {
             if ( activeArtist?.id !== artistId) {
+                setActiveArtistId(artistId)
                 setActiveArtist(null)
             }
             loadArtist()

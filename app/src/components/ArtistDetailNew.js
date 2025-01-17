@@ -157,7 +157,7 @@ const { isOpen, onOpen, onClose } = useDisclosure()
   // console.log(filteredData)
 
 
-  if (stats.length === 0) {
+  if (stats?.length === null || stats.length === 0) {
     return (
         <LoadingWidget/>
     )
@@ -182,7 +182,6 @@ const { isOpen, onOpen, onClose } = useDisclosure()
       }
     }
   })
-  console.log(attributionGroups)
   return (
 
 
@@ -222,30 +221,33 @@ const { isOpen, onOpen, onClose } = useDisclosure()
             </TabList>
             <Card variant="outline" p={2} mt={5}>
               <Heading size={'md'}>{stats[tabIndex].headerName}{(filteredData && filteredData.length > 0 ? '' : ' - (No Data Available)')}</Heading>
-              <Chart
-                height={'300px'}
-                options={{
-                  xaxis: (filteredData && filteredData.length > 0) ? {
-                    labels: {
-                      show: true,
-                      formatter: function (val) {
-                        if (filteredStat) {
-                          return filteredStat['dates'][val]
-                        } else {
-                          return "N/A"
-                        }
-                      }
-                    }
-                  } : {},
-                  ...chartOptions
-                }}
-                series={[{
-                  name: stats[tabIndex].headerName,
-                  data: filteredData
-                }]}
+              {filteredData && filteredData.length > 0 ? (
+                  <Chart
+                      height={'300px'}
+                      options={{
+                        xaxis: (filteredData && filteredData.length > 0) ? {
+                          labels: {
+                            show: true,
+                            formatter: function (val) {
+                              if (filteredStat) {
+                                return filteredStat['dates'][val]
+                              } else {
+                                return "N/A"
+                              }
+                            }
+                          }
+                        } : {},
+                        ...chartOptions
+                      }}
+                      series={[{
+                        name: stats[tabIndex].headerName,
+                        data: filteredData
+                      }]}
 
-                type="area"
-              />
+                      type="area"
+                  />
+              ) : null}
+
             </Card>
             <Card variant={"unstyled"} p={2} mt={5}>
               <Wrap justify={'center'}>
