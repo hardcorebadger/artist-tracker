@@ -6,7 +6,7 @@ from firebase_admin.auth import UserRecord
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
 from firebase_functions.options import RetryConfig, MemoryOption
 from flask import jsonify
-from google.cloud.firestore_v1 import FieldFilter
+from google.cloud.firestore_v1 import FieldFilter, Or
 from sqlalchemy import select, or_
 from sqlalchemy.orm import joinedload
 from sqlalchemy.util.preloaded import sql_dml
@@ -171,8 +171,28 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        spotify = get_spotify_client()
-        return eval_controller.evaluate_copyrights('7uelPzv7TB20x3wtDt95E9', sql_session, None)
+
+        users = db.collection("users").get()
+        user_orgs = {}
+        for user in users:
+            print(user.id + " " + user.get('first_name'))
+            user_dict = user.to_dict()
+            user_org = user_dict.get('organization')
+            if user_org is not None:
+                if user_dict.get('organization') not in user_orgs:
+                    user_orgs[user_dict.get('organization')] = []
+                user_orgs[user_dict.get('organization')].append(user_dict)
+                if 'organizations' not in user_dict:
+                    user.reference.update({'organizations': [user_dict.get('organization')], 'admin': False})
+            # else:
+                # user.reference.update({'organizations':[]})
+        for org in user_orgs.keys():
+            print(org + " " + str(len(user_orgs[org])))
+            for user in user_orgs[org]:
+                print("   " + user.get('first_name'))
+        return "Yay"
+        # spotify = get_spotify_client()
+        # return eval_controller.evaluate_copyrights('7uelPzv7TB20x3wtDt95E9', sql_session, None)
         # return spotify.get_artist('55ZKRn4w3oNhBMV7sgG1PP')
 
     @v2_api.post("/twilio")
@@ -449,11 +469,17 @@ def load_stat_types(sql_session):
 
 def load_users(organization_id):
     db = firestore.client(app)
-    users = db.collection('users').where(filter=FieldFilter('organization', '==', organization_id)).get()
+    users = db.collection('users').where(filter=Or(
+        [
+            FieldFilter('organizations', 'array_contains', organization_id),
+            FieldFilter("admin", "==", True),
+        ]
+    )).get()
     return ({
         "id": user.id,
         "first_name": user.get('first_name'),
-        "last_name": user.get('last_name')
+        "last_name": user.get('last_name'),
+        "admin": user.get('admin') if 'admin' in user.to_dict() else False,
     } for user in users)
 
 def user_from_request(request: https_fn.Request) -> None|UserRecord:
@@ -483,6 +509,30 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         response = jsonify(get_type_definitions(sql_session))
         response.headers.add('Cache-Control', 'public, max-age=600')
         return response
+
+    @v3_api.get('/organizations')
+    def get_organizations_request():
+        db = firestore.client(app)
+        user_data = get_user(user.uid, db)
+        admin = user_data['admin'] if 'admin' in user_data else False
+        if admin == False:
+            return 'Unauthorized', 401
+        return list(map(lambda org: {"id": org.id, "name": org.get('name')}, db.collection('organizations').get()))
+
+    @v3_api.post('/set-organization')
+    def set_organization_request():
+        db = firestore.client(app)
+        user_data = get_user(user.uid, db, False)
+        user_dict = user_data.to_dict()
+        admin = user_dict['admin'] if 'admin' in user_dict else False
+        if admin == False:
+            return 'Unauthorized', 401
+        data = flask.request.get_json()
+
+        user_data.reference.update({'organization': data.get('organization')})
+
+        return {"organization": data.get('organization')}, 200
+
 
     @v3_api.get('/get-existing-tags')
     def get_existing_tags_request():
@@ -580,7 +630,8 @@ def get_existing_tags(sql_session, user):
     if user is None:
         return {
             "tags": [],
-            "users": []
+            "users": [],
+            "current_user": None
         }
     uid = user.uid
     user_data = get_user(uid, db)
@@ -589,7 +640,8 @@ def get_existing_tags(sql_session, user):
     records = (tag_type.as_tag_dict() for tag_type in records)
     return {
         "tags": list(records),
-        "users": list(load_users(user_data.get('organization')))
+        "users": list(load_users(user_data.get('organization'))),
+        "current_user": user_data,
     }
 
 def get_spotify_client():

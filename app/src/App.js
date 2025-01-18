@@ -25,7 +25,7 @@ function App() {
     const [currentReport, setCurrentReport] = useState(getInitialState('currentReport'))
     const [currentRows, setCurrentRows] = useState(null)
     const [currentQueryModel, setCurrentQueryModel] = useState(getInitialState('currentQueryModel'))
-
+    const [currentUser, setCurrentUser] = useState(null)
 
     const [users, setUsers] = useState(null)
     const loadOrgFilters = async (user) => {
@@ -50,6 +50,7 @@ function App() {
                     newUsers[user.id] = user
                 }
                 setUsers(newUsers)
+                setCurrentUser(response.current_user ?? null)
             });
         }
     }
@@ -81,6 +82,7 @@ function App() {
             activeArtist: activeArtist,
             existingTags: existingTags,
             setExistingTags: setExistingTags,
+            currentUser: currentUser,
             refreshFilters: loadOrgFilters,
             users: users,
             setUsers: setUsers,

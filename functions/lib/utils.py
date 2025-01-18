@@ -3,11 +3,13 @@ from firebase_functions.options import SupportedRegion
 from google.auth.transport.requests import AuthorizedSession
 
 
-def get_user(uid, db):
+def get_user(uid, db, as_dict = True):
     ref = db.collection("users").document(uid)
     doc = ref.get()
-    data = doc.to_dict()
-    return data
+    if as_dict:
+        data = doc.to_dict()
+        return data
+    return doc
 
 def pop_default(input_list, default_value):
     try:

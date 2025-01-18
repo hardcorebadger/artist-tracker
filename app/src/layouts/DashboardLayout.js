@@ -7,8 +7,8 @@ import {
   Button, IconButton,
   Text, Container,
   VStack, useControllableState, VisuallyHidden,
-  Accordion, AccordionItem, AccordionPanel, AccordionButton, 
-  Link, Avatar,Menu, MenuButton, MenuList, MenuItem
+  Accordion, AccordionItem, AccordionPanel, AccordionButton,
+  Link, Avatar, Menu, MenuButton, MenuList, MenuItem, useDisclosure
 } from '@chakra-ui/react';
 import { useMediaQuery } from '@chakra-ui/react'
 import { Outlet, useNavigate } from "react-router-dom";
@@ -23,7 +23,9 @@ import { collection, query, where } from 'firebase/firestore';
 import { useCollection } from 'react-firebase-hooks/firestore';
 import { db } from '../firebase';
 import { deepCopy } from '../util/objectUtil';
-import {ColumnDataContext, CurrentReportContext} from "../App";
+import {ColumnDataContext, CurrentReportContext, goFetch} from "../App";
+import {AutoComplete, AutoCompleteInput, AutoCompleteItem, AutoCompleteList} from "@choc-ui/chakra-autocomplete";
+import ChangeOrganizationModal from "../components/ChangeOrganizationModal";
 
 const basePadding = 6
 
@@ -42,15 +44,19 @@ const navItemConfig = [
   },
 ]
 
-function UserBlock() {
-  const user = useUser()  
+function UserBlock({currentUser, openOrgModal}) {
+  const user = useUser()
   return (
     <Box w="100%" p={basePadding} pl={basePadding+2} pr={basePadding+2}>
     <HStack align="center" justify="space-between">
-      <HStack align="center">
-        <Avatar size="sm"/>
-        <Text fontSize="sm" fontWeight="semibold">{user.profile.first_name} {user.profile.last_name}</Text>
-      </HStack>
+        <HStack align="center">
+          <Avatar size="sm"/>
+          <VStack spacing={0}>
+            <Text fontSize="sm" fontWeight="semibold">{user.profile.first_name} {user.profile.last_name}</Text>
+            <Text fontSize="2xs" width={'100%'} fontWeight="light" color={"text.subtle"}>{user.org.info.name}</Text>
+
+          </VStack>
+        </HStack>
       <Menu>
         <MenuButton
           as={IconButton}
@@ -65,6 +71,11 @@ function UserBlock() {
           <MenuItem as={RouterLink} to="/app/settings" >
             Account Settings
           </MenuItem>
+          {currentUser?.admin ? (
+            <MenuItem onClick={openOrgModal} >
+              Change Organization
+            </MenuItem>
+          ) : null}
         </MenuList>
       </Menu>
     </HStack>
@@ -133,11 +144,13 @@ function NavItem({icon, path, display, index, children, clickFirst}) {
   )
 }
 
-function NavBar({navItems}) {
+function NavBar({navItems, currentUser, organizations, openOrgModal}) {
   const location = useLocation()
   const index = location.pathname
   const {setActiveArtist} = useContext(ColumnDataContext)
   const {setCurrentQueryModel, setCurrentRows, setCurrentReport} = useContext(CurrentReportContext)
+
+
   return (
   <Box pl={basePadding} pr={basePadding} pt={3} w="100%" h="100%" position="relative"
   sx ={{
@@ -162,6 +175,7 @@ function NavBar({navItems}) {
         </NavItem>
       ))}
     </VStack>
+
     <Box position="absolute" bottom={0} left={0} right={0} w="100%"
     bgColor="bg.default"
      sx ={{
@@ -170,7 +184,7 @@ function NavBar({navItems}) {
       borderTopWidth: '1px',
     }}
     >
-      <UserBlock />
+      <UserBlock currentUser={currentUser} openOrgModal={openOrgModal} />
     </Box>
   </Box>
   )
@@ -285,13 +299,30 @@ export default function DashboardLayout() {
 
   const [isDesktop] = useMediaQuery('(min-width: 900px)')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const {refreshFilters} = useContext(ColumnDataContext)
-
+  const {refreshFilters, currentUser} = useContext(ColumnDataContext)
+  const [organizations, setOrganizations] = useState(null)
   const user = useUser()
   useEffect(() => {
 
     refreshFilters(user)
+
+
+
   }, []);
+
+  useEffect(() => {
+    if (currentUser !== null) {
+      console.log(currentUser)
+      if (currentUser.admin) {
+        goFetch(user, 'GET', 'organizations').then((response) => {
+          console.log(response)
+          setOrganizations(response)
+        });
+      }
+    }
+  }, [currentUser])
+
+
   const [reports, reportsLoading, reportError] = useCollection(
     query(collection(db, 'reports'), 
       where("organization", "==", user.org.id),
@@ -312,9 +343,14 @@ export default function DashboardLayout() {
     setMobileMenuOpen(false)
   }, [location]);
 
+  useEffect(() => {
+
+  }, [organizations])
+
   const reportItems = reportError || reportsLoading ? [] : reports.docs.map((d) => ({'name': d.data().name, 'path': '/app/reports/'+d.id}))
-  const navItems = bakeNavItems(navItemConfig, reportItems)
-  
+  const navItems = bakeNavItems(navItemConfig, reportItems, organizations, currentUser)
+  const { isOpen, onOpen, onClose } = useDisclosure()
+
 
   return (
     <Box> 
@@ -335,7 +371,7 @@ export default function DashboardLayout() {
           <LogoBlock/>
         </GridItem>
         <GridItem area={'nav'}>
-          <NavBar navItems={navItems}/>
+          <NavBar navItems={navItems} currentUser={currentUser}  organizations={organizations} openOrgModal={onOpen} />
         </GridItem>
         <GridItem area={'main'} maxW={'calc(100vw - 315px)'}>
           <Outlet />
@@ -353,11 +389,17 @@ export default function DashboardLayout() {
           <MobileHeader toggleMenu={toggleMobileMenu} menuOpen={mobileMenuOpen} />
         </Box>
         <Box display={mobileMenuOpen ? "block" : "none"} w="100vw" h={vh100m85} position="fixed" top="85px" left={0} right={0} bgColor="bg.default">
-          <NavBar navItems={navItems}/>
+          <NavBar navItems={navItems} currentUser={currentUser} organizations={organizations} openOrgModal={onOpen} />
         </Box>
       </Box>
       }
-    
+      <ChangeOrganizationModal
+          onOpen={onOpen}
+          organizations={organizations}
+          currentUser={currentUser}
+          onClose={onClose}
+          isOpen={isOpen}
+      />
     </Box>
   );
 }
