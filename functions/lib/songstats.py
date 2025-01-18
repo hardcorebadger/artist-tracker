@@ -15,12 +15,18 @@ class SongstatsClient():
       "apikey": self.key
     },
     params=data)
+    print(res.json())
     if res.status_code > 299:
       if res.status_code == 429:
         print("Songstats Rate Limiting")
       raise ErrorResponse(res.json(), res.status_code, "Songstats")
     return res.json()
-  
+
+  def get_artist_info_songstats(self, songstats_id : str):
+    return self.get('/artists/info', {
+      "songstats_artist_id": songstats_id
+    })
+
   def get_artist_info(self, spotify_id : str):
     return self.get('/artists/info', {
       "spotify_artist_id": spotify_id

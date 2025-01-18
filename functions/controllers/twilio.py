@@ -1,5 +1,6 @@
 import json
 import time
+from time import sleep
 
 from google.cloud.firestore_v1 import FieldFilter
 from sqlalchemy import select
@@ -145,6 +146,7 @@ class TwilioController():
               sent = self.send_template(user_data, "HXabba02580e40f6bbf0e0c1ddac752a36", dict({"1": data.get("name"), "2": "https://indiestack.app/app/artists/" + str(data.get('existing'))}))
               artist_data = artist_with_meta(sql_session=sql_session, spotify_id=None, artist_id=data.get('existing'))
               if artist_data is not None and len(artist_data.statistics) > 0:
+                sleep(0.25)
                 self.send_artist_stats(user_data, artist_data)
               # sent = self.send_template(user_data, "HXabba02580e40f6bbf0e0c1ddac752a36", dict({"1": data.get("name"), "2": "https://google.com"}))
             else:
@@ -198,9 +200,11 @@ class TwilioController():
     else:
       return str(num)
 
-  def send_artist_stats(self, user: dict, artist: Artist):
+  def send_artist_stats(self, user: dict, artist: Artist, on_retrieve = False):
     print("Converting stats to text")
     text = "Audience Stats for \"" + artist.name + "\":\n"
+    if on_retrieve:
+      text = "We finished retrieving " + text
     for stat in artist.statistics:
       text += stat.type.source.title() + " " + stat.type.name + ": " + self.format_number(stat.latest) + " " + ("+" if stat.week_over_week > 0 else "") + f"{round(stat.week_over_week * 100, 2):,}" + "%\n"
     self.send_message(user, text)

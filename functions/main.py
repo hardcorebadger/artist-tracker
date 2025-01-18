@@ -171,28 +171,30 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        return twilio.receive_message(db, '+19493385918', 'https://open.spotify.com/artist/1UKNeJ3wk2fCZEi0Bzb30O?si=86bfc38017b04740', process_spotify_link, sql_session)
 
-        users = db.collection("users").get()
-        user_orgs = {}
-        for user in users:
-            print(user.id + " " + user.get('first_name'))
-            user_dict = user.to_dict()
-            user_org = user_dict.get('organization')
-            if user_org is not None:
-                if user_dict.get('organization') not in user_orgs:
-                    user_orgs[user_dict.get('organization')] = []
-                user_orgs[user_dict.get('organization')].append(user_dict)
-                if 'organizations' not in user_dict:
-                    user.reference.update({'organizations': [user_dict.get('organization')], 'admin': False})
-            # else:
-                # user.reference.update({'organizations':[]})
-        for org in user_orgs.keys():
-            print(org + " " + str(len(user_orgs[org])))
-            for user in user_orgs[org]:
-                print("   " + user.get('first_name'))
-        return "Yay"
+        # return twilio.receive_message(db, '+19493385918', 'https://open.spotify.com/artist/1UKNeJ3wk2fCZEi0Bzb30O?si=86bfc38017b04740', process_spotify_link, sql_session)
+
+        # users = db.collection("users").get()
+        # user_orgs = {}
+        # for user in users:
+        #     print(user.id + " " + user.get('first_name'))
+        #     user_dict = user.to_dict()
+        #     user_org = user_dict.get('organization')
+        #     if user_org is not None:
+        #         if user_dict.get('organization') not in user_orgs:
+        #             user_orgs[user_dict.get('organization')] = []
+        #         user_orgs[user_dict.get('organization')].append(user_dict)
+        #         if 'organizations' not in user_dict:
+        #             user.reference.update({'organizations': [user_dict.get('organization')], 'admin': False})
+        #     # else:
+        #         # user.reference.update({'organizations':[]})
+        # for org in user_orgs.keys():
+        #     print(org + " " + str(len(user_orgs[org])))
+        #     for user in user_orgs[org]:
+        #         print("   " + user.get('first_name'))
+        # return "Yay"
         # spotify = get_spotify_client()
+        return tracking_controller.find_needs_stats_refresh(sql_session, 10)
         # return eval_controller.evaluate_copyrights('7uelPzv7TB20x3wtDt95E9', sql_session, None)
         # return spotify.get_artist('55ZKRn4w3oNhBMV7sgG1PP')
 

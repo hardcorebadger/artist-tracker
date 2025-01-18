@@ -314,6 +314,7 @@ class TrackingController():
 
   def set_onboard_wait(self, sql_session, sql_ref, onboard_wait = None):
       sql_ref.onboard_wait_until = onboard_wait
+      sql_ref.stats_queued_at = None
       sql_session.add_all([sql_ref])
       sql_session.commit()
   # #####################
@@ -348,6 +349,7 @@ class TrackingController():
     #   raise ErrorResponse('Artist not ingested', 401, 'Tracking')
     try:
       stats = self.songstats.get_stat_weeks_abs(spotify_id, 8)
+      print(spotify_id, stats)
     except ErrorResponse as e:
       # Artist somehow got removed from songstats, but them back in OB
       if e.status_code == 404:
@@ -383,9 +385,9 @@ class TrackingController():
               if sql_statistic_type.id == 30:
                   values = stats['stats']["spotify__monthly_listeners_current"] if "spotify__monthly_listeners_current" in stats['stats'] else []
           update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = values
-          wasUpdate = self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
-          if wasUpdate:
-              allNewStats = False
+          # wasUpdate = self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
+          # if wasUpdate:
+          #     allNewStats = False
 
         self.update_sql_meta(sql_session, sql_ref, doc)
         ref.update(update)
@@ -404,7 +406,7 @@ class TrackingController():
         "id", "array_contains_any", user_ids
                 )).where(filter=FieldFilter("sms.verified", "==", True)).get()
                 for user in users:
-                    self.twilio.send_artist_stats(user.to_dict(), sql_ref)
+                    self.twilio.send_artist_stats(user.to_dict(), sql_ref, True)
 
 
     except Exception as e:
@@ -506,12 +508,27 @@ class TrackingController():
     return list(sql_ids)
   
   def find_needs_stats_refresh(self, sql_session, limit: int):
+
     sql_ids = (select(Artist.id)
+             .filter(Artist.evaluation_id != None)
+             .filter(~Artist.statistics.any())
+             .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
+             .filter(Artist.active == True)).limit(limit)
+    sql_ids = sql_session.scalars(sql_ids).unique()
+
+    sql_ids = list(sql_ids)
+    if len(sql_ids) == limit:
+        return sql_ids
+
+    sql_ids_two = (select(Artist.id)
                .filter(Artist.evaluation.has())
                .filter(Artist.statistics.any(Statistic.updated_at <  func.now() - timedelta(days=1)))
                .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
-               .filter(Artist.active == True)).limit(limit)
-    sql_ids = sql_session.scalars(sql_ids).unique()
+               .filter(Artist.active == True)).limit(limit - len(sql_ids))
+    sql_ids_two = sql_session.scalars(sql_ids_two).unique()
+    for id in sql_ids_two:
+        if id not in sql_ids:
+            sql_ids.append(id)
     return list(sql_ids)
 
   def convert_artist_link(self, link, sources, artist_id = None):
