@@ -11,7 +11,7 @@ from .models import SpotifyToken
 from .errors import ErrorResponse
 from requests.exceptions import JSONDecodeError
 
-from spotify_keys import *
+from lib.config import SPOTIFY_CLIENT_SECRET, SPOTIFY_CLIENT_ID, SPOTIFY_ALT_CLIENT_ID, SPOTIFY_ALT_CLIENT_SECRET, SPOTIFY_USER_FACING_CLIENT_SECRET, SPOTIFY_USER_FACING_CLIENT_ID
 
 last_artist = None
 last_playlist = None
@@ -19,12 +19,12 @@ last_playlist = None
 
 class SpotifyClient():
   def __init__(self, db: Client):
-    self.client_id = SPOTIFY_CLIENT_ID
-    self.client_secret = SPOTIFY_CLIENT_SECRET
-    self.alt_client_id = SPOTIFY_ALT_CLIENT_ID
-    self.alt_client_secret = SPOTIFY_ALT_CLIENT_SECRET
-    self.user_client_id = SPOTIFY_USER_FACING_CLIENT_ID
-    self.user_client_secret = SPOTIFY_USER_FACING_CLIENT_SECRET
+    self.client_id = SPOTIFY_CLIENT_ID.value
+    self.client_secret = SPOTIFY_CLIENT_SECRET.value
+    self.alt_client_id = SPOTIFY_ALT_CLIENT_ID.value
+    self.alt_client_secret = SPOTIFY_ALT_CLIENT_SECRET.value
+    self.user_client_id = SPOTIFY_USER_FACING_CLIENT_ID.value
+    self.user_client_secret = SPOTIFY_USER_FACING_CLIENT_SECRET.value
     self.access_token = None
     self.alt_token = None
     self.user_token = None

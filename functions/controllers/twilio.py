@@ -9,7 +9,7 @@ from twilio.rest import Client
 
 from controllers.artists import artist_with_meta
 from lib import SpotifyClient, Artist, OrganizationArtist, ErrorResponse
-from twilio_keys import *
+from lib.config import TWILIO_ACCOUNT, TWILIO_TOKEN, TWILIO_VERIFY_SERVICE, TWILIO_MESSAGE_SERVICE
 
 
 class TwilioController():
@@ -17,8 +17,8 @@ class TwilioController():
   def __init__(self, sql, spotify: SpotifyClient):
     self.sql = sql
     self.spotify = spotify
-    account_sid = TWILIO_ACCOUNT
-    self.client = Client(account_sid, TWILIO_TOKEN)
+    account_sid = TWILIO_ACCOUNT.value
+    self.client = Client(account_sid, TWILIO_TOKEN.value)
 
   def load_user_ref(self, uid, db):
     ref = db.collection("users").document(uid)
@@ -27,7 +27,7 @@ class TwilioController():
   def send_code(self, uid, db, number):
     verification = self.client.verify \
       .v2 \
-      .services(TWILIO_VERIFY_SERVICE) \
+      .services(TWILIO_VERIFY_SERVICE.value) \
       .verifications \
       .create(to=number, channel='sms')
     user, user_ref = self.load_user_ref(uid, db)
@@ -43,7 +43,7 @@ class TwilioController():
 
   def verify_code(self, uid, db, number, code):
     verification_check = self.client.verify.v2.services(
-      TWILIO_VERIFY_SERVICE
+      TWILIO_VERIFY_SERVICE.value
     ).verification_checks.create(to=number, code=code)
     if verification_check.status == 'approved':
       user, user_ref = self.load_user_ref(uid, db)
@@ -185,7 +185,7 @@ class TwilioController():
     self.client.messages.create(
       content_sid=template,
       to=user.get('sms').get('number'),
-      messaging_service_sid=TWILIO_MESSAGE_SERVICE,
+      messaging_service_sid=TWILIO_MESSAGE_SERVICE.value,
       content_variables=json.dumps(vars),
     )
     return True
@@ -217,7 +217,7 @@ class TwilioController():
 
     self.client.messages.create(
       body=message,
-      messaging_service_sid=TWILIO_MESSAGE_SERVICE,
+      messaging_service_sid=TWILIO_MESSAGE_SERVICE.value,
       to=user.get('sms').get('number'),
     )
     return True
