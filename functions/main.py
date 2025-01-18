@@ -171,6 +171,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
+        return twilio.receive_message(db, '+19493385918', 'https://open.spotify.com/artist/1UKNeJ3wk2fCZEi0Bzb30O?si=86bfc38017b04740', process_spotify_link, sql_session)
 
         users = db.collection("users").get()
         user_orgs = {}
@@ -200,7 +201,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         data = flask.request.form.to_dict()
         from_number = data.get('From', None)
         message = data.get('Body', None)
-
+        print("Received twilio message: " + message)
         return twilio.receive_message(db, from_number, message, process_spotify_link, sql_session) if from_number is not None else {"error": "Malformed request"}
 
     @v2_api.post("/reimport-artists")

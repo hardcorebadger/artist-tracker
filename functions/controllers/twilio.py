@@ -143,8 +143,9 @@ class TwilioController():
           if data.get('type') == 'artist':
             if data.get('existing') is not None:
               sent = self.send_template(user_data, "HXabba02580e40f6bbf0e0c1ddac752a36", dict({"1": data.get("name"), "2": "https://indiestack.app/app/artists/" + str(data.get('existing'))}))
-              artist_data = artist_with_meta(sql_session=sql_session, spotify_id=None, id=data.get('existing'))
-              self.send_artist_stats(user_data, artist_data)
+              artist_data = artist_with_meta(sql_session=sql_session, spotify_id=None, artist_id=data.get('existing'))
+              if artist_data is not None and len(artist_data.statistics) > 0:
+                self.send_artist_stats(user_data, artist_data)
               # sent = self.send_template(user_data, "HXabba02580e40f6bbf0e0c1ddac752a36", dict({"1": data.get("name"), "2": "https://google.com"}))
             else:
               sent = self.send_template(user_data, "HXf2f85e6870b94efefd58e668c95008ce", dict({"1": data.get("name"), "2": "https://indiestack.app/app/artists/" + str(data.get("new"))}))

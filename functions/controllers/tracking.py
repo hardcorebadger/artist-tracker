@@ -70,7 +70,7 @@ class TrackingController():
   # def add_artist_sql(self, spotify_id, user_id, org_id):
 
   def set_tags(self, sql_session, organization_id, identifier, tags):
-      sql_ref = artist_with_meta(sql_session=sql_session, id=identifier)
+      sql_ref = artist_with_meta(sql_session=sql_session, artist_id=identifier)
       final = list()
       for tag in tags:
           existing = pop_default(list(
