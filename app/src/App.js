@@ -28,7 +28,7 @@ function App() {
     const [currentUser, setCurrentUser] = useState(null)
     const is_dev = location.hostname === "localhost"
 
-    if ( !location.hostname.includes('indiestack')) {
+    if (!is_dev && !location.hostname.includes('indiestack')) {
         window.location = "https://indiestack.app/" + window.location.pathname;
 
     }
