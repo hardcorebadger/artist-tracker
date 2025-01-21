@@ -454,6 +454,7 @@ def add_artist(sql_session, uid, spotify_url = None, identifier = False, tags = 
     try:
         return process_spotify_link(sql_session, uid, spotify_url, tags, preview)
     except Exception as e:
+        print(e)
         return {
             "found": False,
             "error": e
@@ -709,6 +710,7 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                         task_queue.enqueue(body, task_options)
                     return {'message': 'success', 'status': 200, 'added_count': len(aids)}
                 except ErrorResponse as e:
+                    print(e)
                     if preview:
                         return {
                             "found": False,
@@ -752,9 +754,10 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                 except Exception as e:
                     print('Exception from link proc', e)
                     return {
+
                         "found": False,
                         "url": spotify_url.split('?')[0],
-                        "error": e,
+                        "error": e.status_code if e is ErrorResponse else str(e),
                         "spotify_id": spotify_id,
 
                     }
@@ -763,9 +766,11 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
             return {'message': msg, 'status': status, 'added_count': 1}
     except Exception as e:
         print("error response from link proc", e)
+        print(traceback.format_exc())
         if preview:
             return {
-                "found": False
+                "found": False,
+
             }
 
         raise e

@@ -49,6 +49,7 @@ class CloudSQLClient():
     
     def connect(self):
         if not self.db:
+
             self.connector = Connector()
             self.db = self.__init_pool(self.connector)
             self.session_maker = sessionmaker(bind=self.db)
