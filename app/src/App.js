@@ -26,6 +26,12 @@ function App() {
     const [currentRows, setCurrentRows] = useState(null)
     const [currentQueryModel, setCurrentQueryModel] = useState(getInitialState('currentQueryModel'))
     const [currentUser, setCurrentUser] = useState(null)
+    const is_dev = location.hostname === "localhost"
+
+    if ( !location.hostname.includes('indiestack')) {
+        window.location = "https://indiestack.app/" + window.location.pathname;
+
+    }
 
     const [users, setUsers] = useState(null)
     const loadOrgFilters = async (user) => {
