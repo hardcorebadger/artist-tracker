@@ -2,7 +2,7 @@ import requests
 import json
 from ytmusicapi import YTMusic
 from .errors import ErrorResponse
-from .evaluation import is_probably_same_track
+from .evaluation import CopyrightEvaluator
 
 class YoutubeClient():
   def __init__(self, token, alt_token):
@@ -10,6 +10,7 @@ class YoutubeClient():
     self.alt_token = alt_token
     self.ytmusic = YTMusic()
     self.root_uri = "https://www.googleapis.com/youtube/v3"
+    self.evaluator = CopyrightEvaluator()
   
   def get(self, path, data=None, alt_token = False):
     data['key'] = self.token if alt_token == False else self.alt_token
@@ -54,9 +55,21 @@ class YoutubeClient():
     for video in res['items'][:3]:
       title = video['snippet']['title']
       channel_title = video['snippet']['channelTitle']
-      if is_probably_same_track(title, track, channel_title, artist):
+      if self.evaluator.is_probably_same_track(title, track, channel_title, artist):
         return video
     
     return None
+  
+  def get_watch_playlist(self, vid_id):
+    res = self.ytmusic.get_watch_playlist(videoId=vid_id)
+    return res
+  
+  def get_song(self, vid_id):
+    res = self.ytmusic.get_song(videoId=vid_id)
+    return res
+  
+  def get_artist(self, channel_id):
+    res = self.ytmusic.get_artist(channelId=channel_id)
+    return res
 
     

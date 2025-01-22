@@ -232,6 +232,15 @@ class SpotifyClient():
     })
     return search['artists']['items'][0] if len(search['artists']['items']) > 0 else None
   
+  def find_song(self, artist, track):
+    search = self.get('/search', {
+      "q":f"{track} - {artist}",
+      "type":"track",
+      "market":"US",
+      "limit":1
+    })
+    return search['tracks']['items'][0] if len(search['tracks']['items']) > 0 else None
+  
   def url_to_id(self, url, prefix='artist'):
     # Splitting the URL at "playlist/"
     parts = url.split(f"{prefix}/")
