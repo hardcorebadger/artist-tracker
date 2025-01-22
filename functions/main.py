@@ -19,7 +19,7 @@ from lib.config import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
     CloudSQLClient, LinkSource, OrganizationArtist, StatisticType, \
     ArtistTag, Playlist
-from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController
+from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController, LookalikeController
 import flask
 from datetime import datetime, timedelta
 import traceback
@@ -161,6 +161,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     tracking_controller = TrackingController(spotify, songstats, get_sql(), db, twilio)
     youtube = YoutubeClient(YOUTUBE_TOKEN.value, YOUTUBE_TOKEN_ALT.value)
     eval_controller = EvalController(spotify, youtube, db, get_sql(), tracking_controller)
+    lookalike_controller = LookalikeController(spotify, songstats, youtube, sql_session, db)
     # artist_controller = ArtistController(PROJECT_ID, LOCATION, get_sql())
 
     v2_api = flask.Flask(__name__)
@@ -176,6 +177,8 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
+
+        return lookalike_controller.mine_lookalikes('94b2e9a9-b2e7-4750-8be0-9c3432991a4f')
 
         # return twilio.receive_message(db, '+19493385918', 'https://open.spotify.com/artist/1UKNeJ3wk2fCZEi0Bzb30O?si=86bfc38017b04740', process_spotify_link, sql_session)
 
@@ -199,7 +202,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         #         print("   " + user.get('first_name'))
         # return "Yay"
         # spotify = get_spotify_client()
-        return tracking_controller.find_needs_stats_refresh(sql_session, 10)
+        # return tracking_controller.find_needs_stats_refresh(sql_session, 10)
         # return eval_controller.evaluate_copyrights('7uelPzv7TB20x3wtDt95E9', sql_session, None)
         # return spotify.get_artist('55ZKRn4w3oNhBMV7sgG1PP')
 

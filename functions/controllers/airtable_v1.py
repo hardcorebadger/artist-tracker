@@ -1,6 +1,6 @@
 from datetime import datetime
 from fuzzywuzzy import fuzz
-from lib import ErrorResponse, AirtableClient, SpotifyClient, YoutubeClient, eval_youtube_rights, eval_spotify_rights
+from lib import ErrorResponse, AirtableClient, SpotifyClient, YoutubeClient
 
 class AirtableV1Controller():
   def __init__(self, airtable : AirtableClient, spotify : SpotifyClient, youtube : YoutubeClient):

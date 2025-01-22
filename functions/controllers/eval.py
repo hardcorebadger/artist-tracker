@@ -2,7 +2,7 @@ from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import joinedload
 
-from lib import SpotifyClient, YoutubeClient, ErrorResponse, Artist, Evaluation
+from lib import SpotifyClient, YoutubeClient, ErrorResponse, Artist, Evaluation, CopyrightEvaluator
 from datetime import datetime, timedelta
 import re
 from fuzzywuzzy import fuzz
@@ -19,28 +19,6 @@ from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilte
 #         "p_lines": ", ".join(sp_plines)
 #     }
 
-YT_DIY_DISTROS = [
-   "DistroKid", "Ditto", "TuneCore", "CDBaby", "United Masters", "Symphonic", "EVEARA", "SongCast", "Too Lost", "Amuseio", "Repost Network", "IIP-DDS", "N/A", "CmdShft"
-]
-YT_MAJOR_DISTROS = [
-   "The Orchard Enterprises", "Universal Music Group", "Warner Records Inc", "Sony Entertainment Group", "Atlantic Records", "Ingrooves", "Columbia", "Epic", "Alamo", "Arista Records", "300 Entertainment", "Virgin Music Group", "Sony Music Nashville", "RCA Records Label Nashville"
-]
-YT_KNOWN_INDIE_DISTROS = [
-   "Stem Disintermedia Inc.", "Vydia", "Foundation Media LLC"
-]
-SP_MAJOR_KEYWORDS = [
-   "sony", "umg", "warner", "universal", "atlantic", "the orchard", "ingrooves", "columbia", "epic", "alamo", "300 entertainment"
-]
-SP_KNOWN_INDIE_KEYWORDS = [
-   "empire", "10k project", "all is on music"
-]
-SP_SIGNED_KEYWORDS = [
-   "under exclusive license to"
-]
-SP_DIY_KEYWORDS = [
-   "distrokid", "ditto", "tunecore", "cdbaby", "united masters", "symphonic", "records dk", "cmdshft"
-]
-
 class EvalController():
   def __init__(self, spotify: SpotifyClient, youtube: YoutubeClient, db, sql, tracking_controller):
     self.spotify = spotify
@@ -48,6 +26,7 @@ class EvalController():
     self.db = db
     self.sql = sql
     self.tracking_controller = tracking_controller
+    self.evaluator = CopyrightEvaluator()
 
   def evaluate_copyrights(self, spotify_id: str, sql_session, artist_id: str = None):
     sql_ref = None
@@ -115,7 +94,7 @@ class EvalController():
         if yt_track == None:
             continue
         desc = yt_track['snippet']['description']
-        distro, label, distro_type = self._eval_youtube_rights(artist_name, desc)
+        distro, label, distro_type = self.evaluator.eval_youtube_rights(artist_name, desc)
         yt_evals.append( {
             "type": "youtube",
             'spotify_track_name': t['name'],
@@ -142,7 +121,7 @@ class EvalController():
     p_lines = self.spotify.get_artist_recent_plines_with_dates(spotify_id)
 
     for line in p_lines:
-        label, distro_type = self._eval_spotify_rights(line['line'], artist_name)
+        label, distro_type = self.evaluator.eval_spotify_rights(line['line'], artist_name)
         try:
             date_object = datetime.strptime(line['date'], '%Y-%m-%d').date()
         except ValueError as e:
@@ -271,97 +250,6 @@ class EvalController():
     sql_session.commit()
     # TODO save the full eval state to a subcollection
     return 'success', 200
-  
-  def _eval_spotify_rights(self, p_line, artist_name):
-      p_line = p_line.lower().strip()
-      artist_name = artist_name.lower().strip()
-      for key in SP_MAJOR_KEYWORDS:
-        if key in p_line:
-            return key, "major"
-      for key in SP_KNOWN_INDIE_KEYWORDS:
-        if key in p_line:
-            return key, "indie"
-      for key in SP_SIGNED_KEYWORDS:
-        if key in p_line:
-            return None, "indie"
-      for key in SP_DIY_KEYWORDS:
-        if key in p_line:
-            return key, "diy"
-        
-      if artist_name in p_line:
-        return None, "diy"
-
-      return None, "unknown"
-    
-
-  def _eval_youtube_rights(self, artist_name, yt_description):
-      # print(yt_description)
-      lines = yt_description.split('\n')
-
-      distributor = None
-      pline = None
-
-      for line in lines:
-        if 'Provided to YouTube by ' in line:
-            distributor = line.split('Provided to YouTube by ')[1]
-        if '℗' in line:
-            l = line.split('℗ ')[1]
-            if 'under exclusive license to ' in l:
-                pline = l.split('under exclusive license to ')[1]
-            else:
-                pline = l
-            pline = re.sub(r'\b\d{4}\b', '', pline).strip()
-      
-      #   cant perform checks without distro, assume unknown
-      if distributor == None:
-          return distributor, pline, 'unknown'
-
-
-      distro_type = 'indie'
-
-      # if the distro looks like the artist name
-      if self._fuzzy_equal(artist_name, distributor, 80):
-          distro_type = 'diy'
-          distributor = 'unknown'
-          return distributor, pline, distro_type
-
-
-      for distro in YT_DIY_DISTROS:
-          if self._fuzzy_equal(distro, distributor):
-              distributor = distro
-              distro_type = 'diy'
-              return distributor, pline, distro_type
-      
-      for distro in YT_MAJOR_DISTROS:
-          if self._fuzzy_equal(distro, distributor):
-              distributor = distro
-              distro_type = 'major'
-              return distributor, pline, distro_type
-
-      for distro in YT_KNOWN_INDIE_DISTROS:
-          if self._fuzzy_equal(distro, distributor):
-              distributor = distro
-              distro_type = 'indie'
-              return distributor, pline, distro_type
-          
-      # we found something we just don't know what it is
-      if distributor != None or pline != None:
-          distro_type = 'indie'
-          return distributor, pline, distro_type
-      # we didn't see anything legit looking but can't confirm
-      else:
-          return distributor, pline, 'unknown'
-
-
-  def _fuzzy_equal(self, s1, s2, threshold=80):
-      s1 = s1.lower().strip()
-      s2 = s2.lower().strip()
-      sim = fuzz.partial_ratio(s1, s2)
-      return sim > threshold
-
-
-  def _is_probably_same_track(self, youtube_video_title, spotify_song_title, youtube_channel_title, spotify_artist_name, threshold=80):
-      return self._fuzzy_equal(youtube_channel_title, spotify_artist_name, threshold) and self._fuzzy_equal(youtube_video_title, spotify_song_title, threshold)
   
   def find_needs_eval_refresh(self, sql_session, limit: int):
     sql_ids = ((select(Artist.id).outerjoin(Evaluation, Artist.evaluation)
