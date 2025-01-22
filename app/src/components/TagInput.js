@@ -33,7 +33,7 @@ function TagInput({setSelectedTags, initialTags, disabled}) {
 
         <FormControl id="tags" w="100">
             <FormLabel>Tags</FormLabel>
-            <AutoComplete defaultValues={localTags ?? []} isLoading={disabled || options?.length === 0} creatable openOnFocus multiple
+            <AutoComplete defaultValues={localTags ?? []} isLoading={disabled} creatable openOnFocus multiple
                           onChange={vals => {
                               console.log(vals)
                               setLocalTags(vals)
