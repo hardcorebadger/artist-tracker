@@ -111,7 +111,7 @@ class SpotifyClient():
       )).order_by('created_at', "DESCENDING").get()
 
       existing = check_cache.pop() if len(check_cache) > 0 else None
-      if existing and existing.get('created_at') > datetime.now(existing.get('created_at').tzinfo) - timedelta(seconds=12):
+      if existing and existing.get('created_at') > datetime.now(existing.get('created_at').tzinfo) - timedelta(days=1):
         return existing.to_dict().get('data')
       else:
         artist = self.get(path=f"/artists/{id}", alt_token=alt_token)
@@ -160,6 +160,34 @@ class SpotifyClient():
         print(f"Added cache with id {cache_ref.id}: " + album.get('id'))
 
     return album_data
+
+  def get_artists(self, ids):
+
+    check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
+      "spotify_id", "in", ids
+    )).where(filter=FieldFilter(
+      'type', '==', 'artist'
+    )).get()
+    artist_data = []
+    missing_ids = []
+    for id in ids:
+      found = False
+      for check in check_cache:
+        if check.get('spotify_id') == id and check.get('created_at') > datetime.now(check.get('created_at').tzinfo) - timedelta(days=1):
+          found = True
+          artist_data.append(check.get('data'))
+      if found == False:
+        missing_ids.append(id)
+    if len(missing_ids) > 0:
+      idp = ",".join(id for id in missing_ids)
+      artists = self.get(f"/artists", data={'ids': idp})
+      for artist in artists['artists'] if 'artists' in artists else []:
+        artist_data.append(artist)
+        cache = {"data": artist, "spotify_id": artist.get('id'), "type": "artist", "created_at": SERVER_TIMESTAMP}
+        update_time, cache_ref = self.db.collection("spotify_cache").add(cache)
+        print(f"Added cache with id {cache_ref.id}: " + artist.get('id'))
+
+    return artist_data
   
   def get_playlist(self, id, alt_token=False):
     global last_playlist

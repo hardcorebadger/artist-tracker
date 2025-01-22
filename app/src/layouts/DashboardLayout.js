@@ -46,23 +46,24 @@ const navItemConfig = [
 
 function UserBlock({currentUser, openOrgModal}) {
   const user = useUser()
+
   return (
-    <Box w="100%" p={basePadding} pl={basePadding+2} pr={basePadding+2}>
+    <Box w="100%" p={basePadding} pl={basePadding+2} pr={basePadding+2} >
     <HStack align="center" justify="space-between">
         <HStack align="center">
           <Avatar size="sm"/>
           <VStack spacing={0}>
             <Text fontSize="sm" fontWeight="semibold">{user.profile.first_name} {user.profile.last_name}</Text>
             <Text fontSize="2xs" width={'100%'} fontWeight="light" color={"text.subtle"}>{user.org.info.name}</Text>
-
           </VStack>
         </HStack>
-      <Menu>
+      <Menu computePositionOnMount={true}>
         <MenuButton
           as={IconButton}
           aria-label='Account'
           icon={<Iconify size={20} icon="mdi:dots-horizontal"/>}
           variant='ghost'
+
         />
         <MenuList>
           <MenuItem onClick={signOut} >

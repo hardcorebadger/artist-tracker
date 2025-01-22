@@ -3,7 +3,7 @@ import Routes from './routing/Routes';
 import {
   BrowserRouter as Router
 } from "react-router-dom";
-import {ChakraProvider} from '@chakra-ui/react';
+import {ChakraProvider, ColorModeProvider} from '@chakra-ui/react';
 import {theme} from './theme'
 import {httpsCallable} from "firebase/functions";
 import {functions, useAuth, v3_url} from "./firebase";
@@ -77,6 +77,7 @@ function App() {
     }, [currentReport])
     return (
     <ChakraProvider theme={theme}>
+        <ColorModeProvider>
         <ColumnDataContext.Provider  value={{
             statisticTypes: statisticTypes,
             setStatisticTypes: setStatisticTypes,
@@ -109,7 +110,7 @@ function App() {
         </CurrentReportContext.Provider>
 
         </ColumnDataContext.Provider>
-
+        </ColorModeProvider>
     </ChakraProvider>
   );
 }
