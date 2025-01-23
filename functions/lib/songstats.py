@@ -1,3 +1,5 @@
+import traceback
+
 import requests
 import json
 import pandas as pd
@@ -15,7 +17,7 @@ class SongstatsClient():
       "apikey": self.key
     },
     params=data)
-    print(res.json())
+    # print(res.json())
     if res.status_code > 299:
       if res.status_code == 429:
         print("Songstats Rate Limiting")
@@ -155,30 +157,43 @@ class SongstatsClient():
   
   def __merge_stats_to_df_abs(self, stats):
     dfs = []
-    for stat in stats:
-        source = stat['source']
-        if 'data' not in stat:
-            continue
-        if 'history' not in stat['data']:
-            continue
-        data = stat['data']['history']
-        if len(data) == 0:
-            continue
-        
-        df = pd.DataFrame(data)
-        df['date'] = pd.to_datetime(df['date'])
-        df = df.rename(columns=lambda x: f"{source}__{x}" if x != 'date' else x)
-        df.set_index('date', inplace=True)
-        
-        dfs.append(df)
-        
-    if len(dfs) == 0:
+
+    try:
+      for stat in stats:
+          source = stat['source']
+          if 'data' not in stat:
+              continue
+          if 'history' not in stat['data']:
+              continue
+          data = stat['data']['history']
+          if len(data) == 0:
+              continue
+
+          df = pd.DataFrame(data)
+          df = df.dropna()
+
+          df['date'] = pd.to_datetime(df['date'])
+          df = df.rename(columns=lambda x: f"{source}__{x}" if x != 'date' else x)
+
+
+          df.set_index('date', inplace=True)
+          dfs.append(df)
+
+
+      if len(dfs) == 0:
+        return None, False
+      # Merge all DataFrames on the date index
+      result_df = pd.concat(dfs, axis=1)
+      # forward fill missing data, 14 day moving average, weekly resample, trim startup weeks
+      weekly = result_df.ffill().bfill().fillna(0).resample("W").last().iloc[2:, :].astype(int)
+      return weekly, True
+    except Exception as e:
+      print("stat df abs error")
+
+      print(e)
+      # print(traceback.format_exc(5))
       return None, False
-    # Merge all DataFrames on the date index
-    result_df = pd.concat(dfs, axis=1)
-    # forward fill missing data, 14 day moving average, weekly resample, trim startup weeks
-    weekly = result_df.ffill().bfill().fillna(0).resample("W").last().iloc[2:, :].astype(int)
-    return weekly, True
+
   
   def __merge_stats_to_df(self, stats):
     dfs = []
