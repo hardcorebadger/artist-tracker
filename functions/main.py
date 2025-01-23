@@ -7,7 +7,7 @@ from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
 from firebase_functions.options import RetryConfig, MemoryOption
 from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter, Or
-from sqlalchemy import select, or_, update
+from sqlalchemy import select, or_, update, text
 from sqlalchemy.orm import joinedload
 from sqlalchemy.util.preloaded import sql_dml
 
@@ -146,6 +146,14 @@ def reimport_artists_eval(page = 0, page_size = 50):
 
     sql_session.close()
     return page, updated, found, new
+
+
+def bulk_update(sql_session, ids: list, set: str):
+    list_str = ', '.join("'" + str(item) + "'" for item in ids)
+    sql_query = text('UPDATE artists SET '+set+' WHERE artists.id IN (' + list_str + ')')
+    sql_session.execute(sql_query)
+    sql_session.commit()
+
 #############################
 # V2 API
 # ##############################
@@ -177,7 +185,10 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        return spotify.get_playlist('3WxQaPZsG56Tl6Wrllkqas')
+
+        return "artists"
+        # return json.dumps(body).encode()
+        # return spotify.get_playlist('3WxQaPZsG56Tl6Wrllkqas')
         # return lookalike_controller.mine_lookalikes('94b2e9a9-b2e7-4750-8be0-9c3432991a4f')
         #https://open.spotify.com/artist/7rRz5zPounzREHN0cIrYhS?si=f7dcf5b7322346bb
         #https://open.spotify.com/artist/0PxzGnCYBpSuaI49OR94cA?si=68189be134ec4688
@@ -290,22 +301,22 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         data = flask.request.get_json()
         if 'artist_ids' not in data :
             raise ErrorResponse("Invalid payload. Must include 'artist_ids' ", 500)
-
+        if len(data['artist_ids']) == 0:
+            return 'Cached 0 artists', 200
         artists_data = list(sql_session.scalars(select(Artist).filter(Artist.id.in_(data['artist_ids']))).unique())
         spotify_ids = list(map(lambda a: a.spotify_id, artists_data))
+        print(spotify_ids)
         spotify_id_to_artist_id = {}
-        maps = []
 
         for artist in artists_data:
             spotify_id_to_artist_id[artist.spotify_id] = artist.id
         artists = get_spotify_client().get_cached(spotify_ids, 'artist', timedelta(days=1))
+        artist_ids_to_update = []
         for artist in artists:
-            maps.append({'id': spotify_id_to_artist_id[artist['id']], 'spotify_cached_at': datetime.now(), 'eval_queued_at': None})
-        sql_session.execute(
-            update(Artist),
-            maps,
-        )
-        sql_session.commit()
+            artist_ids_to_update.append(str(spotify_id_to_artist_id[artist['id']]))
+
+        if (len(artist_ids_to_update) > 0):
+            bulk_update(sql_session, artist_ids_to_update, 'spotify_cached_at = NOW(), eval_queued_at = NULL')
         return 'Cached ' + str(len(artists)) + " artist(s)", 200
 
     @v2_api.post("/eval-artist")

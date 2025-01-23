@@ -6,7 +6,7 @@ import traceback
 from datetime import datetime
 
 from firebase_admin import firestore
-from sqlalchemy import select, and_, not_, or_
+from sqlalchemy import select, and_, not_, or_, text
 from sqlalchemy.orm import joinedload, contains_eager, aliased
 
 from lib import Artist, get_user, LinkSource, ArtistLink, ArtistTag, OrganizationArtist, Evaluation, StatisticType, Statistic, \
@@ -20,6 +20,7 @@ class ArtistController():
         self.project_id = project_id
         self.location = location
         self.sql = sql
+
 
     def get_artists_test(self, data, app):
         return (self.get_artists('9sRMdvFDUKVKckwpzeARiG6x2LG2', data, app, self.sql.get_session()))

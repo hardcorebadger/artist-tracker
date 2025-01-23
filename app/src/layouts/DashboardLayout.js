@@ -8,7 +8,7 @@ import {
   Text, Container,
   VStack, useControllableState, VisuallyHidden,
   Accordion, AccordionItem, AccordionPanel, AccordionButton,
-  Link, Avatar, Menu, MenuButton, MenuList, MenuItem, useDisclosure
+  Link, Avatar, Menu, MenuButton, MenuList, MenuItem, useDisclosure, useColorMode
 } from '@chakra-ui/react';
 import { useMediaQuery } from '@chakra-ui/react'
 import { Outlet, useNavigate } from "react-router-dom";
@@ -47,6 +47,7 @@ const navItemConfig = [
 
 function UserBlock({currentUser, openOrgModal}) {
   const user = useUser()
+  const { colorMode, toggleColorMode } = useColorMode()
 
   return (
     <Box w="100%" p={basePadding} pl={basePadding+2} pr={basePadding+2} >
@@ -66,6 +67,9 @@ function UserBlock({currentUser, openOrgModal}) {
           </MenuItem>
           <MenuItem as={RouterLink} to="/app/settings" >
             Account Settings
+          </MenuItem>
+          <MenuItem onClick={toggleColorMode}>
+            <HStack  align={'center'} justify={'center'}> <Text>{colorMode === 'dark' ? 'Light' : 'Dark'} Mode</Text> <Iconify icon={(colorMode === 'light' ? 'material-symbols:dark-mode-outline' : 'material-symbols-light:light-mode')} /></HStack>
           </MenuItem>
           {currentUser?.admin ? (
             <MenuItem onClick={openOrgModal} >

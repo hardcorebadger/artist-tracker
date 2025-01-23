@@ -257,6 +257,32 @@ class SpotifyClient():
     else:
       return json
 
+  def chunk_list(self, input_list, chunk_size):
+    """
+    Splits a list into chunks of the specified size.
+
+    Args:
+        input_list: The list to be chunked.
+        chunk_size: The desired size of each chunk.
+
+    Yields:
+        A chunk of the list.
+    """
+    for i in range(0, len(input_list), chunk_size):
+      yield input_list[i:i + chunk_size]
+  def get_cached_objects(self, ids: list, object_type: str):
+    objects = []
+    id_chunks = self.chunk_list(ids, 30)
+    for ids_search in id_chunks:
+      check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
+        "spotify_id", "in", ids_search
+      )).where(filter=FieldFilter(
+        'type', '==', object_type
+      )).order_by('created_at', "DESCENDING").get()
+      for object in check_cache:
+        objects.append(object)
+
+    return objects
 
   def get_cached(self, ids: list|str, object_type: str, expires_delta: timedelta|None  = timedelta(hours=1), alt_token = False, data: dict|str = {}):
     path = object_type+"s"
@@ -271,11 +297,7 @@ class SpotifyClient():
     ids_search = ids
     if isinstance(ids, str):
       ids_search = [ids]
-    check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
-      "spotify_id", "in", ids_search
-    )).where(filter=FieldFilter(
-      'type', '==', object_type
-    )).order_by('created_at', "DESCENDING").get()
+    check_cache = self.get_cached_objects(ids_search, object_type)
     object_data = []
     missing_ids = []
     for id in ids_search:

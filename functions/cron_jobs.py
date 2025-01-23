@@ -24,8 +24,12 @@ def spotify_cron(sql_session, task_controller : TaskController, eval_controller:
     maps = []
     for artist_id in artist_ids:
         maps.append({'id': artist_id, 'eval_queued_at': datetime.now()})
+    if len(artist_ids) == 0:
+        print("No artists need cache")
+        return
 
-    body = {"artist_ids": artist_ids}
+    body = {"artist_ids": list(map(lambda x: str(x), artist_ids))}
+    print(body, "Sending to cache")
     task_controller.enqueue_task('SpotifyQueue', 2, '/spotify-cache', body)
     sql_session.execute(
         update(Artist),
