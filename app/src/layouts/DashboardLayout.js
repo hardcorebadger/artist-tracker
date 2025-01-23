@@ -26,6 +26,7 @@ import { deepCopy } from '../util/objectUtil';
 import {ColumnDataContext, CurrentReportContext, goFetch} from "../App";
 import {AutoComplete, AutoCompleteInput, AutoCompleteItem, AutoCompleteList} from "@choc-ui/chakra-autocomplete";
 import ChangeOrganizationModal from "../components/ChangeOrganizationModal";
+import UserAvatar from "../components/UserAvatar";
 
 const basePadding = 6
 
@@ -50,13 +51,7 @@ function UserBlock({currentUser, openOrgModal}) {
   return (
     <Box w="100%" p={basePadding} pl={basePadding+2} pr={basePadding+2} >
     <HStack align="center" justify="space-between">
-        <HStack align="center">
-          <Avatar size="sm"/>
-          <VStack spacing={0}>
-            <Text fontSize="sm" fontWeight="semibold">{user.profile.first_name} {user.profile.last_name}</Text>
-            <Text fontSize="2xs" width={'100%'} fontWeight="light" color={"text.subtle"}>{user.org.info.name}</Text>
-          </VStack>
-        </HStack>
+        <UserAvatar userId={user.auth.uid} userAuth={user} subtext={user.org.info.name}/>
       <Menu computePositionOnMount={true}>
         <MenuButton
           as={IconButton}

@@ -122,7 +122,7 @@ class SpotifyClient():
     return self.get_cached(ids, 'artist', timedelta(days=1), alt_token)
   
   def get_playlist(self, id, alt_token=False):
-    playlist = self.get_cached(id, 'playlist', timedelta(minutes=10), data="?fields=name,images,id,tracks(total,limit,next,items(track(name,artists(id,name,type)))", alt_token=alt_token)
+    playlist = self.get_cached(id, 'playlist', timedelta(minutes=10), data="?fields=name,images,description,collaborative,public,owner,id,tracks(total,limit,next,items(track(name,artists(id,name,type)))", alt_token=alt_token)
     if len(playlist['tracks']['items']) < playlist['tracks']['total']:
       current_track_page = playlist['tracks']
       while current_track_page['next']:
@@ -134,7 +134,7 @@ class SpotifyClient():
         )).where(filter=FieldFilter(
           'type', '==', 'playlist'
         )).get().pop()
-        check_cache.reference.update({"data": playlist, "spotify_id": id, "type": "playlist"})
+        check_cache.reference.update({"data": playlist, "spotify_id": id, "type": "playlist", "created_at": SERVER_TIMESTAMP})
 
     return playlist
 
@@ -286,7 +286,7 @@ class SpotifyClient():
           object_data.append(check.get('data'))
       if found == False:
         missing_ids.append(id)
-    print(str(len(object_data)) + " cached found " + str(len(missing_ids)) + " ids needed " + str(len(ids)) + " given")
+    print(str(len(object_data)) + " cached found " + str(len(missing_ids)) + " ids needed " + (str(len(ids)) if isinstance(ids, list) else "1") + " given")
     if len(missing_ids) > 0:
       if len(missing_ids) == 1:
         if len(ids_search) > 1:

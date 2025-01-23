@@ -746,6 +746,7 @@ class TrackingController():
                       add_batch.clear()
                       imported += 1
               except Exception as e:
+                  traceback.print_exc()
                   fails[artist.get('spotify_id')] = repr(e)
 
       if len(fails) > 0:
