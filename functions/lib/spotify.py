@@ -122,11 +122,11 @@ class SpotifyClient():
     return self.get_cached(ids, 'artist', timedelta(days=1), alt_token)
   
   def get_playlist(self, id, alt_token=False):
-    playlist = self.get_cached(id, 'playlist', timedelta(minutes=10), alt_token=alt_token)
+    playlist = self.get_cached(id, 'playlist', timedelta(minutes=10), data="?fields=name,images,id,tracks(total,limit,next,items(track(name,artists(id,name,type)))", alt_token=alt_token)
     if len(playlist['tracks']['items']) < playlist['tracks']['total']:
       current_track_page = playlist['tracks']
       while current_track_page['next']:
-        current_track_page = self.get('/playlists/' + id+'/tracks?' + current_track_page['next'].split('?')[1], data={}, alt_token=alt_token)
+        current_track_page = self.get('/playlists/' + id+'/tracks?fields=total,limit,next,items(track(name,artists(id,name,type))&' + current_track_page['next'].split('?')[1], data={}, alt_token=alt_token)
         playlist['tracks']['items'].extend(current_track_page['items'])
       if len(playlist['tracks']['items']) == playlist['tracks']['total']:
         check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
@@ -258,7 +258,7 @@ class SpotifyClient():
       return json
 
 
-  def get_cached(self, ids: list|str, object_type: str, expires_delta: timedelta|None  = timedelta(hours=1), alt_token = False, data={}):
+  def get_cached(self, ids: list|str, object_type: str, expires_delta: timedelta|None  = timedelta(hours=1), alt_token = False, data: dict|str = {}):
     path = object_type+"s"
     if object_type in ['top-tracks', 'albums-artist']:
       if isinstance(ids, list):
@@ -291,11 +291,11 @@ class SpotifyClient():
       if len(missing_ids) == 1:
         if len(ids_search) > 1:
           path = path + "/" + missing_ids[0]
-        objects = {object_type+"s": [self.get(f"/" + path, data=data, alt_token=alt_token)]}
+        objects = {object_type+"s": [self.get(f"/" + path+(data if isinstance(data, str) else ""), data=data, alt_token=alt_token)]}
       else:
         idp = ",".join(id for id in missing_ids)
         data['ids'] = idp
-        objects = self.get(f"/"+path, data=data, alt_token=alt_token)
+        objects = self.get(f"/"+path+(data if isinstance(data, str) else ""), data=data, alt_token=alt_token)
       for object_item in objects[object_type+"s"] if (object_type+"s") in objects else []:
         if 'id' not in object_item and isinstance(ids, str):
           object_item['id'] = ids
