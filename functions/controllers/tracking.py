@@ -292,6 +292,8 @@ class TrackingController():
           return 'Waiting for data', 201
       else:
           self.set_onboard_wait(sql_session, sql_ref, None)
+
+      print(traceback.format_exc())
       raise e
 
     print("[INGEST] has info")

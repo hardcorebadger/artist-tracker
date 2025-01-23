@@ -22,6 +22,19 @@ class ArtistController():
         self.sql = sql
 
 
+    def queues(self, sql_session, app, uid):
+        db = firestore.client(app)
+
+        user_data = get_user(uid, db)
+        count = self.build_query(uid, user_data, {}, db, sql_session, None, True)
+        return {
+            "eval": count.filter(Artist.eval_queued_at != None).count(),
+            "spotify": count.filter(Artist.spotify_queued_at != None).count(),
+            "stats": count.filter(Artist.stats_queued_at != None).count(),
+
+        }
+
+
     def get_artists_test(self, data, app):
         return (self.get_artists('9sRMdvFDUKVKckwpzeARiG6x2LG2', data, app, self.sql.get_session()))
     def get_artists(self, uid, data, app, sql_session):

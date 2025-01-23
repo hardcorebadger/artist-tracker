@@ -61,6 +61,7 @@ class Artist(Base):
     stats_queued_at = Column(TIMESTAMP)
     onboard_queued_at = Column(TIMESTAMP)
     spotify_cached_at = Column(TIMESTAMP)
+    spotify_queued_at = Column(TIMESTAMP)
 
     links: Mapped[List["ArtistLink"]] = relationship(
         back_populates = "artist", cascade = "all, delete-orphan"

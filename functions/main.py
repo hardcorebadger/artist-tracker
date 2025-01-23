@@ -185,8 +185,9 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-
-        return "artists"
+        artists_controller = ArtistController(PROJECT_ID.value, LOCATION.value, get_sql())
+        return artists_controller.queues(sql_session, app, 'q9HMKTU1S7hUlpNdtBB5braS1VJ3')
+        # return "artists"
         # return json.dumps(body).encode()
         # return spotify.get_playlist('3WxQaPZsG56Tl6Wrllkqas')
         # return lookalike_controller.mine_lookalikes('94b2e9a9-b2e7-4750-8be0-9c3432991a4f')
@@ -316,7 +317,20 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
             artist_ids_to_update.append(str(spotify_id_to_artist_id[artist['id']]))
 
         if (len(artist_ids_to_update) > 0):
-            bulk_update(sql_session, artist_ids_to_update, 'spotify_cached_at = NOW(), eval_queued_at = NULL')
+            bulk_update(sql_session, artist_ids_to_update, 'spotify_cached_at = NOW(), spotify_queued_at = NULL')
+        return 'Cached ' + str(len(artists)) + " artist(s)", 200
+
+    @v2_api.post("/spotify-cache-ids")
+    def spotify_cache_ids():
+        data = flask.request.get_json()
+        if 'spotify_ids' not in data:
+            raise ErrorResponse("Invalid payload. Must include 'spotify_ids' ", 500)
+        if len(data['spotify_ids']) == 0:
+            return 'Cached 0 artists', 200
+        spotify_ids = data['spotify_ids']
+
+        artists = get_spotify_client().get_cached(spotify_ids, 'artist', timedelta(days=1))
+
         return 'Cached ' + str(len(artists)) + " artist(s)", 200
 
     @v2_api.post("/eval-artist")
@@ -393,6 +407,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         data = flask.request.get_json()
         if 'spotify_id' not in data:
             raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
+        print('spotify_id', data['spotify_id'])
 
         return tracking_controller.add_ingest_update_artist(sql_session, data['spotify_id'], 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
 
@@ -409,7 +424,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         data = flask.request.get_json()
         if 'spotify_id' not in data:
             raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
-        
+        print('spotify_id', data['spotify_id'])
         return tracking_controller.ingest_artist(sql_session, data['spotify_id'])
 
     @v2_api.post("/update-artist")
@@ -417,8 +432,11 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         data = flask.request.get_json()
         if 'spotify_id' not in data and 'id' not in data:
             raise ErrorResponse("Invalid payload. Must include 'spotify_id' or 'id'", 500)
-        
-        return tracking_controller.update_artist(sql_session, data['spotify_id'] if 'spotify_id' in data else None, data['id'] if 'id' in data else None, datetime.now() - timedelta(days=1))
+
+        spotify_id = data['spotify_id'] if 'spotify_id' in data else None
+        artist_id = data['id'] if 'id' in data else None
+        print('spotify_id/artist_id',spotify_id,artist_id)
+        return tracking_controller.update_artist(sql_session, spotify_id, artist_id, datetime.now() - timedelta(days=1))
 
     # @v2_api.errorhandler(500)
     # def internal_server_error(error):
@@ -702,6 +720,7 @@ def get_spotify_client():
 
 def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = False ):
     spotify = get_spotify_client()
+    task_controller = TaskController(PROJECT_ID.value, LOCATION.value, V1_API_ROOT.value, V2_API_ROOT.value, V3_API_ROOT.value)
     try:
         db = firestore.client(app)
         songstats = SongstatsClient(SONGSTATS_API_KEY.value)
@@ -742,11 +761,16 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                         sql_session.commit()
                         sql_session.refresh(sql_playlist)
 
+                    aid_chunks = spotify.chunk_list(aids, 50)
+                    for aid_chunk in aid_chunks:
+                        body = {"spotify_ids": list(map(lambda x: str(x), aid_chunk))}
+                        print(body, "Sending to cache")
+                        task_controller.enqueue_task('SpotifyQueue', 2, '/spotify-cache-ids', body)
                     for a in aids:
                         task_queue = functions.task_queue("addartisttask")
                         target_uri = get_function_url("addartisttask")
                         body = {"data": {"spotify_id": a, "uid": uid, "playlist_id": sql_playlist.id, "tags": tags}}
-                        task_options = functions.TaskOptions(schedule_time=datetime.now(), uri=target_uri)
+                        task_options = functions.TaskOptions(schedule_time=datetime.now() + timedelta(seconds=20), uri=target_uri)
                         task_queue.enqueue(body, task_options)
                     return {'message': 'success', 'status': 200, 'added_count': len(aids)}
                 except ErrorResponse as e:

@@ -21,6 +21,8 @@ class SongstatsClient():
     if res.status_code > 299:
       if res.status_code == 429:
         print("Songstats Rate Limiting")
+
+
       raise ErrorResponse(res.json(), res.status_code, "Songstats")
     return res.json()
 
