@@ -23,7 +23,7 @@ import Iconify from './Iconify';
 import Chart from "react-apexcharts";
 import {useContext, useEffect, useState} from 'react';
 import {Box, Link as MUILink} from "@mui/material";
-import {theme} from "./MuiDataGridServer";
+import {darkTheme, theme} from "./MuiDataGridServer";
 import {ThemeProvider} from "@mui/material/styles";
 import {LoadingWidget} from "../routing/LoadingScreen";
 import Moment from "react-moment";
@@ -78,7 +78,7 @@ function CopyrightCard({artist, linkSources}) {
   const statusColor = artist.evaluation?.status == 1 ? 'red' :  (artist.evaluation?.status == 0 ? 'green' : 'yellow')
   const typeColor = artist.evaluation?.distributor_type == 2 ? 'red' : (artist.evaluation?.distributor_type == 1 ? 'yellow' : 'green')
   const priorsColor = artist.evaluation?.back_catalog == 1 ? 'yellow' : 'green'
-
+  const {colorMode} = useColorMode();
   const links =  Object.keys(artist).filter((key) => {
     if (!key.startsWith('link_')){
       return false;
@@ -119,7 +119,7 @@ function CopyrightCard({artist, linkSources}) {
             const value = artist[key]
             const source = linkSources.filter((s) => s.key === (key.split("link_")[1])).pop()
             return (
-                <ThemeProvider theme={theme} key={"detail_" + key}>
+                <ThemeProvider theme={colorMode === 'dark' ? darkTheme : theme} key={"detail_" + key}>
                  <MUILink color='primary' href={value}>
                    <Wrap align={'center'}>
                      <Iconify icon={source?.logo}/> {source?.display_name} <Iconify icon="mdi:external-link" />
@@ -285,7 +285,7 @@ const { isOpen, onOpen, onClose } = useDisclosure()
                         ) : null}
                         {item[0].playlist && item.length === 1 ?
                             (
-                                <ThemeProvider theme={theme}>
+                                <ThemeProvider theme={colorMode === 'dark' ? darkTheme : theme}>
 
                                   <MUILink target="_blank"
                                            href={"https://open.spotify.com/playlist/" + item[0].playlist.spotify_id}>{item[0].playlist.name}
@@ -310,7 +310,7 @@ const { isOpen, onOpen, onClose } = useDisclosure()
                                 </Text>
                                 {item.playlist ?
                                     (
-                                        <ThemeProvider theme={theme}>
+                                        <ThemeProvider theme={colorMode === 'dark' ? darkTheme : theme}>
 
                                           <MUILink target="_blank"
                                                    href={"https://open.spotify.com/playlist/" + item.playlist.spotify_id}>{item.playlist.name}

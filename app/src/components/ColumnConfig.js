@@ -1,5 +1,5 @@
 import {
-    Box, Text, Wrap
+    Box, Text, useColorMode, Wrap
 } from '@chakra-ui/react';
 import Iconify from '../components/Iconify';
 import numeral from 'numeral';
@@ -272,10 +272,11 @@ export const statisticColumnTemplates = {
             type: 'number',
             sortable: false,
             renderCell: (params) => {
+                const {colorMode} = useColorMode();
             return (
             <div style={{width:"100%", paddingTop: "5px"}}>
             <Sparklines data={params.value ? params.value : []} min={0} height={50} width={params.colDef.width}>
-                <SparklinesLine color="#329795" />
+                <SparklinesLine color={colorMode === 'light' ? "#329795" : "#37ada7"} />
             </Sparklines>
             </div>
             )},
