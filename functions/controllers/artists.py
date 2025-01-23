@@ -167,7 +167,12 @@ class ArtistController():
                 query = query.outerjoin(dynamic, and_(Artist.id == dynamic.artist_id,
                       dynamic.statistic_type_id == statistic_id))
                 if value is not None:
-                    value = int(value)
+                    if '.' in str(value):
+                        value = float(value)
+                    else:
+                        value = int(value)
+                if statistic_func in ['week_over_week', 'month_over_month']:
+                    value /= 100
                 query = self.build_condition(query, getattr(dynamic, statistic_func), operator, value)
             elif field == 'tags':
                 tag_type = 1
