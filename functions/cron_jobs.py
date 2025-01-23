@@ -19,6 +19,20 @@ def onboarding_cron(sql_session, task_controller : TaskController, tracking_cont
         body = {"spotify_id": aritst_id}
         task_controller.enqueue_task('StatsQueue', 2, '/ingest-artist', body)
 
+def spotify_cron(sql_session, task_controller : TaskController, eval_controller: EvalController):
+    artist_ids = eval_controller.find_needs_shopify_for_eval(sql_session, 50)
+    maps = []
+    for artist_id in artist_ids:
+        maps.append({'id': artist_id, 'eval_queued_at': datetime.now()})
+
+    body = {"artist_ids": artist_ids}
+    task_controller.enqueue_task('SpotifyQueue', 2, '/spotify-cache', body)
+    sql_session.execute(
+        update(Artist),
+        maps,
+    )
+    sql_session.commit()
+
 def eval_cron(sql_session, task_controller : TaskController, eval_controller: EvalController, batch_size : int):
 
     artist_ids = eval_controller.find_needs_eval_refresh(sql_session, batch_size)

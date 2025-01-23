@@ -250,24 +250,29 @@ class EvalController():
     sql_session.commit()
     # TODO save the full eval state to a subcollection
     return 'success', 200
-  
+
+  def find_needs_eval_base(self, spotify_id = False):
+      q = select(Artist.id) if spotify_id == False else select(Artist.spotify_id)
+      return q.outerjoin(Evaluation, Artist.evaluation).filter(
+              and_(
+                  Artist.active == True,
+                  or_(Artist.eval_queued_at == None, Artist.eval_queued_at <= func.now() - timedelta(hours=12)),
+                  or_(
+                      or_(
+                          and_(Evaluation.updated_at <= func.now() - timedelta(days=10), Evaluation.distributor_type != 1),
+                          and_(Evaluation.updated_at <= func.now() - timedelta(days=30), Evaluation.distributor_type == 1),
+                      ),
+                      Evaluation.id == None
+                  )
+              )
+          )
+
+  def find_needs_shopify_for_eval(self, sql_session, limit: int = 50):
+      sql_ids = self.find_needs_eval_base(True).filter(Artist.spotify_cached_at <= func.now() - timedelta(hours=23)).order_by(Artist.evaluation_id.desc().limit(limit))
+      sql_ids = sql_session.scalars(sql_ids).unique()
+      return list(sql_ids)
+
   def find_needs_eval_refresh(self, sql_session, limit: int):
-    sql_ids = ((select(Artist.id).outerjoin(Evaluation, Artist.evaluation)
-               .filter(
-                    and_(
-                        Artist.active == True,
-                        or_(Artist.eval_queued_at == None, Artist.eval_queued_at <= func.now() - timedelta(hours=12)),
-                        or_(
-                            or_(
-                                and_(Evaluation.updated_at <= func.now() - timedelta(days=10), Evaluation.distributor_type != 1),
-                                and_(Evaluation.updated_at <= func.now() - timedelta(days=30), Evaluation.distributor_type == 1),
-                            ),
-                            Evaluation.id == None
-                        )
-                       )
-                    )
-               )
-                .order_by(Artist.evaluation_id.desc())
-               .limit(limit))
+    sql_ids = self.find_needs_eval_base().filter(Artist.spotify_cached_at > func.now() - timedelta(hours=22)).order_by(Artist.evaluation_id.desc().limit(limit))
     sql_ids = sql_session.scalars(sql_ids).unique()
     return list(sql_ids)

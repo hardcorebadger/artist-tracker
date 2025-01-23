@@ -104,97 +104,38 @@ class SpotifyClient():
     return res.json()
   
   def get_artist(self, id, alt_token=False):
-      check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
-        "spotify_id", "==", id
-      )).where(filter=FieldFilter(
-        'type', '==', 'artist'
-      )).order_by('created_at', "DESCENDING").get()
-
-      existing = check_cache.pop() if len(check_cache) > 0 else None
-      if existing and existing.get('created_at') > datetime.now(existing.get('created_at').tzinfo) - timedelta(days=1):
-        return existing.to_dict().get('data')
-      else:
-        artist = self.get(path=f"/artists/{id}", alt_token=alt_token)
-        if existing:
-          existing.reference.set({"id": existing.id, "data": artist, "created_at": SERVER_TIMESTAMP, "type": "artist", "spotify_id": id})
-          print("Updated artist in cache: " + id)
-        else:
-          cache = {"data": artist, "spotify_id": id, "type": "artist", "created_at": SERVER_TIMESTAMP}
-          update_time, cache_ref = self.db.collection("spotify_cache").add(cache)
-          print("Added artist to cache: " + id)
-        return artist
+    return self.get_cached(id, 'artist', timedelta(days=1), alt_token)
 
   def get_artist_top_tracks(self, id):
     return self.get(f"/artists/{id}/top-tracks", data={"market":"US"})
 
   def get_album(self, id):
-    return self.get(f"/albums/{id}")
+    return self.get_cached(id, 'album', None, alt_token=False)
   
   def get_artist_albums(self, id):
-    return self.get(f"/artists/{id}/albums", data={'include_groups':'album,single'})
-  
-  def get_albums(self, ids):
+    return self.get_cached(id, 'albums-artist', timedelta(days=3), alt_token=False, data={'include_groups':'album,single'})
 
-    check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
-        "spotify_id", "in", ids
-      )).where(filter=FieldFilter(
-      'type', '==', 'album'
-    )).get()
-    album_data = []
-    missing_ids = []
-    for id in ids:
-      found = False
-      for check in check_cache:
-        if check.get('spotify_id') == id:
-          found = True
-          album_data.append(check.get('data'))
-      if found == False:
-        missing_ids.append(id)
-    if len(missing_ids) > 0:
-      idp = ",".join(id for id in missing_ids)
-      albums = self.get(f"/albums", data={'ids': idp})
-      for album in albums['albums'] if 'albums' in albums else []:
-        album_data.append(album)
-        cache = {"data": album, "spotify_id": album.get('id'), "type": "album", "created_at": SERVER_TIMESTAMP}
-        update_time, cache_ref = self.db.collection("spotify_cache").add(cache)
-        print(f"Added cache with id {cache_ref.id}: " + album.get('id'))
+  def get_albums(self, ids, alt_token=False):
+    return self.get_cached(ids, 'album', None, alt_token=alt_token)
 
-    return album_data
-
-  def get_artists(self, ids):
-
-    check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
-      "spotify_id", "in", ids
-    )).where(filter=FieldFilter(
-      'type', '==', 'artist'
-    )).get()
-    artist_data = []
-    missing_ids = []
-    for id in ids:
-      found = False
-      for check in check_cache:
-        if check.get('spotify_id') == id and check.get('created_at') > datetime.now(check.get('created_at').tzinfo) - timedelta(days=1):
-          found = True
-          artist_data.append(check.get('data'))
-      if found == False:
-        missing_ids.append(id)
-    if len(missing_ids) > 0:
-      idp = ",".join(id for id in missing_ids)
-      artists = self.get(f"/artists", data={'ids': idp})
-      for artist in artists['artists'] if 'artists' in artists else []:
-        artist_data.append(artist)
-        cache = {"data": artist, "spotify_id": artist.get('id'), "type": "artist", "created_at": SERVER_TIMESTAMP}
-        update_time, cache_ref = self.db.collection("spotify_cache").add(cache)
-        print(f"Added cache with id {cache_ref.id}: " + artist.get('id'))
-
-    return artist_data
+  def get_artists(self, ids, alt_token=False):
+    return self.get_cached(ids, 'artist', timedelta(days=1), alt_token)
   
   def get_playlist(self, id, alt_token=False):
-    global last_playlist
-    if last_playlist is not None and last_playlist['id'] == id:
-      return last_playlist
-    playlist = self.get(f"/playlists/{id}", alt_token=alt_token)
-    last_playlist = playlist
+    playlist = self.get_cached(id, 'playlist', timedelta(minutes=10), alt_token=alt_token)
+    if len(playlist['tracks']['items']) < playlist['tracks']['total']:
+      current_track_page = playlist['tracks']
+      while current_track_page['next']:
+        current_track_page = self.get('/playlists/' + id+'/tracks?' + current_track_page['next'].split('?')[1], data={}, alt_token=alt_token)
+        playlist['tracks']['items'].extend(current_track_page['items'])
+      if len(playlist['tracks']['items']) == playlist['tracks']['total']:
+        check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
+          "spotify_id", "==", id
+        )).where(filter=FieldFilter(
+          'type', '==', 'playlist'
+        )).get().pop()
+        check_cache.reference.update({"data": playlist, "spotify_id": id, "type": "playlist"})
+
     return playlist
 
   def trim_link_id(self, url):
@@ -316,6 +257,62 @@ class SpotifyClient():
     else:
       return json
 
+
+  def get_cached(self, ids: list|str, object_type: str, expires_delta: timedelta|None  = timedelta(hours=1), alt_token = False, data={}):
+    path = object_type+"s"
+    if object_type in ['top-tracks', 'albums-artist']:
+      if isinstance(ids, list):
+        raise Exception('sub item caches must be done one id at a time (no list)')
+      path = 'artists/'+ids+'/'+object_type.split('-artist')[0]
+    elif isinstance(ids, str):
+      path = path + "/" + ids
+    elif len(ids) == 1:
+      path = path + "/" + ids[0]
+    ids_search = ids
+    if isinstance(ids, str):
+      ids_search = [ids]
+    check_cache = self.db.collection("spotify_cache").where(filter=FieldFilter(
+      "spotify_id", "in", ids_search
+    )).where(filter=FieldFilter(
+      'type', '==', object_type
+    )).order_by('created_at', "DESCENDING").get()
+    object_data = []
+    missing_ids = []
+    for id in ids_search:
+      found = False
+      for check in check_cache:
+        if check.get('spotify_id') == id and (expires_delta is None or check.get('created_at') > datetime.now(check.get('created_at').tzinfo) - expires_delta):
+          found = True
+          object_data.append(check.get('data'))
+      if found == False:
+        missing_ids.append(id)
+    print(str(len(object_data)) + " cached found " + str(len(missing_ids)) + " ids needed " + str(len(ids)) + " given")
+    if len(missing_ids) > 0:
+      if len(missing_ids) == 1:
+        if len(ids_search) > 1:
+          path = path + "/" + missing_ids[0]
+        objects = {object_type+"s": [self.get(f"/" + path, data=data, alt_token=alt_token)]}
+      else:
+        idp = ",".join(id for id in missing_ids)
+        data['ids'] = idp
+        objects = self.get(f"/"+path, data=data, alt_token=alt_token)
+      for object_item in objects[object_type+"s"] if (object_type+"s") in objects else []:
+        if 'id' not in object_item and isinstance(ids, str):
+          object_item['id'] = ids
+        object_data.append(object_item)
+        existing = False
+        for check in check_cache:
+          if check.get('spotify_id') == object_item['id']:
+            existing = check
+            break
+        if existing:
+          existing.reference.set({"id": existing.id, "data": object_item, "created_at": SERVER_TIMESTAMP, "type": object_type, "spotify_id": object_item['id']})
+          print("Updated "+object_type+" in cache: " + object_item['id'])
+        else:
+          cache = {"data": object_item, "spotify_id": object_item.get('id'), "type": object_type, "created_at": SERVER_TIMESTAMP}
+          update_time, cache_ref = self.db.collection("spotify_cache").add(cache)
+          print(f"Added cache with id {cache_ref.id}: " + object_item.get('id'))
+    return object_data if isinstance(ids, list) else object_data[0]
 
   def encode_client_credentials(self, client_id, client_secret):
     credentials = f"{client_id}:{client_secret}"

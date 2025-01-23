@@ -7,13 +7,13 @@ from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
 from firebase_functions.options import RetryConfig, MemoryOption
 from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter, Or
-from sqlalchemy import select, or_
+from sqlalchemy import select, or_, update
 from sqlalchemy.orm import joinedload
 from sqlalchemy.util.preloaded import sql_dml
 
 from controllers.artists import ArtistController
 from controllers.twilio import TwilioController
-from cron_jobs import eval_cron, stats_cron, onboarding_cron
+from cron_jobs import eval_cron, stats_cron, onboarding_cron, spotify_cron
 from lib.utils import get_function_url
 from lib.config import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
@@ -177,9 +177,11 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-
-        return lookalike_controller.mine_lookalikes('94b2e9a9-b2e7-4750-8be0-9c3432991a4f')
-
+        return spotify.get_playlist('3WxQaPZsG56Tl6Wrllkqas')
+        # return lookalike_controller.mine_lookalikes('94b2e9a9-b2e7-4750-8be0-9c3432991a4f')
+        #https://open.spotify.com/artist/7rRz5zPounzREHN0cIrYhS?si=f7dcf5b7322346bb
+        #https://open.spotify.com/artist/0PxzGnCYBpSuaI49OR94cA?si=68189be134ec4688
+        #https://open.spotify.com/playlist/3WxQaPZsG56Tl6Wrllkqas?si=85dee54659ef43ef
         # return twilio.receive_message(db, '+19493385918', 'https://open.spotify.com/artist/1UKNeJ3wk2fCZEi0Bzb30O?si=86bfc38017b04740', process_spotify_link, sql_session)
 
         # users = db.collection("users").get()
@@ -283,6 +285,28 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         #     "sql": query.compile(compile_kwargs={"literal_binds": True}).string,
         #     "rows": list(map(lambda artist: artist.as_dict(), artists))
         # }
+    @v2_api.post("/spotify-cache")
+    def spotify_cache():
+        data = flask.request.get_json()
+        if 'artist_ids' not in data :
+            raise ErrorResponse("Invalid payload. Must include 'artist_ids' ", 500)
+
+        artists_data = list(sql_session.scalars(select(Artist).filter(Artist.id.in_(data['artist_ids']))).unique())
+        spotify_ids = list(map(lambda a: a.spotify_id, artists_data))
+        spotify_id_to_artist_id = {}
+        maps = []
+
+        for artist in artists_data:
+            spotify_id_to_artist_id[artist.spotify_id] = artist.id
+        artists = get_spotify_client().get_cached(spotify_ids, 'artist', timedelta(days=1))
+        for artist in artists:
+            maps.append({'id': spotify_id_to_artist_id[artist['id']], 'spotify_cached_at': datetime.now(), 'eval_queued_at': None})
+        sql_session.execute(
+            update(Artist),
+            maps,
+        )
+        sql_session.commit()
+        return 'Cached ' + str(len(artists)) + " artist(s)", 200
 
     @v2_api.post("/eval-artist")
     def eval_artist():
@@ -423,6 +447,8 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     sql_session = get_sql().get_session()
 
     try:
+        spotify_cron(sql_session, task_controller, eval_controller)
+
         # does 300 evals per hours, doesn't care where they are in OB, TODO prios by oldest first so new artists go first
         eval_cron(sql_session, task_controller, eval_controller, 10)
         # only looks at artists who are ingested, updates 750 stats per hour
