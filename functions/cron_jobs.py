@@ -19,11 +19,11 @@ def onboarding_cron(sql_session, task_controller : TaskController, tracking_cont
         body = {"spotify_id": aritst_id}
         task_controller.enqueue_task('StatsQueue', 2, '/ingest-artist', body)
 
-def spotify_cron(sql_session, task_controller : TaskController, eval_controller: EvalController):
+def spotify_cron(sql_session, task_controller : TaskController, eval_controller: EvalController, bulk_update):
     artist_ids = eval_controller.find_needs_shopify_for_eval(sql_session, 50)
-    maps = []
+    artist_id_strs = []
     for artist_id in artist_ids:
-        maps.append({'id': artist_id, 'eval_queued_at': datetime.now()})
+        artist_id_strs.append(str(artist_id))
     if len(artist_ids) == 0:
         print("No artists need cache")
         return
@@ -31,39 +31,30 @@ def spotify_cron(sql_session, task_controller : TaskController, eval_controller:
     body = {"artist_ids": list(map(lambda x: str(x), artist_ids))}
     print(body, "Sending to cache")
     task_controller.enqueue_task('SpotifyQueue', 2, '/spotify-cache', body)
-    sql_session.execute(
-        update(Artist),
-        maps,
-    )
-    sql_session.commit()
+    bulk_update(sql_session, artist_id_strs, 'eval_queued_at = NOW()')
 
-def eval_cron(sql_session, task_controller : TaskController, eval_controller: EvalController, batch_size : int):
+
+def eval_cron(sql_session, task_controller : TaskController, eval_controller: EvalController, batch_size : int, bulk_update):
 
     artist_ids = eval_controller.find_needs_eval_refresh(sql_session, batch_size)
-    maps = []
+    artist_id_strs = []
     for artist_id in artist_ids:
-        maps.append({'id': artist_id, 'eval_queued_at': datetime.now()})
+        artist_id_strs.append(str(artist_id))
         body = {"id": str(artist_id)}
         task_controller.enqueue_task('EvalQueue', 2, '/eval-artist', body)
-    sql_session.execute(
-        update(Artist),
-        maps,
-    )
-    sql_session.commit()
+    bulk_update(sql_session, artist_id_strs, 'eval_queued_at = NOW()')
 
 
-def stats_cron(sql_session, task_controller : TaskController, tracking_controller: TrackingController, batch_size : int):
+
+def stats_cron(sql_session, task_controller : TaskController, tracking_controller: TrackingController, batch_size : int, bulk_update):
     artist_ids = tracking_controller.find_needs_stats_refresh(sql_session, batch_size)
-    maps = []
+    artist_id_strs = []
     for artist_id in artist_ids:
-        maps.append({'id': artist_id, 'stats_queued_at': datetime.now()})
+        artist_id_strs.append(str(artist_id))
         body = {"id": str(artist_id)}
-        task_controller.enqueue_task('StatsQueue', 2, '/update-artist', body)       
-    sql_session.execute(
-        update(Artist),
-        maps,
-    )
-    sql_session.commit()
+        task_controller.enqueue_task('StatsQueue', 2, '/update-artist', body)
+    bulk_update(sql_session, artist_id_strs, 'stats_queued_at = NOW()')
+
 
 def airtable_v1_cron(task_controller : TaskController, airtable_v1_controller: AirtableV1Controller):
     jobs_added = 0

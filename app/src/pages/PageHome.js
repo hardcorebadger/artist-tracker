@@ -43,6 +43,7 @@ import {
 } from "@choc-ui/chakra-autocomplete";
 import {ColumnDataContext, goFetch} from "../App";
 import TagInput from "../components/TagInput";
+import {LoadingWidget} from "../routing/LoadingScreen";
 const client_id = 'aa08e3eb52f24d9a9f772e2c544b39b5';
 const scope = 'user-read-private user-read-email playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public user-library-read user-read-recently-played';
 
@@ -172,6 +173,7 @@ function PageDefault() {
     return goFetch(user, 'GET', 'artists', data)
   }
   const { isOpen, onOpen, onClose } = useDisclosure()
+  const {users} = useContext(ColumnDataContext)
 
   useEffect( () => {
     const loadArtists = async () => {
@@ -199,7 +201,7 @@ function PageDefault() {
           </VStack>
           <Grid templateColumns='repeat(4, 1fr)' gap={5}>
           <GridItem colSpan={3}>
-            <ReportsList />
+            {(users !== null) ? (<ReportsList/>) : <LoadingWidget height={'50vh'}/>}
           </GridItem>
           <GridItem colSpan={1}>
             <Stack>
@@ -215,14 +217,14 @@ function PageDefault() {
                   <Link href={user?.profile?.sms?.verified ? 'sms:+18333712184' : '/app/settings/account'} isExternal={user?.profile?.sms?.verified ?? false}><Button colorScheme='primary'>{user?.profile?.sms?.verified ? 'Text +1 833 371-2184' : 'Get Started'}</Button></Link>
                 </Stack>
               </Card>
-              <Card p={25}>
-                <Stack w="100%" spacing={3}>
-                  <Heading size="xs">Spotify</Heading>
-                  <Text></Text>
+              {/*<Card p={25}>*/}
+              {/*  <Stack w="100%" spacing={3}>*/}
+              {/*    <Heading size="xs">Spotify</Heading>*/}
+              {/*    <Text></Text>*/}
 
-                  <Link href={'https://accounts.spotify.com/authorize?'+spotifyParams.toString()} isExternal={true}><Button colorScheme='primary'>Link</Button></Link>
-                </Stack>
-              </Card>
+              {/*    <Link href={'https://accounts.spotify.com/authorize?'+spotifyParams.toString()} isExternal={true}><Button colorScheme='primary'>Link</Button></Link>*/}
+              {/*  </Stack>*/}
+              {/*</Card>*/}
             </Stack>
           </GridItem>
             <AddTagsModal

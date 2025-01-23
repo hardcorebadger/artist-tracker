@@ -458,12 +458,12 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     sql_session = get_sql().get_session()
 
     try:
-        spotify_cron(sql_session, task_controller, eval_controller)
+        spotify_cron(sql_session, task_controller, eval_controller, bulk_update)
 
         # does 300 evals per hours, doesn't care where they are in OB, TODO prios by oldest first so new artists go first
-        eval_cron(sql_session, task_controller, eval_controller, 10)
+        eval_cron(sql_session, task_controller, eval_controller, 10, bulk_update)
         # only looks at artists who are ingested, updates 750 stats per hour
-        stats_cron(sql_session, task_controller, tracking_controller, 25)
+        stats_cron(sql_session, task_controller, tracking_controller, 25, bulk_update)
 
         # deals with messiness of waiting for songstats to ingest, pulls info and stats for the artist for first time, 1.5k per hr
         onboarding_cron(sql_session, task_controller, tracking_controller, 50)
