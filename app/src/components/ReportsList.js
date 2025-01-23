@@ -11,7 +11,7 @@ import {
   Th,
   Td,
   Tbody,
-  HStack,
+  HStack, useColorMode,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../routing/AuthGuard';
@@ -27,7 +27,7 @@ import UserAvatar from './UserAvatar'
 export default function ReportsList() {
 
   const [createReportLoading, setCreateReportLoading] = useState(false)
-
+  const {colorMode} = useColorMode()
   const user = useUser()
   const navigate = useNavigate()
   const [reports, reportsLoading, reportError] = useCollection(
@@ -77,7 +77,7 @@ export default function ReportsList() {
             </Thead>
             <Tbody>
               {reportItems && reportItems.map(item => (
-              <Tr key={item.id} sx={{'&:hover':{backgroundColor:'#e7fffa', cursor:'pointer'}}} onClick={()=>navigate(item.path)}>
+              <Tr key={item.id} sx={{'&:hover':{backgroundColor:(colorMode === 'light' ? '#e7fffa' : '#1e3e43'), cursor:'pointer'}}} onClick={()=>navigate(item.path)}>
                 <Td fontWeight='semibold'>{item.name}</Td>
                 <Td>{format(Date(item.last_modified_on), 'yyyy-MM-dd')}</Td>
                 <Td><UserAvatar userId={item.created_by}/></Td>

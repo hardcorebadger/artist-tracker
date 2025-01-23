@@ -5,7 +5,7 @@ const color_mode = "dark";
 
 export const theme = extendTheme({
   colorMode: color_mode,
-  initialColorMode: 'dark',
+  initialColorMode: 'system',
   useSystemColorMode: true,
   semanticTokens: {
     colors: {
