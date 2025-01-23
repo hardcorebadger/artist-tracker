@@ -14,7 +14,7 @@ import {
   TabList,
   Tabs,
   Tag,
-  Text, UnorderedList,
+  Text, UnorderedList, useColorMode,
   useDisclosure,
   VStack,
   Wrap,
@@ -143,7 +143,7 @@ const { isOpen, onOpen, onClose } = useDisclosure()
     const stats = bakeStats(statisticTypes, linkSources)
   const {users} = useContext(ColumnDataContext)
   const [expandedAttributionGroup, setExpandedAttributionGroup] = useState(null)
-
+  const {colorMode} = useColorMode()
   useEffect(() => {
     setExpandedAttributionGroup(null)
   }, [artist]);
@@ -237,6 +237,12 @@ const { isOpen, onOpen, onClose } = useDisclosure()
                             }
                           }
                         } : {},
+                        theme: {
+                          mode: colorMode
+                        },
+                        chart: {
+                          background: 'transparent',
+                        },
                         ...chartOptions
                       }}
                       series={[{
