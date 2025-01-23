@@ -21,7 +21,7 @@ import {
   ModalCloseButton,
   ModalBody,
   ModalFooter,
-  WrapItem, Wrap, Avatar, Flex, FormHelperText, FormLabel, FormControl, Link
+  WrapItem, Wrap, Avatar, Flex, FormHelperText, FormLabel, FormControl, Link, useColorMode
 } from '@chakra-ui/react';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import { Link as RouterLink } from 'react-router-dom';
@@ -233,8 +233,6 @@ function PageDefault() {
               setAddPreview={setAddPreview}
             />
         </Grid>
-       
-         
         </VStack>
       </PageLayoutContained>
   );

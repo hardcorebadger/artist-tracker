@@ -1,9 +1,9 @@
-import {HStack, Text, VStack, IconButton, Button, Link, Badge, chakra, Box, Wrap} from "@chakra-ui/react";
+import {HStack, Text, VStack, IconButton, Button, Link, Badge, chakra, Box, Wrap, useColorMode} from "@chakra-ui/react";
 import {DataGridPro, GridColumnHeaderItem, GridHeader, useGridApiContext, useGridApiRef} from '@mui/x-data-grid-pro';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
 import { red } from '@mui/material/colors';
-import { createTheme } from '@mui/material/styles';
+import { createTheme, useColorScheme } from '@mui/material/styles';
 
 import EditableTitle from "./EditableTitle";
 import ConfirmButton from "./ConfirmButton";
@@ -20,20 +20,7 @@ import {useUser} from "../routing/AuthGuard";
 // const ChakraDataGrid = chakra(DataGrid);
 
 // MUI theme for the data grid
-export const theme = createTheme({
-  cssVariables: true,
-  palette: {
-    primary: {
-      main: '#329795',
-    },
-    secondary: {
-      main: '#4049d3',
-    },
-    error: {
-      main: red.A400,
-    },
-  },
-});
+export
 
 // compares the state of the report to the saved version to see if we should show save button
 const compareState = (
@@ -62,13 +49,49 @@ const initialPagination = {
     page: 0,
     pageSize: 20,
 }
+export const theme = createTheme({
+    cssVariables: true,
+    palette: {
+        primary: {
+            main: '#329795',
+        },
+        secondary: {
+            main: '#4049d3',
+        },
+        error: {
+            main: red.A400,
+        },
 
+    },
+});
+export const darkTheme = createTheme({
+    cssVariables: true,
+    palette: {
+        mode: 'dark',
+        primary: {
+            main: '#37ada7',
+        },
+        secondary: {
+            main: '#4049d3',
+        },
+        error: {
+            main: red.A400,
+        },
+        text: {
+            primary: '#fff',
+            secondary: 'rgba(255, 255, 255, 0.7)',
+            disabled: 'rgba(255, 255, 255, 0.5)',
+            icon: 'rgba(255, 255, 255, 0.5)'
+        }
+    },
+});
 export default function MuiDataGridController({initialReportName, initialColumnOrder, initialSortModel, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
 
     // contexts
     const { statisticTypes, linkSources, tagTypes, users, existingTags } = useContext(ColumnDataContext);
     const { currentRows, setCurrentRows, currentQueryModel, setCurrentQueryModel } = useContext(CurrentReportContext);
     const user = useUser()
+    const {colorMode} = useColorMode();
     // data
     const getArtists = (data) => {
         console.log(data)
@@ -262,11 +285,10 @@ export default function MuiDataGridController({initialReportName, initialColumnO
 
           }}
           >
-        <ThemeProvider theme={theme}>
+        <ThemeProvider theme={colorMode === 'dark' ? darkTheme : theme}>
             {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
             {/* <CssBaseline /> */}
             
-               
                 <DataGridPro
                   columns={columns}
                   loading={dataIsLoading}

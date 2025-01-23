@@ -16,6 +16,7 @@ function getInitialState(key) {
     const data = localStorage.getItem(key)
     return data ? JSON.parse(data) : null
 }
+
 function App() {
     const [statisticTypes, setStatisticTypes] = useState(null);
     const [linkSources, setLinkSources] = useState(null);
