@@ -9,7 +9,7 @@ import {
     ModalCloseButton,
     ModalContent, ModalFooter,
     ModalHeader,
-    ModalOverlay, Text, useToast
+    ModalOverlay, Text, useToast, VStack
 } from "@chakra-ui/react";
 import {
     AutoComplete, AutoCompleteCreatable,
@@ -97,9 +97,15 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
                     </Box>
                     <TagInput disabled={loading} initialTags={artist?.tags.map((tag) => tag.tag)} setSelectedTags={setSelectedTags}/>
 
+
                 </ModalBody>
                 <ModalFooter>
-                    <Button width={'100%'} disabled={loading} onClick={setTags}>{"Save Tags"}</Button>
+                    <VStack sx={{width: '100%'}}>
+
+                        <Button width={'100%'} disabled={loading} onClick={onClose}>{"Cancel"}</Button>
+
+                        <Button width={'100%'} disabled={loading} onClick={setTags}>{"Save Tags"}</Button>
+                    </VStack>
                 </ModalFooter>
             </ModalContent>
         </Modal>

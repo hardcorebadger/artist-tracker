@@ -28,32 +28,37 @@ function TagInput({setSelectedTags, initialTags, disabled}) {
             <LoadingWidget/>
         )
     }
-
+    const onTagRemoved=(removed, item, tags) => {
+        const newTags = tags.filter((tag) => tag.label !== removed.label).map((tag) => tag.label);
+        setLocalTags(newTags)
+        setSelectedTags(newTags)
+    }
     return (
 
         <FormControl id="tags" w="100">
             <FormLabel>Tags</FormLabel>
-            <AutoComplete defaultValues={localTags ?? []} isLoading={disabled} creatable openOnFocus multiple
-                          onChange={vals => {
-                              console.log(vals)
-                              setLocalTags(vals)
-                              setSelectedTags(vals) }}
-                          onTagRemoved={(removed, item, tags) => {
-                              console.log(removed, item, tags)
-                              const newTags = tags.filter((tag) => tag !== removed)
-                              console.log(newTags)
-                              setLocalTags(newTags)
-                              setSelectedTags(newTags)
+            <AutoComplete  values={localTags}  isLoading={disabled}  creatable closeOnBlur={true} openOnFocus multiple
+
+                          onSelectOption={(option) => {
+                              setLocalTags([...localTags, option.item.value])
+                              setSelectedTags([...localTags, option.item.value])
                           }}
+
                 >
                 <AutoCompleteInput>
                     {({ tags }) =>
+
                         tags.map((tag, tid) => (
                             <AutoCompleteTag
                                 key={tid}
                                 label={tag.label}
-
-                                onRemove={tag.onRemove}
+                                disabled={null}
+                                onRemove={() => {
+                                    console.log("B " + tid + " " + tag.label)
+                                    // console.log(tag, tag.label + " "+ tid, tags)
+                                    tag.onRemove()
+                                    onTagRemoved(tag, tag.label, tags)
+                                }}
                             />
                         ))
                     }

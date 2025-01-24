@@ -387,7 +387,8 @@ class TrackingController():
               if sql_statistic_type.id == 30:
                   values = stats['stats']["spotify__monthly_listeners_current"] if "spotify__monthly_listeners_current" in stats['stats'] else []
           update[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = values
-          wasUpdate = self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
+          if len(stats['as_of']) > 0:
+              wasUpdate = self.add_or_update_sql_stat(sql_ref, sql_statistic_type, stats['as_of'].pop(), values)
           # if wasUpdate:
           #     allNewStats = False
 
