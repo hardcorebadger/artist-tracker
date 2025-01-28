@@ -188,7 +188,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        return stripe.generate_checkout("8AasHpt0Y2CNmogY6TpM", sql_session)
+        return stripe.generate_checkout("8AasHpt0Y2CNmogY6TpM", False, sql_session)
         # artists_controller = ArtistController(PROJECT_ID, LOCATION, sql)
         # return artists_controller.queues(sql_session, app, 'q9HMKTU1S7hUlpNdtBB5braS1VJ3')
         # return "artists"
