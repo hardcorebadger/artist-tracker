@@ -187,7 +187,7 @@ const { isOpen, onOpen, onClose } = useDisclosure()
 
       <VStack spacing={10} align="left">
       <HStack justifyContent='space-between'>
-        <HStack spacing={5}>
+        <Stack spacing={5} direction={{base: 'column', md: 'row'}} >
           {onNavigateBack && <IconButton size="sm" variant="outline" onClick={onNavigateBack} icon={<Iconify icon="mdi:arrow-left"/>} aria-label={"Back"}/>}
           <Heading size="lg"><Box sx={{'display': 'flex', 'alignItems': 'center'}}><Image mr={2} height={'50px'} src={artist.avatar}/> <Text >{artist?.name}</Text></Box></Heading>
           <HStack spacing={3} ms={1} pt={'3px'}>
@@ -198,14 +198,14 @@ const { isOpen, onOpen, onClose } = useDisclosure()
               onOpen()
             }}><Iconify icon={'material-symbols:edit-outline'}/></Button>
           </HStack>
-        </HStack>
+        </Stack>
 
 
         <Button colorScheme='primary'><Link href={ artist.link_spotify } target="_blank">
         Open in Spotify</Link></Button>
       </HStack>
-      <Grid templateColumns='repeat(4, 1fr)' gap={5}>
-        <GridItem colSpan={3}>
+      <Grid templateColumns={{base: '1fr', md: 'repeat(4, 1fr)'}} gap={5}>
+        <GridItem colSpan={{base: 1, md: 3}}>
           <Tabs onChange={(index) => setTabIndex(index)}>
             <TabList>
               {stats.map((s, i) => (
