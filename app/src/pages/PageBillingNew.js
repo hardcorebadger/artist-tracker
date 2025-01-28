@@ -23,7 +23,7 @@ import { signInWithEmailAndPassword, signInWithGoogle, auth, db, functions } fro
 import { useUser } from '../routing/AuthGuard';
 import { updateDoc, doc, startAfter } from 'firebase/firestore';
 import { products } from '../config';
-import {Link as RouterLink, useSearchParams} from 'react-router-dom';
+import {Link as RouterLink, useNavigate, useSearchParams} from 'react-router-dom';
 import AnnotadedSection from '../components/AnnotatedSection';
 import { useDocument } from 'react-firebase-hooks/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -147,13 +147,13 @@ function SubscriptionCard({user, subscription, activeSubscription}) {
   )
 }
 
-function Subscriptions({subscriptions, activeSubscription, checkout, checkoutLoading}) {
+function Subscriptions({subscriptions, activeSubscription, checkoutLoading}) {
 
   const user = useUser()
 
 
 
-
+  const navigate = useNavigate()
   return (
     <AnnotadedSection title="Subscriptions" description="Information on your active subscription(s)">
       {subscriptions?.map((subscription) => {
@@ -166,7 +166,10 @@ function Subscriptions({subscriptions, activeSubscription, checkout, checkoutLoa
             <Iconify size={'30px'} icon={'ph:empty'}/>
             <Text fontSize={"lg"} >Not Subscribed Yet!</Text>
             <Text fontSize={"xs"} mb={5}>Subscribe now to our Trial period for only $50/month</Text>
-            <Button onClick={checkout} isLoading={checkoutLoading} colorScheme={'primary'}>Subscribe Now</Button>
+              <Button isLoading={checkoutLoading} colorScheme={'primary'} onClick={() => {
+                navigate('/app/upgrade')
+              }}>Subscribe Now</Button>
+
           </VStack>
       ) : null}
 
@@ -227,35 +230,35 @@ export default function PageBillingNew() {
   }, [])
   useEffect(() => {}, [subscriptions, activeSubscription])
 
-  const checkout = async () => {
-    setSubscribeLoading(true);
-    goFetch(user, 'POST','checkout', {
-    }).then((response) => {
-      console.log(response);
-      setSubscribeLoading(false);
-      if (response.hasOwnProperty("checkout")) {
-        window.location.href = (response.checkout.url);
-      } else {
-        toast({
-          title: 'Failed to generate checkout',
-          description: "We were unable to generate a link for your Stripe checkout.",
-          status: 'error',
-          duration: 9000,
-          isClosable: true,
-        })
-      }
-    }).catch((error) => {
-      setSubscribeLoading(false);
-
-      toast({
-        title: 'Failed to generate checkout',
-        description: "We were unable to generate a link for your Stripe checkout.",
-        status: 'error',
-        duration: 9000,
-        isClosable: true,
-      })
-    })
-  }
+  // const checkout = async () => {
+  //   setSubscribeLoading(true);
+  //   goFetch(user, 'POST','checkout', {
+  //   }).then((response) => {
+  //     console.log(response);
+  //     setSubscribeLoading(false);
+  //     if (response.hasOwnProperty("checkout")) {
+  //       window.location.href = (response.checkout.url);
+  //     } else {
+  //       toast({
+  //         title: 'Failed to generate checkout',
+  //         description: "We were unable to generate a link for your Stripe checkout.",
+  //         status: 'error',
+  //         duration: 9000,
+  //         isClosable: true,
+  //       })
+  //     }
+  //   }).catch((error) => {
+  //     setSubscribeLoading(false);
+  //
+  //     toast({
+  //       title: 'Failed to generate checkout',
+  //       description: "We were unable to generate a link for your Stripe checkout.",
+  //       status: 'error',
+  //       duration: 9000,
+  //       isClosable: true,
+  //     })
+  //   })
+  // }
   console.log(activeSubscription)
 
   return (
@@ -264,9 +267,8 @@ export default function PageBillingNew() {
           <HStack mb={8} align={'center'} justify={'space-between'}>
 
             <Heading >Billing</Heading>
-            <Button colorScheme={'primary'} disabled={activeSubscription !== false || activeSubscription === null} isLoading={subscribeLoading} onClick={checkout}>Subscribe</Button>
           </HStack>
-          {subscriptions === null ? <LoadingWidget height={'30vh'}/> : <Subscriptions checkout={checkout} checkoutLoading={subscribeLoading} subscriptions={subscriptions} activeSubscription={activeSubscription} />}
+          {subscriptions === null ? <LoadingWidget height={'30vh'}/> : <Subscriptions checkoutLoading={subscribeLoading} subscriptions={subscriptions} activeSubscription={activeSubscription} />}
 
           <Divider/>
 

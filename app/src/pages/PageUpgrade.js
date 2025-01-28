@@ -4,79 +4,118 @@ import {
   Heading,
   Container,
   SimpleGrid,
-  Card,
-  HStack
-} from '@chakra-ui/react';
-import { PageLayoutContained } from '../layouts/DashboardLayout';
-import Iconify from '../components/Iconify';
-import { products } from '../config';
-import BuyButton from '../components/BuyButton'; 
-
-function FeaturePoint({children}) {
-  return (
-    <HStack>
-      <Iconify icon='material-symbols:check' color='green.400' size={20}/>
-      <Text fontSize='md' color="text.subtle">{children}</Text>
-    </HStack>
-  )
-}
+  RadioGroup,
+  Button, useToast,
+} from "@chakra-ui/react";
+import { PageLayoutContained } from "../layouts/DashboardLayout";
+import PlanCard from "../components/PlanCard";
+import { useState } from "react";
+import {goFetch} from "../App";
+import {useUser} from "../routing/AuthGuard";
 
 function PageUpgrade() {
-  
-  const product_a = Object.keys(products)[0]
-  const product_b = Object.keys(products)[1]
+  const [selectedPlan, setSelectedPlan] = useState("Indiestack Trial Monthly");
+  const toast = useToast()
+    const [subscribeLoading, setSubscribeLoading] = useState(false);
+  const handlePlanChange = (value) => {
+    setSelectedPlan(value);
+  };
+  const user = useUser();
+
+  const checkout = async () => {
+    setSubscribeLoading(true);
+    goFetch(user, 'POST','checkout', {
+    }).then((response) => {
+      console.log(response);
+      setSubscribeLoading(false);
+      if (response.hasOwnProperty("checkout")) {
+        window.location.href = (response.checkout.url);
+      } else {
+        toast({
+          title: 'Failed to generate checkout',
+          description: "We were unable to generate a link for your Stripe checkout.",
+          status: 'error',
+          duration: 9000,
+          isClosable: true,
+        })
+      }
+    }).catch((error) => {
+      setSubscribeLoading(false);
+
+      toast({
+        title: 'Failed to generate checkout',
+        description: "We were unable to generate a link for your Stripe checkout.",
+        status: 'error',
+        duration: 9000,
+        isClosable: true,
+      })
+    })
+  }
+
+  const plans = [
+    {
+      value: "Indiestack Trial Monthly",
+      planName: "Indiestack Trial Monthly",
+      price: "$50/mo",
+      description: "A special limited offer",
+      enabled: true,
+      features: [
+        { text: "> 1k artists", has: false },
+        { text: "Multiple Users", has: true },
+        { text: "SMS Support", has: true },
+        { text: "Artist Lookalikes", has: true },
+        { text: "Artist Reports", has: true },
+        { text: "User Artist Attribution", has: true },
+      ],
+    },
+    {
+      value: "Indiestack Enterprise",
+      planName: "Indiestack Enterprise",
+      price: "$500/mo",
+      description: "Unleash the firehose",
+      enabled: false,
+      features: [
+        { text: "> 1k artists", has: true },
+        { text: "Multiple Users", has: true },
+        { text: "SMS Support", has: true },
+        { text: "Artist Lookalikes", has: true },
+        { text: "Artist Reports", has: true },
+        { text: "User Artist Attribution", has: true },
+      ],
+    },
+  ];
 
   return (
       <PageLayoutContained size="sm">
-        <Container maxW='700' textAlign='center' pb="50">
-          <VStack align='center' spacing={5}>
-            <Heading size='3xl' >Upgrade to get access</Heading>
-            <Text color='text.subtle' size='lg'>This is a demo! You can test out the purchase flow without actually paying! When you click buy below, use card number '4242 4242 4242 4242' any future date for expiration, and any values you want for anything else.</Text>
+        <Container maxW="700" textAlign="center" pb="50">
+          <VStack align="center" spacing={5}>
+            <Heading size="3xl">Upgrade to get access</Heading>
+            <Text color="text.subtle" size="lg">
+              Subscribe now to our Trial period for only $50/month
+            </Text>
           </VStack>
         </Container>
-        <Container maxW='800' pb='100'>
-          <SimpleGrid columns={2} rows={1} spacing={10}>
-            <Card p='30'>
-              <VStack align='left' spacing={7}>
-              <VStack align='left' spacing={2}>
-                <Text fontSize='lg' fontWeight='bold'>{products[product_a].display}</Text>
-                <Text fontSize='3xl' >$99</Text>
-                <Text fontSize='md' >Best for your first launch</Text>
-              </VStack>
-              <VStack spacing={1} align='left'>
-                <FeaturePoint>Password + Google Auth</FeaturePoint>
-                <FeaturePoint>User Roles and Orgs</FeaturePoint>
-                <FeaturePoint>Stripe Payments integration</FeaturePoint>
-                <FeaturePoint>Chakra UI Integration</FeaturePoint>
-                <FeaturePoint>Laravel Backend</FeaturePoint>
-                <FeaturePoint>Template Pages</FeaturePoint>
-                <FeaturePoint>Sendgrid Email Sending</FeaturePoint>
-                <FeaturePoint>React Frontend</FeaturePoint>
-              </VStack>
-              <BuyButton product_id={product_a}  width='100%' colorScheme='primary'>Buy now</BuyButton>
-              </VStack>
-            </Card>
-            <Card p='30'>
-              <VStack align='left' spacing={7}>
-              <VStack align='left' spacing={2}>
-                <Text fontSize='lg' fontWeight='bold'>{products[product_b].display}</Text>
-                <Text fontSize='3xl' >$299</Text>
-                <Text fontSize='md' >Best for habitual hackers</Text>
-              </VStack>
-              <VStack spacing={1} align='left'>
-              <FeaturePoint>Password + Google Auth</FeaturePoint>
-                <FeaturePoint>User Roles and Orgs</FeaturePoint>
-                <FeaturePoint>Stripe Payments integration</FeaturePoint>
-                <FeaturePoint>Chakra UI Integration</FeaturePoint>
-                <FeaturePoint>Laravel Backend</FeaturePoint>
-                <FeaturePoint>Template Pages</FeaturePoint>
-                <FeaturePoint>Sendgrid Email Sending</FeaturePoint>
-                <FeaturePoint>React Frontend</FeaturePoint>
-              </VStack>
-              <BuyButton product_id={product_b} overlay={true} width='100%' colorScheme='primary'>Buy now</BuyButton>
-              </VStack>
-            </Card>
+        <Container maxW="800" pb="100">
+          <RadioGroup onChange={handlePlanChange} value={selectedPlan}>
+            <SimpleGrid columns={2} spacing={10}>
+              {plans.map((plan) => (
+                  <PlanCard
+                      key={plan.value}
+                      value={plan.value}
+                      planName={plan.planName}
+                      isDisabled={!plan.enabled}
+                      price={plan.price}
+                      description={plan.description}
+                      features={plan.features}
+                  />
+              ))}
             </SimpleGrid>
+          </RadioGroup>
+          <VStack pt="6">
+            <Button colorScheme="primary" onClick={checkout} isLoading={subscribeLoading}>
+              Subscribe to {selectedPlan}
+            </Button>
+          </VStack>
         </Container>
       </PageLayoutContained>
   );

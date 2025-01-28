@@ -45,7 +45,7 @@ export default function Router() {
       element: <AuthGuard><DashboardLayout /></AuthGuard>,
       children: [
         { index: true, element: <Navigate to="home" replace />   },
-        { path: 'home', element: <PageHome />},
+        { path: 'home', element: <AccessGuard><PageHome /></AccessGuard>},
         { path: 'admin', element: <AdminGuard><PageAdmin/></AdminGuard>},
         // { path: 'report/:id', element: <PageArtistReport />},
         { path: 'upgrade', element: <PageUpgrade />},
@@ -55,7 +55,6 @@ export default function Router() {
             // { path: '*', element: <Navigate to="/404" replace /> },
           ]},
 
-        { path: 'paywalled', element: <AccessGuard level="elite"><PagePaywalled /></AccessGuard> },
         { path: 'settings',
           children: [
             { index: true, element: <Navigate to="account" replace />   },
@@ -66,17 +65,17 @@ export default function Router() {
         { path: 'reports',
           children: [
             { index: true, element: <Navigate to="all" replace />   },
-            { path: 'all', element: <PageReports /> },
+            { path: 'all', element: <AccessGuard><PageReports /></AccessGuard> },
             { path: ':id', children: [
-                { index: true, element: <PageArtistReport/>},
-                { path: 'artists/:artistId', element: <PageArtist/>}
+                { index: true, element: <AccessGuard><PageArtistReport/></AccessGuard>},
+                { path: 'artists/:artistId', element: <AccessGuard><PageArtist/></AccessGuard>}
               ] },
           ]
         },
         { path: 'artists',
           children: [
             // { path: 'new', element: <PageAddArtist /> },
-            { path: ':artistId', element: <PageArtist /> },
+            { path: ':artistId', element: <AccessGuard><PageArtist /></AccessGuard> },
           ]
         },
       ],

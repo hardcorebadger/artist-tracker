@@ -293,7 +293,7 @@ export function PageLayoutContained({size, left, children}) {
 const bakeNavItems = (config, reports, orgs, user ) => {
   const navItems = deepCopy(config)
   reports.forEach(i => {navItems[1].children.push(i)})
-  if (user.admin) {
+  if (user?.admin) {
     navItems.push({path: "/app/admin", name: "Admin", icon: "ri:admin-fill"})
   }
   return navItems
@@ -304,12 +304,18 @@ export default function DashboardLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const {refreshFilters, currentUser} = useContext(ColumnDataContext)
   const [organizations, setOrganizations] = useState(null)
+  const {organization, setOrganization} = useContext(ColumnDataContext)
   const user = useUser()
   useEffect(() => {
 
     refreshFilters(user)
 
-
+    if (organization === null || organization.id !== user.organization) {
+        goFetch(user, 'GET', 'organization').then((response) => {
+            console.log(response)
+            setOrganization(response)
+        });
+    }
 
   }, []);
 
@@ -376,7 +382,7 @@ export default function DashboardLayout() {
         <GridItem area={'nav'}>
           <NavBar navItems={navItems} currentUser={currentUser}  organizations={organizations} openOrgModal={onOpen} />
         </GridItem>
-        <GridItem area={'main'} maxW={'calc(100vw - 315px)'}>
+        <GridItem area={'main'} maxW={'calc(100vw - 315px)'} maxH={'calc(100vh - 85px)'} overflowY={'scroll'}>
           <Outlet />
         </GridItem>
 

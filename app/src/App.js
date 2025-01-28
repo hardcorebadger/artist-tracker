@@ -27,6 +27,7 @@ function App() {
     const [currentRows, setCurrentRows] = useState(null)
     const [currentQueryModel, setCurrentQueryModel] = useState(getInitialState('currentQueryModel'))
     const [currentUser, setCurrentUser] = useState(null)
+    const [organization, setOrganization] = useState(null)
     const is_dev = location.hostname === "localhost"
 
     if (!is_dev && !location.hostname.includes('indiestack')) {
@@ -91,6 +92,8 @@ function App() {
             existingTags: existingTags,
             setExistingTags: setExistingTags,
             currentUser: currentUser,
+            organization: organization,
+            setOrganization: setOrganization,
             refreshFilters: loadOrgFilters,
             users: users,
             setUsers: setUsers,

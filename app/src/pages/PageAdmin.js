@@ -5,10 +5,11 @@ import {collection, query, limit, getDocs, startAfter, orderBy, where, getCountF
 import { db } from "../firebase";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme, theme } from "../components/MuiDataGridServer";
-import { useColorMode } from "@chakra-ui/react";
+import {Button, Menu, MenuButton, MenuItem, MenuList, Portal, useColorMode, useToast} from "@chakra-ui/react";
 import Iconify from "../components/Iconify";
 import {goFetch} from "../App";
 import {useUser} from "../routing/AuthGuard";
+import {ChevronDownIcon, ChevronRightIcon} from "@chakra-ui/icons";
 
 export default function PageAdmin() {
     const [rows, setRows] = useState([]); // Holds all rows (organizations and users)
@@ -20,6 +21,7 @@ export default function PageAdmin() {
     const [currentPage, setCurrentPage] = useState(0); // Current page
     const [lastVisible, setLastVisible] = useState(null); // Keeps track of the last document (for Firestore pagination)
     const user = useUser();
+    const toast = useToast()
     useEffect(() => {
         fetchOrganizations();
     }, [currentPage, pageSize]);
@@ -88,6 +90,7 @@ export default function PageAdmin() {
                     type: "organization",
                     name: org.name,
                     organization_id: org.id,
+                    free_mode: org.free_mode ?? false,
                     email: null,
                     first_name: null,
                     last_name: null,
@@ -134,6 +137,16 @@ export default function PageAdmin() {
             [orgId]: !isExpanded,
         }));
     };
+
+    const toggleFreeMode = async (orgId, free_mode) => {
+        goFetch(user, 'POST', 'edit-organization', {
+            "id": orgId,
+            "free_mode": free_mode
+        }).then((response) => {
+            console.log(response)
+            fetchOrganizations()
+        })
+    }
 
     const fetchUsersForOrg = async (orgId) => {
         try {
@@ -248,7 +261,52 @@ export default function PageAdmin() {
                 } else {
                     return (
                         <Box sx={{ pl: 4, bgcolor: "rgba(0, 0, 0, 0.04)" }}>
-                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{'subscription' in params.row ? (params.row.subscription?.status ?? 'none') : ""}</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{'subscription' in params.row ? (params.row.subscription?.status ?? (params.row.free_mode ? 'free' : 'none')) : ""}</Typography>
+                        </Box>
+                    )
+                }
+            },
+        },
+        {
+            field: "actions",
+            headerName: "Actions",
+            width: 300,
+            renderCell: (params) => {
+                if (params.row.type === "user") {
+                    return (null);
+                } else if (params.row.type === "header") {
+                    return null;
+                } else {
+                    return (
+                        <Box sx={{ pl: 4, bgcolor: "rgba(0, 0, 0, 0.04)" }}>
+                            <Menu>
+                                {({ isOpen }) => (
+                                    <>
+                                        {/* Menu Button */}
+                                        <MenuButton as={Button} rightIcon={(isOpen ? <ChevronDownIcon/> : <ChevronRightIcon />)}>
+                                            {isOpen ? "Actions" : "Actions"}
+                                        </MenuButton>
+
+                                        {/* Menu List with resolved background visibility */}
+                                        <Portal>
+                                            <MenuList
+                                                zIndex="popover" // Chakra's default popover zIndex
+                                                bg="rgb(41, 48, 62)" // Ensure background is explicitly set
+                                                boxShadow="lg"
+                                                p={2}// Add a shadow to make it pop
+                                                borderRadius="md" // Optional: Rounded edges for better UI
+                                            >
+                                                <MenuItem onClick={() => {
+                                                    handleCopy(params.row.id)
+                                                }}>Copy Org ID</MenuItem>
+                                                <MenuItem onClick={() => {
+                                                    toggleFreeMode(params.row.organization_id, !params.row.free_mode)
+                                                }}>{params.row.free_mode ? ("Disable") : "Activate"} Free Mode</MenuItem>
+                                            </MenuList>
+                                        </Portal>
+                                    </>
+                                )}
+                            </Menu>
                         </Box>
                     )
                 }
@@ -259,6 +317,29 @@ export default function PageAdmin() {
     const handlePageChange = (newPage) => {
         setCurrentPage(newPage);
     };
+
+    const handleCopy = async (text) => {
+        try {
+            await navigator.clipboard.writeText(text); // Copy the text to the clipboard
+            toast({
+                title: 'Copied to clipboard',
+                description: "Successfully copied: " + text + " to clipboard!",
+                status: 'success',
+                duration: 9000,
+                isClosable: true,
+            })
+        } catch (error) {
+            toast({
+                title: 'Failed to copy',
+                description: "Failed to copy: " + text + " to clipboard!",
+                status: 'error',
+                duration: 9000,
+                isClosable: true,
+            })
+            console.error("Failed to copy text: ", error);
+        }
+    };
+
 
     return (
         <Box sx={{ height: 600, width: "100%" }} p={5}>

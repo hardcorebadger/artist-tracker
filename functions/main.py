@@ -621,6 +621,19 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         is_admin = user_data.get('admin') if 'admin' in user_data else False
         return {'checkout': stripe.generate_checkout(user_data.get('organization'), is_admin, sql_session)}, 200
 
+    @v3_api.post('/edit-organization')
+    def edit_organization():
+        req = flask.request.get_json()
+        db = firestore.client(app)
+        user_data = get_user(user.uid, db)
+        is_admin = user_data.get('admin') if 'admin' in user_data else False
+
+        if is_admin == False:
+            return 'Unauthorized', 401
+        org = db.collection('organizations').document(req['id']).get()
+        org.reference.update({'free_mode': req['free_mode']})
+        return org.to_dict()
+
     @v3_api.post('/admin-organizations')
     def get_organizations_admin():
         db = firestore.client(app)
@@ -754,6 +767,20 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             return {
                 "id": twilio.send_code(uid, db, data.get('number'))
             }
+    @v3_api.get('/organization')
+    def get_organization():
+        db = firestore.client(app)
+        user_data = get_user(user.uid, db)
+        org = db.collection('organizations').document(user_data['organization']).get()
+        org_dict = org.to_dict()
+        sub = sql_session.scalars(select(Subscription).where(Subscription.organization_id == user_data['organization']).where(Subscription.status.in_(['active', 'paused'])).order_by(Subscription.created_at.desc())).first()
+        org_dict['subscription'] = sub.as_dict() if sub else None
+        response = jsonify(org_dict )
+
+        response.headers.add('Cache-Control', 'public, max-age=5')
+        response.headers.add('X-Organization', request.headers.get('X-Organization'))
+        response.headers.add('Vary', 'X-Organization')
+        return response
 
     @v3_api.post('/spotify-auth')
     def spotify_auth():

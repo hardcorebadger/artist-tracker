@@ -21,7 +21,7 @@ import {
   ModalCloseButton,
   ModalBody,
   ModalFooter,
-  WrapItem, Wrap, Avatar, Flex, FormHelperText, FormLabel, FormControl, Link, useColorMode
+  WrapItem, Wrap, Avatar, Flex, FormHelperText, FormLabel, FormControl, Link, useColorMode, Alert
 } from '@chakra-ui/react';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import { Link as RouterLink } from 'react-router-dom';
@@ -173,7 +173,7 @@ function PageDefault() {
     return goFetch(user, 'GET', 'artists', data)
   }
   const { isOpen, onOpen, onClose } = useDisclosure()
-  const {users} = useContext(ColumnDataContext)
+  const {users, organization} = useContext(ColumnDataContext)
 
   useEffect( () => {
     const loadArtists = async () => {
