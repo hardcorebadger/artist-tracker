@@ -6,13 +6,12 @@ import traceback
 from datetime import datetime
 
 from firebase_admin import firestore
-from sqlalchemy import select, and_, not_, or_, text
-from sqlalchemy.orm import joinedload, contains_eager, aliased
+from sqlalchemy import select, and_, not_, or_, text, func
+from sqlalchemy.orm import joinedload, contains_eager, aliased, subqueryload
 
 from lib import Artist, get_user, LinkSource, ArtistLink, ArtistTag, OrganizationArtist, Evaluation, StatisticType, Statistic, \
     UserArtist, Attribution, pop_default
 
-count_by_query = None
 
 class ArtistController():
 
@@ -48,29 +47,29 @@ class ArtistController():
             page = int(data.get('page', 0))
             page_size = int(data.get('pageSize', 20))
 
-            filters = data.get('filterModel', [])
+            # filters = data.get('filterModel', [])
             user_data = get_user(uid, db)
 
-            hashed_data = dict({'filters': filters, 'org': user_data.get('organization', None) })
-            json_string = json.dumps(hashed_data, sort_keys=True)
+            # hashed_data = dict({'filters': filters, 'org': user_data.get('organization', None) })
+            # json_string = json.dumps(hashed_data, sort_keys=True)
 
             # Create a hash object (using SHA-256 algorithm)
-            hash_object = hashlib.sha256(json_string.encode())
+            # hash_object = hashlib.sha256(json_string.encode())
 
             # Get the hexadecimal representation of the hash
-            hex_digest = hash_object.hexdigest()
-            global count_by_query
+            # hex_digest = hash_object.hexdigest()
+            # global count_by_query
             count = None
-            if count_by_query is None:
-                count_by_query = dict()
-
-            if hex_digest in count_by_query:
-                count_object = count_by_query[hex_digest]
-                if (time.time() - count_object['time']) < 360:
-                    count = count_object['count']
+            # if count_by_query is None:
+            #     count_by_query = dict()
+            #
+            # if hex_digest in count_by_query:
+            #     count_object = count_by_query[hex_digest]
+            #     if (time.time() - count_object['time']) < 360:
+            #         count = count_object['count']
             if count is None and id_lookup is None:
                 count = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup, True).count()
-                count_by_query[hex_digest] = dict({"count": count, "time": time.time()})
+                # count_by_query[hex_digest] = dict({"count": count, "time": time.time()})
 
             query = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup).limit(page_size).offset(page * page_size)
 
@@ -121,7 +120,7 @@ class ArtistController():
             query = (select(Artist).options(
                 joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True).defer(StatisticType.created_at).defer(StatisticType.updated_at),
                 joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True).defer(LinkSource.logo),
-                joinedload(Artist.organizations, innerjoin=True),
+                subqueryload(Artist.organizations),
                 contains_eager(Artist.evaluation),
                 joinedload(Artist.users, innerjoin=False),
                 joinedload(Artist.tags, innerjoin=False),
@@ -133,7 +132,7 @@ class ArtistController():
                     StatisticType.created_at).defer(StatisticType.updated_at),
                 joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True).defer(
                     LinkSource.logo),
-                joinedload(Artist.organizations, innerjoin=True),
+                subqueryload(Artist.organizations),
                 contains_eager(Artist.evaluation),
                 joinedload(Artist.users, innerjoin=False),
                 joinedload(Artist.tags, innerjoin=False),
@@ -141,9 +140,10 @@ class ArtistController():
             ))
             query = query.filter(Artist.id == id_lookup)
 
+        sub_query = select(func.distinct(OrganizationArtist.artist_id)).filter(OrganizationArtist.organization_id == user_data.get('organization'))
         query = query.filter(Artist.active == True)
         query = query.outerjoin(Evaluation, Artist.evaluation)
-        query = query.where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization')))
+        query = query.where(Artist.id.in_(sub_query))
         # query = query.filter(UserArtist.organization_id == user_data.get('organization'))
         # query = query.filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))
 

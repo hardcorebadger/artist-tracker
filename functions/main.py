@@ -1,4 +1,5 @@
 import json
+
 import math
 
 from firebase_admin import initialize_app, firestore, functions, auth
@@ -28,7 +29,6 @@ from firebase_functions.params import IntParam, StringParam
 
 # MIN_INSTANCES = IntParam("HELLO_WORLD_MIN_INSTANCES")
 
-
 # from local_scripts import dump_unclean
 
 #################################
@@ -41,13 +41,12 @@ app = initialize_app()
 # Globals
 #################################
 
-spotify_client = None
-artists_controller = None
+# spotify_client = None
 stat_types = None
 link_sources = None
-twilio_client = None
+# twilio_client = None
 youtube_client = None
-task_controller = None
+# task_controller = None
 
 def get_tag_types():
     return dict({
@@ -65,7 +64,6 @@ def get_tag_types():
 
 
 sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD, SQL_DB)
-stripe = StripeController(STRIPE_KEY, STRIPE_WEBHOOK_SECRET)
 songstats = SongstatsClient(SONGSTATS_API_KEY)
 
 @tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, max_backoff_seconds=60), memory=MemoryOption.MB_512)
@@ -154,6 +152,10 @@ def bulk_update(sql_session, ids: list, set: str):
     sql_session.execute(sql_query)
     sql_session.commit()
 
+def get_stripe():
+    return StripeController(STRIPE_KEY, STRIPE_WEBHOOK_SECRET)
+
+
 #############################
 # V2 API
 # ##############################
@@ -175,20 +177,20 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.errorhandler(Exception)
     def invalid_api_usage(e : Exception):
-        print(e)
+        print(str(e))
         if isinstance(e, ErrorResponse):
-            print(e.to_json())
+            print(str(e.to_json()))
             return e.respond()
         traceback.print_exc()
         return flask.jsonify({'error': "An unknown error occurred (500, responding 299 to cancel retry)"}), 299
 
     @v2_api.post("/stripe")
     def stripe_route():
-        return stripe.webhook(flask.request, sql_session)
+        return get_stripe().webhook(flask.request, sql_session)
 
     @v2_api.post("/debug")
     def debug():
-        return stripe.generate_checkout("8AasHpt0Y2CNmogY6TpM", True, sql_session)
+        return get_stripe().generate_checkout("8AasHpt0Y2CNmogY6TpM", True, sql_session)
         # artists_controller = ArtistController(PROJECT_ID, LOCATION, sql)
         # return artists_controller.queues(sql_session, app, 'q9HMKTU1S7hUlpNdtBB5braS1VJ3')
         # return "artists"
@@ -310,7 +312,6 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
             return 'Cached 0 artists', 200
         artists_data = list(sql_session.scalars(select(Artist).filter(Artist.id.in_(data['artist_ids']))).unique())
         spotify_ids = list(map(lambda a: a.spotify_id, artists_data))
-        print(spotify_ids)
         spotify_id_to_artist_id = {}
 
         for artist in artists_data:
@@ -411,7 +412,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         data = flask.request.get_json()
         if 'spotify_id' not in data:
             raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
-        print('spotify_id', data['spotify_id'])
+        print('spotify_id', str(data['spotify_id']))
 
         return tracking_controller.add_ingest_update_artist(sql_session, data['spotify_id'], 'yb11Ujv8JXN9hPzWjcGeRvm9qNl1', '33EkD6zWBJcKcgdS9kIn')
 
@@ -428,7 +429,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         data = flask.request.get_json()
         if 'spotify_id' not in data:
             raise ErrorResponse("Invalid payload. Must include 'spotify_id'", 500)
-        print('spotify_id', data['spotify_id'])
+        print('spotify_id', str(data['spotify_id']))
         return tracking_controller.ingest_artist(sql_session, data['spotify_id'])
 
     @v2_api.post("/update-artist")
@@ -439,7 +440,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
         spotify_id = data['spotify_id'] if 'spotify_id' in data else None
         artist_id = data['id'] if 'id' in data else None
-        print('spotify_id/artist_id',spotify_id,artist_id)
+        print('spotify_id/artist_id',str(spotify_id),str(artist_id))
         return tracking_controller.update_artist(sql_session, spotify_id, artist_id, datetime.now() - timedelta(days=1))
 
     # @v2_api.errorhandler(500)
@@ -489,7 +490,7 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
         # deals with messiness of waiting for songstats to ingest, pulls info and stats for the artist for first time, 1.5k per hr
         onboarding_cron(sql_session, task_controller, tracking_controller, 50)
     except Exception as e:
-        print(e)
+        print(str(e))
         sql_session.close()
 
     sql_session.close()
@@ -502,7 +503,7 @@ def add_artist(sql_session, uid, spotify_url = None, identifier = False, tags = 
     songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
     tracking_controller = TrackingController(spotify, songstats, db)
-    print(uid, spotify_url, tags, preview)
+    print(uid, spotify_url, str(tags), preview)
     if identifier:
 
         user_data = get_user(uid, db)
@@ -515,7 +516,7 @@ def add_artist(sql_session, uid, spotify_url = None, identifier = False, tags = 
     try:
         return process_spotify_link(sql_session, uid, spotify_url, tags, preview)
     except Exception as e:
-        print(e)
+        print(str(e))
         return {
             "found": False,
             "error": e
@@ -584,7 +585,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     def checkout_request():
         db = firestore.client(app)
         user_data = get_user(user.uid, db)
-
+        stripe = get_stripe()
         existing = sql_session.scalars(select(Subscription).where(Subscription.organization_id == user_data['organization']).where(Subscription.status != 'cancelled').order_by(Subscription.created_at.desc())).first()
         if existing:
             if existing.status == 'active':
@@ -598,7 +599,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
                     sql_session.add(existing)
                     sql_session.commit()
                 except Exception as e:
-                    print(e)
+                    print(str(e))
         is_admin = user_data.get('admin') if 'admin' in user_data else False
         return {'checkout': stripe.generate_checkout(user_data.get('organization'), is_admin, sql_session)}, 200
 
@@ -615,7 +616,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
 
             return list(map(lambda x: x.as_dict(), subs))
         except Exception as e:
-            print(e)
+            print(str(e))
             print(traceback.format_exc())
             return {"error": str(e)}, 500
 
@@ -627,7 +628,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         if subscription is None:
             return 'Failed', 400
 
-        return stripe.portal_url(subscription.customer_id), 200
+        return get_stripe().portal_url(subscription.customer_id), 200
 
     @v3_api.get('/organizations')
     def get_organizations_request():
@@ -676,7 +677,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         if artists.get('error', None) is not None:
             response.status_code = 500
         else:
-            response.headers.add('Cache-Control', 'public, max-age=15')
+            response.headers.add('Cache-Control', 'public, max-age=20')
         response.headers.add('X-Organization', request.headers.get('X-Organization'))
         response.headers.add('Vary', 'X-Organization')
         return response
@@ -729,7 +730,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         try:
             sql_session.close()
         except Exception as e:
-            print(e)
+            print(str(e))
             print(traceback.format_exc())
             return {"error": "failed"}, 500
         return resp
@@ -769,29 +770,22 @@ def get_existing_tags(sql_session, user):
     }
 
 def get_twilio_client():
-    global twilio_client
-    if twilio_client is None:
-        twilio_client = TwilioController(get_spotify_client(), TWILIO_ACCOUNT, TWILIO_TOKEN, TWILIO_VERIFY_SERVICE, TWILIO_MESSAGE_SERVICE)
+    twilio_client = TwilioController(get_spotify_client(), TWILIO_ACCOUNT, TWILIO_TOKEN, TWILIO_VERIFY_SERVICE, TWILIO_MESSAGE_SERVICE)
     return twilio_client
 
 def get_artists_controller():
-    global artists_controller
-    if artists_controller is None:
-        artists_controller = ArtistController(PROJECT_ID, LOCATION)
+    artists_controller = ArtistController(PROJECT_ID, LOCATION)
     return artists_controller
 
 
 def get_task_controller():
-    global task_controller
-    if task_controller is None:
-        task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT, V3_API_ROOT)
+    task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT, V3_API_ROOT)
 
     return task_controller
 
 def get_spotify_client():
-    global spotify_client
-    if spotify_client is None:
-        spotify_client = SpotifyClient(firestore.client(app), SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_ALT_CLIENT_ID, SPOTIFY_ALT_CLIENT_SECRET, SPOTIFY_USER_FACING_CLIENT_ID, SPOTIFY_USER_FACING_CLIENT_SECRET)
+    # if spotify_client is None:
+    spotify_client = SpotifyClient(firestore.client(app), SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_ALT_CLIENT_ID, SPOTIFY_ALT_CLIENT_SECRET, SPOTIFY_USER_FACING_CLIENT_ID, SPOTIFY_USER_FACING_CLIENT_SECRET)
 
     return spotify_client
 
@@ -848,7 +842,6 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                     aid_chunks = spotify.chunk_list(aids, 50)
                     for aid_chunk in aid_chunks:
                         body = {"spotify_ids": list(map(lambda x: str(x), aid_chunk))}
-                        print(body, "Sending to cache")
                         task_controller.enqueue_task('SpotifyQueue', 2, '/spotify-cache-ids', body)
                     for a in aids:
                         task_queue = functions.task_queue("addartisttask")
@@ -858,7 +851,7 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                         task_queue.enqueue(body, task_options)
                     return {'message': 'success', 'status': 200, 'added_count': len(aids)}
                 except ErrorResponse as e:
-                    print(e)
+                    print(str(e))
                     if preview:
                         return {
                             "found": False,
@@ -900,7 +893,7 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                         "existing_created_at": org.created_at if org else None,
                     }
                 except Exception as e:
-                    print('Exception from link proc', e)
+                    print('Exception from link proc', str(e))
                     return {
 
                         "found": False,
@@ -913,7 +906,7 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
             msg, status = tracking_controller.add_ingest_update_artist(sql_session, spotify_id, uid, user_data['organization'], tags)
             return {'message': msg, 'status': status, 'added_count': 1}
     except Exception as e:
-        print("error response from link proc", e)
+        print("error response from link proc", str(e))
         print(traceback.format_exc())
         if preview:
             return {

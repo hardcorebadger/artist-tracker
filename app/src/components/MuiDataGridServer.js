@@ -1,4 +1,17 @@
-import {HStack, Text, VStack, IconButton, Button, Link, Badge, chakra, Box, Wrap, useColorMode} from "@chakra-ui/react";
+import {
+    HStack,
+    Text,
+    VStack,
+    IconButton,
+    Button,
+    Link,
+    Badge,
+    chakra,
+    Box,
+    Wrap,
+    useColorMode,
+    Stack
+} from "@chakra-ui/react";
 import {DataGridPro, GridColumnHeaderItem, GridHeader, useGridApiContext, useGridApiRef} from '@mui/x-data-grid-pro';
 import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider } from '@mui/material/styles';
@@ -253,7 +266,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     return (
         
         <VStack spacing={5} align="left" >
-        <HStack px={6} justifyContent='space-between'>
+        <Stack px={6} justifyContent='space-between' direction={{base: 'column', md: 'row'}}>
         <VStack spacing={3} align="left">
         <EditableTitle value={reportName} setValue={setReportName} />
         <Text size="sm" color="text.subtle">Artist Report</Text>
@@ -273,7 +286,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
           {(hasBeenEdited && onSaveNew) && <Button colorScheme='primary' onClick={() => onSaveNew(columnOrder, filterModel, reportName, sortModel)}>Save as New</Button>}
         </HStack>
         
-        </HStack>
+        </Stack>
         <Box width="calc(100vw - 300px)" maxWidth={'100%'} minWidth={"750px"}>
         {/* This is MUI */}
         <div

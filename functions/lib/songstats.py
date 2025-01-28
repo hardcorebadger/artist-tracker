@@ -192,7 +192,7 @@ class SongstatsClient():
     except Exception as e:
       print("stat df abs error")
 
-      print(e)
+      print(str(e))
       # print(traceback.format_exc(5))
       return None, False
 

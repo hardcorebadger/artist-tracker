@@ -109,7 +109,6 @@ class TrackingController():
               organization_id=organization_id,
           ))
       if any:
-        print(sql_ref.tags)
         sql_session.add(sql_ref)
         sql_session.commit()
 
@@ -245,7 +244,7 @@ class TrackingController():
     ref.set(new_schema)
     imported, skipped, avg, fails = self.import_sql(sql_session, ref.get(), attribution)
     if len(fails) > 0:
-        print(fails)
+        print(str(fails))
         return 'Artist failed to import, please try again', 500
     self.add_tags(sql_session, artist_with_meta(sql_session, spotify_id), org_id, tags)
 
@@ -296,7 +295,7 @@ class TrackingController():
       raise e
 
     print("[INGEST] has info")
-    print(info)
+    print(str(info))
     # add the additional info
     ref.update({
       "avatar": info['artist_info']['avatar'],
@@ -350,7 +349,7 @@ class TrackingController():
     #   raise ErrorResponse('Artist not ingested', 401, 'Tracking')
     try:
       stats = self.songstats.get_stat_weeks_abs(spotify_id, 8)
-      print(spotify_id, stats)
+      print(spotify_id, str(stats))
     except ErrorResponse as e:
       # Artist somehow got removed from songstats, but them back in OB
       if e.status_code == 404:
@@ -412,7 +411,7 @@ class TrackingController():
 
 
     except Exception as e:
-        print(e)
+        print(str(e))
         return 'error', 500
     print("[INGEST] stats updated")
 
@@ -751,7 +750,7 @@ class TrackingController():
                   fails[artist.get('spotify_id')] = repr(e)
 
       if len(fails) > 0:
-          print(fails)
+          print(str(fails))
       sql_session.close()
       end = time.time()
       avg = 0

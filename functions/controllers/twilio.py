@@ -100,7 +100,7 @@ class TwilioController():
             data = None
           else:
             data = link_proc(sql_session, user.id, message, None, True)
-            print("link data", data)
+            print("link data", str(data))
         else:
           artist_query = (select(Artist)
                           .options( joinedload(Artist.organizations, innerjoin=True))
@@ -117,7 +117,7 @@ class TwilioController():
                 data = None
                 raise e
 
-            print("new found data", data)
+            print("new found data", str(data))
             if artist_existing is not None:
               data = {
                 "found": True,
@@ -137,7 +137,7 @@ class TwilioController():
               "existing": artist_existing.id,
               "existing_created_at": org.created_at
             }
-            print("new data", data)
+            print("new data", str(data))
         if data is not None and data.get('found', False) == False and ~sent:
           sent = self.send_message(user_data, "We were unable to process the link you provided. Please double check or try again in a minute.")
         elif data is not None:
@@ -165,7 +165,7 @@ class TwilioController():
 
 
     except ErrorResponse as e:
-      print(e)
+      print(str(e))
       if ~sent:
         sent = self.send_message(user_data, "There was an unexpected error while processing your request. Please try again in a little while.")
 

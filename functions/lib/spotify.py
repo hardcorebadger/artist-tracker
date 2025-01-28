@@ -249,7 +249,7 @@ class SpotifyClient():
         if existing is not None:
           return existing.as_dict()
         else:
-          print(e)
+          print(str(e))
           return {'error': 'could not insert token'}
       return token_record.as_dict()
     else:
@@ -327,11 +327,11 @@ class SpotifyClient():
             break
         if existing:
           existing.reference.set({"id": existing.id, "data": object_item, "created_at": SERVER_TIMESTAMP, "type": object_type, "spotify_id": object_item['id']})
-          print("Updated "+object_type+" in cache: " + object_item['id'])
+          print("Updated "+object_type+" in cache: " + str(object_item['id']))
         else:
           cache = {"data": object_item, "spotify_id": object_item.get('id'), "type": object_type, "created_at": SERVER_TIMESTAMP}
           update_time, cache_ref = self.db.collection("spotify_cache").add(cache)
-          print(f"Added cache with id {cache_ref.id}: " + object_item.get('id'))
+          print(f"Added cache with id {str(cache_ref.id)}: " + str(object_item.get('id')))
     return object_data if isinstance(ids, list) else object_data[0]
 
   def encode_client_credentials(self, client_id, client_secret):

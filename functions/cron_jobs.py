@@ -29,7 +29,6 @@ def spotify_cron(sql_session, task_controller : TaskController, eval_controller:
         return
 
     body = {"artist_ids": list(map(lambda x: str(x), artist_ids))}
-    print(body, "Sending to cache")
     task_controller.enqueue_task('SpotifyQueue', 2, '/spotify-cache', body)
     bulk_update(sql_session, artist_id_strs, 'spotify_queued_at = NOW()')
 
