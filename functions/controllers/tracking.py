@@ -162,7 +162,7 @@ class TrackingController():
       })
       if sqlRef is None:
         print('Artist needs migration; importing to SQL')
-        self.import_sql(doc, attribution)
+        self.import_sql(sql_session, doc, attribution)
         sqlRef = artist_with_meta(sql_session, spotify_id)
       else:
           if len(list(filter(lambda x: x.user_id == user_id, sqlRef.users))) == 0:
@@ -243,7 +243,7 @@ class TrackingController():
     for s in HOT_TRACKING_FIELDS:
       new_schema[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = []
     ref.set(new_schema)
-    imported, skipped, avg, fails = self.import_sql(ref.get(), attribution)
+    imported, skipped, avg, fails = self.import_sql(sql_session, ref.get(), attribution)
     if len(fails) > 0:
         print(fails)
         return 'Artist failed to import, please try again', 500
@@ -265,7 +265,7 @@ class TrackingController():
 
     if sql_ref is None:
         print('Artist needs migration; importing to SQL')
-        self.import_sql(doc)
+        self.import_sql(sql_session, doc)
         sql_ref = artist_with_meta(sql_session, spotify_id)
 
     data = doc.to_dict()
@@ -341,7 +341,7 @@ class TrackingController():
         sql_ref = artist_with_meta(sql_session, spotify_id, None)
     if sql_ref is None:
         print('Artist needs migration; importing to SQL')
-        self.import_sql(doc)
+        self.import_sql(sql_session, doc)
         sql_ref = artist_with_meta(sql_session, spotify_id, None)
 
     # check the artist is ingested - not needed

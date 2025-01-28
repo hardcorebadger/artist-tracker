@@ -153,6 +153,12 @@ function Subscriptions({subscriptions, activeSubscription}) {
               <SubscriptionCard  user={user} subscription={subscription} activeSubscription={activeSubscription} key={subscription.id}/>
           )
       })}
+      {subscriptions?.length === 0 ? (
+          <VStack>
+            <Iconify size={'30px'} icon={'ph:empty'}/>
+            <Text>No Subscriptions</Text>
+          </VStack>
+      ) : null}
 
 
     </AnnotadedSection>

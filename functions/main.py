@@ -140,7 +140,7 @@ def reimport_artists_eval(page = 0, page_size = 50):
         else:
             new += 1
             print("Adding artist: " + spotify_id)
-            tracking_controller.import_sql(artist)
+            tracking_controller.import_sql(sql_session, artist)
     if len(evalIds) > 0:
         sql_session.commit()
 
@@ -188,7 +188,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        return stripe.generate_checkout("8AasHpt0Y2CNmogY6TpM", False, sql_session)
+        return stripe.generate_checkout("8AasHpt0Y2CNmogY6TpM", True, sql_session)
         # artists_controller = ArtistController(PROJECT_ID, LOCATION, sql)
         # return artists_controller.queues(sql_session, app, 'q9HMKTU1S7hUlpNdtBB5braS1VJ3')
         # return "artists"
@@ -276,7 +276,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
 
 
-        imported, skipped, avg, fails = tracking_controller.import_sql(old_artists)
+        imported, skipped, avg, fails = tracking_controller.import_sql(sql_session, old_artists)
 
         return {
             'totalPages': math.ceil(total / count),
@@ -599,21 +599,25 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
                     sql_session.commit()
                 except Exception as e:
                     print(e)
-        user_dict = user_data.to_dict()
-        is_admin = user_dict['admin'] if 'admin' in user_dict else False
+        is_admin = user_data.get('admin') if 'admin' in user_data else False
         return {'checkout': stripe.generate_checkout(user_data.get('organization'), is_admin, sql_session)}, 200
 
     @v3_api.get('/subscriptions')
     def load_subscriptions():
-        db = firestore.client(app)
-        user_data = get_user(user.uid, db)
-        query = (select(Subscription)
-                 .where(Subscription.organization_id == user_data['organization'])
-                 .where(or_(Subscription.status.in_(['active', 'paused']), and_(Subscription.status == 'canceled', Subscription.renews_at > datetime.now())))
-                 .order_by(Subscription.created_at.desc()))
-        subs = sql_session.scalars(query)
+        try:
+            db = firestore.client(app)
+            user_data = get_user(user.uid, db)
+            query = (select(Subscription)
+                     .where(Subscription.organization_id == user_data['organization'])
+                     .where(or_(Subscription.status.in_(['active', 'paused']), and_(Subscription.status == 'canceled', Subscription.renews_at > datetime.now())))
+                     .order_by(Subscription.created_at.desc()))
+            subs = sql_session.scalars(query)
 
-        return list(map(lambda x: x.as_dict(), subs))
+            return list(map(lambda x: x.as_dict(), subs))
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
+            return {"error": str(e)}, 500
 
     @v3_api.post('/subscription-portal')
     def billing_portal_url():
@@ -717,13 +721,18 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     @v3_api.after_request
     def after_request(response):
         # Code to run after each request
-        close_all_sessions()
+
         return response
 
     with v3_api.request_context(request.environ):
         resp = v3_api.full_dispatch_request()
-        close_all_sessions()
-        print("After")
+        try:
+            sql_session.close()
+            close_all_sessions()
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
+            return {"error": "failed"}, 500
         return resp
 
 def get_type_definitions(sql_session):

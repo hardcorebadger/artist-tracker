@@ -46,7 +46,7 @@ class EvalController():
         sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()
         if sql_ref is None:
             print('Artist needs migration; importing to SQL')
-            self.tracking_controller.import_sql(doc)
+            self.tracking_controller.import_sql(sql_session, doc)
             sql_ref = sql_session.scalars(select(Artist).options(joinedload(Artist.evaluation, innerjoin=False)).where(Artist.spotify_id == spotify_id)).first()
 
     # check the artist is ingested

@@ -56,7 +56,11 @@ then
         exit 1
   fi
   firebase use prod
-  firebase deploy --only functions;
+  if [ -n "$2" ]; then
+    firebase deploy --only functions:$2;
+  else
+    firebase deploy --only functions;
+  fi
 fi
 
 # deploy firestore rules and indexes

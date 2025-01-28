@@ -2,6 +2,7 @@ import datetime
 import hashlib
 import json
 import os
+import traceback
 
 import stripe
 from flask import jsonify
@@ -65,7 +66,9 @@ class StripeController():
             sql_session.commit()
 
         except Exception as e:
-            return str(e)
+            print(traceback.format_exc())
+            print(e)
+            raise e
 
 
 
