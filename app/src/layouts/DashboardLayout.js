@@ -266,7 +266,7 @@ function MobileHeader({toggleMenu, menuOpen}) {
         </HStack>
         <HStack align='center'>
             <ColorModeSwitcher/>
-            <Button colorScheme='primary' size='sm' as={RouterLink} to="/app/upgrade">Go Pro</Button>
+            {/*<Button colorScheme='primary' size='sm' as={RouterLink} to="/app/upgrade">Go Pro</Button>*/}
         </HStack>
       </HStack>
     </Box>

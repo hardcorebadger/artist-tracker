@@ -118,7 +118,7 @@ function SubscriptionCard({user, subscription, activeSubscription}) {
           templateColumns={['1fr', '1fr', '1fr 1fr']}
           gap={4}
           >
-            <GridItem sx={{minWidth: '300px'}}>
+            <GridItem sx={{minWidth: '35%'}}>
                 <HStack align="center" spacing={3}>
                   <Heading size="md">Indiestack Trial</Heading>
                   <Badge colorScheme={badge_color}>{status}</Badge>
