@@ -19,8 +19,8 @@ class StripeController():
 
     def __init__(self, api_key, webhook_secret):
         self.REDIRECT_URL = "https://indiestack.app/app/settings/billing"
-        # self.PRODUCT_ID = "price_1Qm504BqdR0twCRHpFzPtS0s"
-        self.PRODUCT_ID = "price_1Qm5EXBqdR0twCRHbAD4Y7rq"
+        self.PRODUCT_ID = "price_1Qm504BqdR0twCRHpFzPtS0s"
+        self.ADMIN_PRODUCT_ID = "price_1Qm5EXBqdR0twCRHbAD4Y7rq"
         self.live = True
         if "_test" in api_key:
             self.live = False
@@ -29,7 +29,7 @@ class StripeController():
         stripe.api_key = api_key
         self.webhook_secret = webhook_secret
 
-    def generate_checkout(self, organization_id, sql_session):
+    def generate_checkout(self, organization_id, is_admin, sql_session):
         try:
             subscription = Subscription(
                 organization_id=organization_id,
@@ -44,7 +44,7 @@ class StripeController():
                 line_items=[
                     {
                         # Provide the exact Price ID (for example, pr_1234) of the product you want to sell
-                        'price': self.PRODUCT_ID,
+                        'price': self.PRODUCT_ID if is_admin == False else self.ADMIN_PRODUCT_ID,
                         'quantity': 1,
                     },
                 ],

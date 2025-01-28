@@ -599,8 +599,9 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
                     sql_session.commit()
                 except Exception as e:
                     print(e)
-
-        return {'checkout': stripe.generate_checkout(user_data.get('organization'), sql_session)}, 200
+        user_dict = user_data.to_dict()
+        is_admin = user_dict['admin'] if 'admin' in user_dict else False
+        return {'checkout': stripe.generate_checkout(user_data.get('organization'), is_admin, sql_session)}, 200
 
     @v3_api.get('/subscriptions')
     def load_subscriptions():
