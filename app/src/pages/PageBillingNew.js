@@ -39,20 +39,28 @@ String.prototype.ucwords = function() {
       });
 };
 
+const brand_icons = {
+  "diners": "la:cc-diners-club",
+
+}
+
 function PaymentInfo({subscription}) {
 
-  if (subscription?.payment_method_details === null || subscription?.payment_method_details.type !== 'card') {
+  const paymentType = subscription?.payment_method_details?.type ?? null;
+
+  if (subscription?.payment_method_details === null || (paymentType !== 'card' && paymentType !== 'paypal')) {
     return (
-        <Text>{subscription.payment_method_details ? subscription.payment_method_details.type.ucwords() : "N/A"}</Text>
+        <Text>{subscription.payment_method_details ? paymentType.ucwords() : "N/A"}</Text>
     )
   }
 
 
-
+  const typeBrand = paymentType === 'card' ? subscription.payment_method_details.card.brand : 'paypal';
+  const paymentInfo = paymentType === 'card' ? subscription.payment_method_details.card.last4 : paymentType.ucwords();
   return (
       <HStack>
-        <Iconify size={'30px'} icon={'icons8:' + subscription.payment_method_details.card.brand}/>
-        <Text>{subscription.payment_method_details.card.last4}</Text>
+        <Iconify size={'30px'} icon={'la:cc-' + typeBrand}/>
+        <Text>{paymentInfo}</Text>
 
       </HStack>
   )
