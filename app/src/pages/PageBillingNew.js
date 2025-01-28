@@ -23,7 +23,7 @@ import { signInWithEmailAndPassword, signInWithGoogle, auth, db, functions } fro
 import { useUser } from '../routing/AuthGuard';
 import { updateDoc, doc, startAfter } from 'firebase/firestore';
 import { products } from '../config';
-import { Link as RouterLink } from 'react-router-dom';
+import {Link as RouterLink, useSearchParams} from 'react-router-dom';
 import AnnotadedSection from '../components/AnnotatedSection';
 import { useDocument } from 'react-firebase-hooks/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -174,6 +174,11 @@ export default function PageBillingNew() {
   const [subscribeLoading, setSubscribeLoading] = useState(false)
   const toast = useToast()
   const [activeSubscription, setActiveSubscription] = useState(null)
+  const [searchParams, setSearchParams] = useSearchParams();
+
+
+
+
   useEffect(() => {
     goFetch(user, 'GET','subscriptions').then((response) => {
       setSubscriptions(response)
@@ -191,6 +196,25 @@ export default function PageBillingNew() {
         setActiveSubscription(active)
       }
     })
+    if (searchParams.has('success')) {
+      toast({
+        title: 'Successfully Subscribed!',
+        description: "If the page does not update to show your subscription please wait and refresh the page.",
+        status: 'success',
+        duration: 9000,
+        isClosable: true,
+      })
+      setSearchParams({})
+    } else if (searchParams.has('canceled')) {
+      toast({
+        title: 'Checkout Cancelled!',
+        description: "You or our payment provider failed to complete checkout.",
+        status: 'failed',
+        duration: 9000,
+        isClosable: true,
+      })
+      setSearchParams({})
+    }
 
   }, [])
   useEffect(() => {}, [subscriptions, activeSubscription])
