@@ -1,3 +1,19 @@
 .hover-cell {
     cursor: pointer;
 }
+.user-row, .header-row  {
+    background-color: #f7f7f7; /* Light gray for user rows */
+}
+
+/*.org-row:fo {*/
+/*    */
+/*}*/
+
+
+.user-row.dark,.header-row.dark  {
+    background-color: #0e1117; /* Slightly darker gray for user rows */
+}
+
+.user-row.dark:hover,.header-row.dark:hover  {
+    background-color: #181d27 !important; /* Slightly darker gray for user rows */
+}

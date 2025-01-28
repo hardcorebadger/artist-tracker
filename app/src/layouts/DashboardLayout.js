@@ -1,4 +1,4 @@
-import {useState, useEffect, Children, useContext} from 'react';
+import {useState, useEffect, Children, useContext, useRef} from 'react';
 import {
   Box, Grid,
   GridItem,
@@ -359,7 +359,7 @@ export default function DashboardLayout() {
   const reportItems = reportError || reportsLoading ? [] : reports.docs.map((d) => ({'name': d.data().name, 'path': '/app/reports/'+d.id}))
   const navItems = bakeNavItems(navItemConfig, reportItems, organizations, currentUser)
   const { isOpen, onOpen, onClose } = useDisclosure()
-
+  const layoutRef = useRef()
 
   return (
     <Box> 
@@ -382,8 +382,8 @@ export default function DashboardLayout() {
         <GridItem area={'nav'}>
           <NavBar navItems={navItems} currentUser={currentUser}  organizations={organizations} openOrgModal={onOpen} />
         </GridItem>
-        <GridItem area={'main'} maxW={'calc(100vw - 315px)'} maxH={'calc(100vh - 85px)'} overflowY={'scroll'}>
-          <Outlet />
+        <GridItem area={'main'} maxW={'calc(100vw - 315px)'} maxH={'calc(100vh - 85px)'} overflowY={'scroll'}  ref={layoutRef}>
+          <Outlet context={[layoutRef]} />
         </GridItem>
 
       </Grid>
@@ -391,8 +391,8 @@ export default function DashboardLayout() {
       {!isDesktop &&
       <Box w="100wv">
         <Box w="100vw" h="85px"></Box>
-        <Box w="100vw" position="relative">
-          <Outlet/>
+        <Box w="100vw" position="relative" ref={layoutRef}>
+          <Outlet context={[layoutRef]} />
         </Box>
         <Box w="100vw" h="85px" position="fixed" top={0} left={0} right={0} bgColor="bg.default">
           <MobileHeader toggleMenu={toggleMobileMenu} menuOpen={mobileMenuOpen} />

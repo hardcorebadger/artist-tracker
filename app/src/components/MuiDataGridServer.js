@@ -101,8 +101,8 @@ export const darkTheme = createTheme({
 export default function MuiDataGridController({initialReportName, initialColumnOrder, initialSortModel, initialFilterValues, onSave, onSaveNew, onDelete, onOpenArtist}) {
 
     // contexts
-    const { statisticTypes, linkSources, tagTypes, users, existingTags } = useContext(ColumnDataContext);
-    const { currentRows, setCurrentRows, currentQueryModel, setCurrentQueryModel } = useContext(CurrentReportContext);
+    const {statisticTypes, linkSources, tagTypes, users, existingTags} = useContext(ColumnDataContext);
+    const {currentRows, setCurrentRows, currentQueryModel, setCurrentQueryModel} = useContext(CurrentReportContext);
     const user = useUser()
     const {colorMode} = useColorMode();
     // data
@@ -118,7 +118,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     const [filterModel, setFilterModel] = useState(deepCopy(currentQueryModel?.filters ?? initialFilterValues))
     const [columnOrder, setColumnOrder] = useState(deepCopy(currentQueryModel?.columnOrder ?? initialColumnOrder))
     if (!initialFilterValues?.hasOwnProperty('items')) {
-        initialFilterValues = {items:[]}
+        initialFilterValues = {items: []}
     }
 
     // helpers
@@ -141,19 +141,21 @@ export default function MuiDataGridController({initialReportName, initialColumnO
             const arraysEqual = (a1, a2) =>
                 a1.length === a2.length && a1.every((o, idx) => objectsEqual(o, a2[idx]));
 
-            const resp = await getArtists({page: paginationModel.page,
+            const resp = await getArtists({
+                page: paginationModel.page,
                 pageSize: paginationModel.pageSize,
                 sortModel,
-                filterModel});
+                filterModel
+            });
 
             setDataIsLoading(false)
 
             if (resp.page !== paginationModel.page || resp.pageSize !== paginationModel.pageSize) {
                 return
             }
-            
+
             if (!arraysEqual(resp.filterModel?.items ?? [], filterModel?.items ?? [])) {
-                
+
                 return
             }
             if (JSON.stringify(resp.sortModel) !== JSON.stringify(sortModel) && !objectsEqual(resp.sortModel, sortModel)) {
@@ -178,7 +180,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
             }
 
         }
-        const updateModel =  {
+        const updateModel = {
             filters: filterModel,
             sorts: sortModel,
             pagination: paginationModel,
@@ -247,15 +249,15 @@ export default function MuiDataGridController({initialReportName, initialColumnO
     }
 
     const handleColumnOrderChange = (change) => {
-      const column = change.column.field
-      setColumnOrder( array_move(deepCopy(columnOrder), change.oldIndex -1, change.targetIndex -1))
+        const column = change.column.field
+        setColumnOrder(array_move(deepCopy(columnOrder), change.oldIndex - 1, change.targetIndex - 1))
 
     }
     useEffect(() => {
 
     }, [existingTags, users])
 
-    
+
     // bake the columns for MUI based on current column order object
     const columns = buildColumns(columnOrder, quickFilter, statisticTypes, linkSources, tagTypes, users, existingTags)
 
@@ -264,85 +266,83 @@ export default function MuiDataGridController({initialReportName, initialColumnO
 
     // console.log(currentRows?.rows)
     return (
-        
-        <VStack spacing={5} align="left" >
-        <Stack px={6} justifyContent='space-between' direction={{base: 'column', md: 'row'}}>
-        <VStack spacing={3} align="left">
-        <EditableTitle value={reportName} setValue={setReportName} />
-        <Text size="sm" color="text.subtle">Artist Report</Text>
-        </VStack>
-        <HStack>
-          {onSaveNew && 
-          <ConfirmButton button={<IconButton variant='outline' icon={<Iconify icon="mdi:trash"/>}/>}
-          title="Delete artist report"
-          body="Are you sure you want to delete this report?"
-          affirmative="Delete"
-          onAffirm={onDelete}
-          />
-          }
-          <DataGridColumnMenu columnOrder={columnOrder} columnOptions={buildColumnOptions(statisticTypes, linkSources)} setColumnOrder={setColumnOrder} />
-          {(hasBeenEdited && onSaveNew)&& <Button colorScheme='primary' variant='outline' onClick={revertState}>Revert</Button>}
-          {hasBeenEdited&& <Button colorScheme='primary' onClick={() => onSave(columnOrder, filterModel, reportName, sortModel)}>Save</Button> }
-          {(hasBeenEdited && onSaveNew) && <Button colorScheme='primary' onClick={() => onSaveNew(columnOrder, filterModel, reportName, sortModel)}>Save as New</Button>}
-        </HStack>
-        
-        </Stack>
-        <Box width="calc(100vw - 300px)" maxWidth={'100%'} minWidth={"750px"}>
-        {/* This is MUI */}
-        <div
-          style={{
-              display: 'flex',
-              flexDirection: 'column',
-              height: 'calc(100vh - 175px)',
-              minHeight: '750px'
 
-          }}
-          >
-        <ThemeProvider theme={colorMode === 'dark' ? darkTheme : theme}>
-            {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
-            {/* <CssBaseline /> */}
-            
-                <DataGridPro
-                  columns={columns}
-                  loading={dataIsLoading}
-                  rows={currentRows?.rows ?? []}
-                  sortingMode="server"
-                  filterMode="server"
-                  paginationMode="server"
-                  onSortModelChange={setSortModel}
-                  onFilterModelChange={setFilterModel}
-                  onColumnOrderChange={handleColumnOrderChange}
-                  pagination
-                  ref={apiRef}
-                  onCellClick={(e) => {
-                      if (e.field === 'name') {
-                          const artist = currentRows?.rows?.filter((row) => row?.id == e.id).pop()
-                          onOpenArtist(artist)
-                      }
-                  }}
-                  rowCount={currentRows?.rowCount ?? 0}
-                  filterModel={filterModel}
-                  sortModel={sortModel}
-                  onPaginationModelChange={setPaginationModel}
-                  paginationModel={paginationModel}
-                  initialState={{
-                      pagination: currentQueryModel?.pagination ?? initialPagination,
-                  }}
-                  pageSizeOptions={[10, 20, 50, 100, 200]}
-                 />
-                
-        </ThemeProvider>
-        </div>
-        </Box>
-        {/* End MUI */}
-      </VStack>
+        <VStack spacing={5} align="left">
+            <Stack px={6} justifyContent='space-between' direction={{base: 'column', md: 'row'}}>
+                <VStack spacing={3} align="left">
+                    <EditableTitle value={reportName} setValue={setReportName}/>
+                    <Text size="sm" color="text.subtle">Artist Report</Text>
+                </VStack>
+                <HStack>
+                    {onSaveNew &&
+                        <ConfirmButton button={<IconButton variant='outline' icon={<Iconify icon="mdi:trash"/>}/>}
+                                       title="Delete artist report"
+                                       body="Are you sure you want to delete this report?"
+                                       affirmative="Delete"
+                                       onAffirm={onDelete}
+                        />
+                    }
+                    <DataGridColumnMenu columnOrder={columnOrder}
+                                        columnOptions={buildColumnOptions(statisticTypes, linkSources)}
+                                        setColumnOrder={setColumnOrder}/>
+                    {(hasBeenEdited && onSaveNew) &&
+                        <Button colorScheme='primary' variant='outline' onClick={revertState}>Revert</Button>}
+                    {hasBeenEdited && <Button colorScheme='primary'
+                                              onClick={() => onSave(columnOrder, filterModel, reportName, sortModel)}>Save</Button>}
+                    {(hasBeenEdited && onSaveNew) && <Button colorScheme='primary'
+                                                             onClick={() => onSaveNew(columnOrder, filterModel, reportName, sortModel)}>Save
+                        as New</Button>}
+                </HStack>
+
+            </Stack>
+            <Box width="calc(100vw - 300px)" maxWidth={'100%'} minWidth={"750px"}>
+                {/* This is MUI */}
+                <div
+                    style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        height: 'calc(100vh - 175px)',
+                        minHeight: '750px'
+
+                    }}
+                >
+                    <ThemeProvider theme={colorMode === 'dark' ? darkTheme : theme}>
+                        {/* CssBaseline kickstart an elegant, consistent, and simple baseline to build upon. */}
+                        {/* <CssBaseline /> */}
+
+                        <DataGridPro
+                            columns={columns}
+                            loading={dataIsLoading}
+                            rows={currentRows?.rows ?? []}
+                            sortingMode="server"
+                            filterMode="server"
+                            paginationMode="server"
+                            onSortModelChange={setSortModel}
+                            onFilterModelChange={setFilterModel}
+                            onColumnOrderChange={handleColumnOrderChange}
+                            pagination
+                            ref={apiRef}
+                            onCellClick={(e) => {
+                                if (e.field === 'name') {
+                                    const artist = currentRows?.rows?.filter((row) => row?.id == e.id).pop()
+                                    onOpenArtist(artist)
+                                }
+                            }}
+                            rowCount={currentRows?.rowCount ?? 0}
+                            filterModel={filterModel}
+                            sortModel={sortModel}
+                            onPaginationModelChange={setPaginationModel}
+                            paginationModel={paginationModel}
+                            initialState={{
+                                pagination: currentQueryModel?.pagination ?? initialPagination,
+                            }}
+                            pageSizeOptions={[10, 20, 50, 100, 200]}
+                        />
+
+                    </ThemeProvider>
+                </div>
+            </Box>
+            {/* End MUI */}
+        </VStack>
     )
 }
-
-String.prototype.ucwords = function() {
-    const str = this.toLowerCase();
-    return str.replace(/(^([a-zA-Z\p{M}]))|([ -][a-zA-Z\p{M}])/g,
-        function(s){
-            return s.toUpperCase();
-        });
-};

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Box, Typography, CircularProgress, IconButton } from "@mui/material";
+import {Box, Typography, CircularProgress, IconButton, Chip} from "@mui/material";
 import { DataGridPro } from "@mui/x-data-grid-pro";
 import {
     collection,
@@ -15,8 +15,9 @@ import {
 import { db } from "../firebase";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme, theme } from "../components/MuiDataGridServer";
+import {theme as chakraTheme} from '../theme'
 import {
-    Button, Checkbox, FormControl, FormLabel, Heading, HStack, Input,
+    Button, ChakraProvider, Checkbox, FormControl, FormLabel, Heading, HStack, Input,
     Menu,
     MenuButton,
     MenuItem,
@@ -30,8 +31,10 @@ import Iconify from "../components/Iconify";
 import {goFetch} from "../App";
 import {useUser} from "../routing/AuthGuard";
 import {ChevronDownIcon, ChevronRightIcon} from "@chakra-ui/icons";
+import {useOutletContext} from "react-router-dom";
+import {LoadingWidget} from "../routing/LoadingScreen";
 
-export default function PageAdmin() {
+export default function PageAdmin({}) {
     const [rows, setRows] = useState([]); // Holds all rows (organizations and users)
     const [expandedOrgIds, setExpandedOrgIds] = useState({}); // Tracks expanded/collapsed state per organization
     const [loading, setLoading] = useState(true); // Loading state for organizations and users
@@ -42,7 +45,7 @@ export default function PageAdmin() {
     const [lastVisible, setLastVisible] = useState(null); // Keeps track of the last document (for Firestore pagination)
     const user = useUser();
     const toast = useToast()
-
+    const [layoutRef] = useOutletContext()
     const [selectedOrgDelete, setSelectedOrgDelete] = useState(null); // For tracking organization to delete
     const {
         isOpen: isDeleteOpen,
@@ -57,6 +60,7 @@ export default function PageAdmin() {
     const fetchSubAPI = async(orgIds, theRows) => {
 
         console.log("Fetching ", orgIds)
+        setExpandedOrgIds({})
 
         goFetch(user, 'POST', 'admin-organizations', {ids: orgIds}).then((response) => {
             const newRows = [...theRows];
@@ -67,7 +71,7 @@ export default function PageAdmin() {
                 // Check if the item exists
                 if (index !== -1) {
                     // Update the item with the new values
-                    newRows[index] = { ...newRows[index], ...{"subscription": org.subscription, "users": org.users} };
+                    newRows[index] = { ...newRows[index], ...{"subscription": org.subscription, "users": org.users, "artists": org.artists} };
                     setRows(newRows)
                 }
             }
@@ -217,11 +221,13 @@ export default function PageAdmin() {
             return [];
         }
     };
+    console.log(layoutRef)
 
     const columns = [
         {
             field: "name",
             headerName: "Name",
+            headerClassName: "admin-header",
             width: 300,
             renderCell: (params) => {
                 if (params.row.type === "organization") {
@@ -242,13 +248,13 @@ export default function PageAdmin() {
                     );
                 } else if (params.row.type === "header") {
                     return (
-                        <Box sx={{ pl: 4, bgcolor: "rgba(0, 0, 0, 0.04)" }}>
+                        <Box sx={{ pl: 4}}>
                             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Name</Typography>
                         </Box>
                     );
                 } else if (params.row.type === "user") {
                     return (
-                        <Box sx={{ pl: 4, bgcolor: "rgba(0, 0, 0, 0.04)" }}>
+                        <Box sx={{ pl: 4}}>
                             <Typography variant="body2">{`${params.row.first_name} ${params.row.last_name}`}</Typography>
                         </Box>
                     );
@@ -256,26 +262,49 @@ export default function PageAdmin() {
                 return null;
             },
         },
+
         {
-            field: "email",
-            headerName: "# Users",
+            field: "artists",
+            headerName: "# Artists",
+            headerClassName: "admin-header",
             width: 300,
             renderCell: (params) => {
+
+
                 if (params.row.type === "user") {
                     return (
-                        <Box sx={{ pl: 4, bgcolor: "rgba(0, 0, 0, 0.04)" }}>
+                        <Box sx={{ pl: 4}}>
                             <Typography variant="body2">{params.row.email}</Typography>
                         </Box>
                     );
                 } else if (params.row.type === "header") {
                     return (
-                        <Box sx={{ pl: 4, bgcolor: "rgba(0, 0, 0, 0.04)" }}>
+                        <Box sx={{ pl: 4}}>
                             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Email</Typography>
                         </Box>
                     );
                 } else {
                     return (
-                        <Box sx={{ pl: 4, bgcolor: "rgba(0, 0, 0, 0.04)" }}>
+                        <Box sx={{ pl: 4}}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{params.row.artists}</Typography>
+                        </Box>
+                    )
+                }
+            },
+        },
+        {
+            field: "email",
+            headerName: "# Users",
+            headerClassName: "admin-header",
+            width: 300,
+            renderCell: (params) => {
+                if (params.row.type === "user") {
+                    return null;
+                } else if (params.row.type === "header") {
+                    return null;
+                } else {
+                    return (
+                        <Box sx={{ pl: 4}}>
                             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{params.row.users}</Typography>
                         </Box>
                     )
@@ -286,6 +315,7 @@ export default function PageAdmin() {
         {
             field: "subscription",
             headerName: "Subscription",
+            headerClassName: "admin-header",
             width: 300,
             renderCell: (params) => {
                 if (params.row.type === "user") {
@@ -293,9 +323,14 @@ export default function PageAdmin() {
                 } else if (params.row.type === "header") {
                     return null;
                 } else {
+                    const substatus = 'subscription' in params.row ? (params.row.subscription?.status ?? (params.row.free_mode ? 'free' : 'none')) : null
+                    if (!substatus) {
+                        return (<LoadingWidget width={'30px'} height={'30px'}/> )
+                    }
+
                     return (
-                        <Box sx={{ pl: 4, bgcolor: "rgba(0, 0, 0, 0.04)" }}>
-                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{'subscription' in params.row ? (params.row.subscription?.status ?? (params.row.free_mode ? 'free' : 'none')) : ""}</Typography>
+                        <Box sx={{ pl: 4}}>
+                            <Chip variant={'outlined'} color={substatus === 'free' ? 'warning' : (substatus === 'none' ? 'error' : 'success')} label={substatus.ucwords()}/>
                         </Box>
                     )
                 }
@@ -304,7 +339,8 @@ export default function PageAdmin() {
         {
             field: "actions",
             headerName: "Actions",
-            width: 300,
+            headerClassName: "admin-header",
+            width: 250,
             renderCell: (params) => {
                 if (params.row.type === "user") {
                     return (null);
@@ -312,36 +348,36 @@ export default function PageAdmin() {
                     return null;
                 } else {
                     return (
-                        <Box sx={{ pl: 4, bgcolor: "rgba(0, 0, 0, 0.04)" }}>
-                            <Menu>
+                        <Box >
+                            <ChakraProvider theme={chakraTheme}>
+
+                            <Menu computePositionOnMount={true}>
                                 {({ isOpen }) => (
                                     <>
                                         {/* Menu Button */}
-                                        <MenuButton as={Button} rightIcon={(isOpen ? <ChevronDownIcon/> : <ChevronRightIcon />)}>
+                                        <MenuButton as={Button} rightIcon={( <Iconify size={'10px'} icon={'bx:down-arrow'}/>)}>
                                             {isOpen ? "Actions" : "Actions"}
                                         </MenuButton>
 
                                         {/* Menu List with resolved background visibility */}
-                                        <Portal>
-                                            <MenuList
-                                                zIndex="popover" // Chakra's default popover zIndex
-                                                bg="rgb(41, 48, 62)" // Ensure background is explicitly set
-                                                boxShadow="lg"
-                                                p={2}// Add a shadow to make it pop
-                                                borderRadius="md" // Optional: Rounded edges for better UI
-                                            >
-                                                <MenuItem onClick={() => {
-                                                    handleCopy(params.row.id)
-                                                }}>Copy Org ID</MenuItem>
-                                                <MenuItem onClick={() => {
-                                                    toggleFreeMode(params.row.organization_id, !params.row.free_mode)
-                                                }}>{params.row.free_mode ? ("Disable") : "Activate"} Free Mode</MenuItem>
-                                                <MenuItem onClick={() => handleDeleteClick(params.row)}><Iconify icon={'mdi:trash'}/> Delete</MenuItem>
+                                        <Portal containerRef={layoutRef}>
+                                            <MenuList>
+                                                <MenuItem className={'menu-item-org'} onClick={() => handleCopy(params.row.id)}>
+                                                    Copy Org ID
+                                                </MenuItem>
+                                                <MenuItem className={'menu-item-org'} onClick={() => toggleFreeMode(params.row.organization_id, !params.row.free_mode)}>
+                                                    {params.row.free_mode ? ("Disable") : "Activate"} Free Mode
+                                                </MenuItem>
+                                                <MenuItem className={'menu-item-org'} onClick={() => handleDeleteClick(params.row)}>
+                                                    <Iconify icon={'mdi:trash'}/> Delete
+                                                </MenuItem>
                                             </MenuList>
                                         </Portal>
                                     </>
                                 )}
                             </Menu>
+                            </ChakraProvider>
+
                         </Box>
                     )
                 }
@@ -477,9 +513,16 @@ export default function PageAdmin() {
         setFreeMode(false); // Reset the free_mode checkbox
         fetchOrganizations(); // Refresh the organization list
     };
-
+    const styles = {
+        userRow: {
+            backgroundColor: "#f7f7f7", // Light gray to indicate it's a lower-level row
+        },
+        headerRow: {
+            backgroundColor: "#e0e0e0", // Slightly darker gray for headers
+        },
+    };
     return (
-        <Box sx={{ height: 600, width: "100%" }} p={5}>
+        <Box sx={{ height: '80vh', width: "100%" }} p={5}>
             <Modal isOpen={isDeleteOpen} onClose={onDeleteClose}>
                 <ModalOverlay />
                 <ModalContent>
@@ -539,7 +582,7 @@ export default function PageAdmin() {
                     </ModalFooter>
                 </ModalContent>
             </Modal>
-            <HStack align={'center'} justifyContent={'space-between'} gutterBottom>
+            <HStack align={'center'} justifyContent={'space-between'} mb={1}>
                 <Heading >
                     Admin Panel
                 </Heading>
@@ -571,6 +614,14 @@ export default function PageAdmin() {
                         rowCount={rowCountState}
                         paginationMode="server"
                         pagination
+                        getRowClassName={(params) => {
+                            if (params.row.type === "user") {
+                                return "user-row " + colorMode.colorMode; // Add a specific class for user rows
+                            } else if (params.row.type === "header") {
+                                return "header-row " + colorMode.colorMode; // Optionally, a class for header rows
+                            }
+                            return "org-row " + colorMode.colorMode; // Default (no additional class)
+                        }}
                         onPaginationModelChange={(newModel) => {
                             setCurrentPage(newModel.page)
                             setPageSize(newModel.pageSize)
@@ -589,6 +640,11 @@ export default function PageAdmin() {
                         onPageSizeChange={(newPageSize) => setPageSize(newPageSize)}
                         loading={loading}
                         getRowId={(row) => row.id}
+                        isRowSelectable={() => false}
+                        sx={{'& .admin-header .MuiDataGrid-columnHeaderTitle': {
+                                fontWeight: '900',
+                            }}}
+                        getRowHeight={(params) => ((params.model.type === "user" || params.model.type === "header") ? 40 : null)}
                     />
                 )}
             </ThemeProvider>

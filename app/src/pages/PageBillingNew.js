@@ -31,13 +31,7 @@ import {goFetch} from "../App";
 import Iconify from "../components/Iconify";
 import {LoadingWidget} from "../routing/LoadingScreen";
 
-String.prototype.ucwords = function() {
-  const str = this.toLowerCase();
-  return str.replace(/(^([a-zA-Z\p{M}]))|([ -][a-zA-Z\p{M}])/g,
-      function(s){
-        return s.toUpperCase();
-      });
-};
+
 
 const brand_icons = {
   "diners": "la:cc-diners-club",

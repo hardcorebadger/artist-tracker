@@ -20,7 +20,7 @@ from lib.utils import get_function_url
 from lib.config import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
     CloudSQLClient, LinkSource, OrganizationArtist, StatisticType, \
-    ArtistTag, Playlist, Subscription
+    ArtistTag, Playlist, Subscription, pop_default
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController, LookalikeController
 import flask
 from datetime import datetime, timedelta
@@ -641,7 +641,10 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         ids = data.get('ids', None)
         organizations = dict()
         subs = sql_session.scalars(select(Subscription).where(Subscription.organization_id.in_(ids)).where(Subscription.status.in_(['active', 'paused'])).order_by(Subscription.created_at.desc())).all()
+        list_str = ', '.join("'" + str(item) + "'" for item in ids)
 
+        sql_query = text('SELECT organization_artists.organization_id, COUNT(*) FROM organization_artists LEFT JOIN artists ON artists.id = organization_artists.artist_id WHERE artists.active = true AND organization_id IN ('+list_str+') GROUP BY organization_artists.organization_id')
+        resp = sql_session.execute(sql_query).all()
         users = list(map(lambda x: x.to_dict(), db.collection('users').where(filter=FieldFilter(
         "organization", "in", ids
         )).get()))
@@ -651,6 +654,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
                 organizations[sub.organization_id] = {
                     'id': sub.organization_id,
                     'subscription': sub.as_dict(),
+                    'artists': pop_default(list(filter(lambda x: x[0] == sub.organization_id, resp)), ['', 0])[1],
                     "users": len(list(filter(lambda x: x.get('organization') == sub.organization_id, users)))
                 }
             else:
@@ -660,6 +664,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
                 organizations[org_id] = {
                     'id': org_id,
                     'subscription': None,
+                    'artists': pop_default(list(filter(lambda x: x[0] == org_id, resp)), ['', 0])[1],
                     "users": len(list(filter(lambda x: x.get('organization') == org_id, users)))
                 }
         return list(organizations.values())

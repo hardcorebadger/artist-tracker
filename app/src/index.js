@@ -15,6 +15,13 @@ const root = ReactDOM.createRoot(container);
 LicenseInfo.setLicenseKey(
   '4bb4e0380ced9f6000f7f44b17a7f071T1JERVI6NDI5NjIsRVhQSVJZPTE2ODMxNTUwNjMwMDAsS0VZVkVSU0lPTj0x',
 );
+String.prototype.ucwords = function() {
+    const str = this.toLowerCase();
+    return str.replace(/(^([a-zA-Z\p{M}]))|([ -][a-zA-Z\p{M}])/g,
+        function(s){
+            return s.toUpperCase();
+        });
+};
 root.render(
 
       <>
