@@ -190,7 +190,23 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        return get_stripe().generate_checkout("8AasHpt0Y2CNmogY6TpM", True, sql_session)
+        page = auth.list_users()
+        docs = db.collection("users").stream()
+
+        # Create a dictionary where key = document ID and value = document data
+        users_dict = {doc.id: doc for doc in docs}
+        print(users_dict)
+        while page:
+            for user in page.users:
+                if user.uid not in users_dict:
+                    print("User not found: " + user.uid + " " + user.email)
+                    continue
+                user_doc = users_dict[user.uid]
+                user_doc.reference.update({'email': user.email})
+                print(user_doc.get('first_name') + " " + user.email)
+            # Get the next page
+            page = page.get_next_page()
+        return "",200
         # artists_controller = ArtistController(PROJECT_ID, LOCATION, sql)
         # return artists_controller.queues(sql_session, app, 'q9HMKTU1S7hUlpNdtBB5braS1VJ3')
         # return "artists"
@@ -232,6 +248,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         from_number = data.get('From', None)
         message = data.get('Body', None)
         print("Received twilio message: " + message)
+
         return twilio.receive_message(db, from_number, message, process_spotify_link, sql_session) if from_number is not None else {"error": "Malformed request"}
 
     @v2_api.post("/reimport-artists")
@@ -575,6 +592,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     if user is None:
         return 'Unauthorized', 401
 
+
     @v3_api.get('/get-type-defs')
     def get_type_definitions_request():
         response = jsonify(get_type_definitions(sql_session))
@@ -602,6 +620,36 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
                     print(str(e))
         is_admin = user_data.get('admin') if 'admin' in user_data else False
         return {'checkout': stripe.generate_checkout(user_data.get('organization'), is_admin, sql_session)}, 200
+
+    @v3_api.post('/admin-organizations')
+    def get_organizations_admin():
+        db = firestore.client(app)
+        data = flask.request.get_json()
+        ids = data.get('ids', None)
+        organizations = dict()
+        subs = sql_session.scalars(select(Subscription).where(Subscription.organization_id.in_(ids)).where(Subscription.status.in_(['active', 'paused'])).order_by(Subscription.created_at.desc())).all()
+
+        users = list(map(lambda x: x.to_dict(), db.collection('users').where(filter=FieldFilter(
+        "organization", "in", ids
+        )).get()))
+
+        for sub in subs:
+            if sub.organization_id not in organizations:
+                organizations[sub.organization_id] = {
+                    'id': sub.organization_id,
+                    'subscription': sub.as_dict(),
+                    "users": len(list(filter(lambda x: x.get('organization') == sub.organization_id, users)))
+                }
+            else:
+                continue
+        for org_id in ids:
+            if org_id not in organizations:
+                organizations[org_id] = {
+                    'id': org_id,
+                    'subscription': None,
+                    "users": len(list(filter(lambda x: x.get('organization') == org_id, users)))
+                }
+        return list(organizations.values())
 
     @v3_api.get('/subscriptions')
     def load_subscriptions():
@@ -759,7 +807,11 @@ def get_existing_tags(sql_session, user):
             "current_user": None
         }
     uid = user.uid
-    user_data = get_user(uid, db)
+    user_snap = get_user(uid, db, False)
+    user_data = user_snap.to_dict()
+
+    if ('email' not in user_data or user_data['email'] is None):
+        user_snap.update({'email': user.email})
     records = select(ArtistTag).distinct(ArtistTag.tag_type_id, ArtistTag.tag).filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))
     records = sql_session.scalars(records).all()
     records = (tag_type.as_tag_dict() for tag_type in records)

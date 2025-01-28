@@ -10,6 +10,7 @@ import GuestGuard from './GuestGuard';
 import AccessGuard from './AccessGuard';
 
 import LoadingScreen from './LoadingScreen';
+import AdminGuard from "./AdminGuard";
 // ----------------------------------------------------------------------
 
 function path(root, sublink) {
@@ -45,6 +46,7 @@ export default function Router() {
       children: [
         { index: true, element: <Navigate to="home" replace />   },
         { path: 'home', element: <PageHome />},
+        { path: 'admin', element: <AdminGuard><PageAdmin/></AdminGuard>},
         // { path: 'report/:id', element: <PageArtistReport />},
         { path: 'upgrade', element: <PageUpgrade />},
         { path: 'callback', children: [
@@ -131,3 +133,4 @@ const Page404 = Loadable(lazy(() => import('../pages/Page404')));
 
 const PageLanding = Loadable(lazy(() => import('../pages/PageLanding')));
 const PageCallback = Loadable(lazy(() => import('../pages/PageCallback')));
+const PageAdmin = Loadable(lazy(() => import('../pages/PageAdmin')));

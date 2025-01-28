@@ -290,9 +290,12 @@ export function PageLayoutContained({size, left, children}) {
   }
 }
 
-const bakeNavItems = (config, reports) => {
+const bakeNavItems = (config, reports, orgs, user ) => {
   const navItems = deepCopy(config)
   reports.forEach(i => {navItems[1].children.push(i)})
+  if (user.admin) {
+    navItems.push({path: "/app/admin", name: "Admin", icon: "ri:admin-fill"})
+  }
   return navItems
 }
 export default function DashboardLayout() {

@@ -6,6 +6,7 @@ from google.auth.transport.requests import AuthorizedSession
 def get_user(uid, db, as_dict = True):
     ref = db.collection("users").document(uid)
     doc = ref.get()
+
     if as_dict:
         data = doc.to_dict()
         return data
