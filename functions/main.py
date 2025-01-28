@@ -454,7 +454,12 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     with v2_api.request_context(req.environ):
         resp = v2_api.full_dispatch_request()
-        sql_session.close()
+        try:
+            sql_session.close()
+            close_all_sessions()
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
         return resp
 #################################
 # Cron Job Definitions

@@ -139,7 +139,7 @@ function SubscriptionCard({user, subscription, activeSubscription}) {
   )
 }
 
-function Subscriptions({subscriptions, activeSubscription}) {
+function Subscriptions({subscriptions, activeSubscription, checkout, checkoutLoading}) {
 
   const user = useUser()
 
@@ -154,9 +154,11 @@ function Subscriptions({subscriptions, activeSubscription}) {
           )
       })}
       {subscriptions?.length === 0 ? (
-          <VStack>
+          <VStack spacing={0}>
             <Iconify size={'30px'} icon={'ph:empty'}/>
-            <Text>No Subscriptions</Text>
+            <Text fontSize={"lg"} >Not Subscribed Yet!</Text>
+            <Text fontSize={"xs"} mb={5}>Subscribe now to our Trial period for only $50/month</Text>
+            <Button onClick={checkout} isLoading={checkoutLoading} colorScheme={'primary'}>Subscribe Now</Button>
           </VStack>
       ) : null}
 
@@ -200,7 +202,7 @@ export default function PageBillingNew() {
       console.log(response);
       setSubscribeLoading(false);
       if (response.hasOwnProperty("checkout")) {
-        window.open(response.checkout.url, '_blank');
+        window.location.href = (response.checkout.url);
       } else {
         toast({
           title: 'Failed to generate checkout',
@@ -230,9 +232,9 @@ export default function PageBillingNew() {
           <HStack mb={8} align={'center'} justify={'space-between'}>
 
             <Heading >Billing</Heading>
-            <Button disabled={activeSubscription !== false && activeSubscription !== null} isLoading={subscribeLoading} onClick={checkout}>Subscribe</Button>
+            <Button colorScheme={'primary'} disabled={activeSubscription !== false && activeSubscription !== null} isLoading={subscribeLoading} onClick={checkout}>Subscribe</Button>
           </HStack>
-          {subscriptions === null ? <LoadingWidget height={'30vh'}/> : <Subscriptions subscriptions={subscriptions} activeSubscription={activeSubscription} />}
+          {subscriptions === null ? <LoadingWidget height={'30vh'}/> : <Subscriptions checkout={checkout} checkoutLoading={subscribeLoading} subscriptions={subscriptions} activeSubscription={activeSubscription} />}
 
           <Divider/>
 
