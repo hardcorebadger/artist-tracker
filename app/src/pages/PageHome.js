@@ -195,13 +195,16 @@ function PageDefault() {
 
   return (
       <PageLayoutContained size="lg">
-        <VStack spacing={10} align="left">
+        <VStack spacing={10} align="left" sx={{maxWidth: 'calc(100vw - 60px )'}}>
           <VStack spacing={2} align="left">
             <Heading size="sm">{user.org.info.name}'s Dashboard</Heading>
           </VStack>
-          <Grid templateColumns='repeat(4, 1fr)' gap={5}>
-          <GridItem colSpan={3}>
-            {(users !== null) ? (<ReportsList/>) : <LoadingWidget height={'50vh'}/>}
+          <Grid templateColumns={{base: 'repeat(1fr)', md: 'repeat(4, 1fr)'}} gap={5}>
+          <GridItem colSpan={{base: 1, md: 3}}>
+            <Box sx={{maxWidth: 'calc(100vw - 60px )', overflowX:'scroll'}}>
+
+              {(users !== null) ? (<ReportsList/>) : <LoadingWidget height={'50vh'}/>}
+            </Box>
           </GridItem>
           <GridItem colSpan={1}>
             <Stack>
