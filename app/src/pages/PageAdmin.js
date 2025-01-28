@@ -1,11 +1,31 @@
 import React, { useEffect, useState } from "react";
 import { Box, Typography, CircularProgress, IconButton } from "@mui/material";
 import { DataGridPro } from "@mui/x-data-grid-pro";
-import {collection, query, limit, getDocs, startAfter, orderBy, where, getCountFromServer} from "firebase/firestore";
+import {
+    collection,
+    query,
+    limit,
+    getDocs,
+    startAfter,
+    orderBy,
+    where,
+    getCountFromServer,
+    addDoc, deleteDoc, doc
+} from "firebase/firestore";
 import { db } from "../firebase";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme, theme } from "../components/MuiDataGridServer";
-import {Button, Menu, MenuButton, MenuItem, MenuList, Portal, useColorMode, useToast} from "@chakra-ui/react";
+import {
+    Button, Checkbox, FormControl, FormLabel, Heading, HStack, Input,
+    Menu,
+    MenuButton,
+    MenuItem,
+    MenuList, Modal, ModalBody, ModalCloseButton,
+    ModalContent, ModalFooter, ModalHeader, ModalOverlay,
+    Portal, Text,
+    useColorMode, useDisclosure,
+    useToast
+} from "@chakra-ui/react";
 import Iconify from "../components/Iconify";
 import {goFetch} from "../App";
 import {useUser} from "../routing/AuthGuard";
@@ -22,6 +42,14 @@ export default function PageAdmin() {
     const [lastVisible, setLastVisible] = useState(null); // Keeps track of the last document (for Firestore pagination)
     const user = useUser();
     const toast = useToast()
+
+    const [selectedOrgDelete, setSelectedOrgDelete] = useState(null); // For tracking organization to delete
+    const {
+        isOpen: isDeleteOpen,
+        onOpen: onDeleteOpen,
+        onClose: onDeleteClose,
+    } = useDisclosure(); // For Delete Confirmation Modal
+
     useEffect(() => {
         fetchOrganizations();
     }, [currentPage, pageSize]);
@@ -109,6 +137,12 @@ export default function PageAdmin() {
 
         }
     };
+
+    const handleDeleteClick = (org) => {
+        setSelectedOrgDelete(org); // Store selected organization ID
+        onDeleteOpen(); // Open confirmation modal
+    };
+
     const toggleExpandCollapse = async (orgId) => {
         const isExpanded = expandedOrgIds[orgId];
 
@@ -302,6 +336,7 @@ export default function PageAdmin() {
                                                 <MenuItem onClick={() => {
                                                     toggleFreeMode(params.row.organization_id, !params.row.free_mode)
                                                 }}>{params.row.free_mode ? ("Disable") : "Activate"} Free Mode</MenuItem>
+                                                <MenuItem onClick={() => handleDeleteClick(params.row)}><Iconify icon={'mdi:trash'}/> Delete</MenuItem>
                                             </MenuList>
                                         </Portal>
                                     </>
@@ -339,14 +374,185 @@ export default function PageAdmin() {
             console.error("Failed to copy text: ", error);
         }
     };
+    const [name, setName] = useState(""); // Form state for organization name
+    const [freeMode, setFreeMode] = useState(false); // Form state for free_mode checkbox
+    const { isOpen, onOpen, onClose } = useDisclosure(); // Chakra UI modal helpers
 
+    const deleteOrganization = async () => {
+        const index = rows.findIndex(item => (item.organization_id ?? "NA") === selectedOrgDelete.organization_id && item.type === 'organization');
+        if (index === -1) {
+            toast({
+                title: "Organization has Users",
+                description: "Cannot delete organization with users.",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            });
+
+            onDeleteClose(); // Close the modal
+            setSelectedOrgDelete(null); // Reset selected organization ID
+            return;
+        }
+        const org = rows[index]
+        if (org.users === null || org.users > 0) {
+            toast({
+                title: "Organization has Users",
+                description: "Cannot delete organization with users.",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            });
+
+            onDeleteClose(); // Close the modal
+            setSelectedOrgDelete(null); // Reset selected organization ID
+            return;
+        }
+        try {
+            // Reference to the organization document
+            const docRef = doc(db, "organizations", selectedOrgDelete.organization_id);
+
+            // Delete the document
+            await deleteDoc(docRef);
+
+            // Show success toast
+            toast({
+                title: "Organization deleted",
+                description: "The organization has been successfully deleted.",
+                status: "success",
+                duration: 5000,
+                isClosable: true,
+            });
+
+            onDeleteClose(); // Close the modal
+            setSelectedOrgDelete(null); // Reset selected organization ID
+            fetchOrganizations(); // Refresh the organization list
+        } catch (error) {
+            console.error("Error deleting organization:", error);
+
+            // Show error toast
+            toast({
+                title: "Error",
+                description: "Failed to delete the organization. Please try again.",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            });
+        }
+    };
+
+    const createOrganization = async (orgName, isFreeMode) => {
+        // Replace this with your API or function to handle organization creation
+        console.log("Creating organization with:", orgName, isFreeMode);
+        try {
+            const orgRef = collection(db, "organizations");
+
+            // Add a new document with the given name and free_mode
+            await addDoc(orgRef, {
+                name: orgName,
+                free_mode: isFreeMode,
+            });
+        } catch (error) {
+            console.error("Error adding organization:", error);
+
+            // Show error toast
+            toast({
+                title: "Error",
+                description: "Failed to add organization. Please try again.",
+                status: "error",
+                duration: 5000,
+                isClosable: true,
+            });
+        }
+
+        // Example: Show a toast notification
+        toast({
+            title: "Organization created successfully!",
+            description: `Organization ${orgName} has been added.`,
+            status: "success",
+            duration: 5000,
+            isClosable: true,
+        });
+        onClose(); // Close the modal
+        setName(""); // Reset form fields
+        setFreeMode(false); // Reset the free_mode checkbox
+        fetchOrganizations(); // Refresh the organization list
+    };
 
     return (
         <Box sx={{ height: 600, width: "100%" }} p={5}>
-            <ThemeProvider theme={colorMode.colorMode === "dark" ? darkTheme : theme}>
-                <Typography variant="h4" gutterBottom>
+            <Modal isOpen={isDeleteOpen} onClose={onDeleteClose}>
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>Confirm Deletion</ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody>
+                        Are you sure you want to delete the organization: "{selectedOrgDelete?.name}"? This action cannot be undone.
+                    </ModalBody>
+                    <ModalFooter>
+                        <Button onClick={onDeleteClose} mr={3}>
+                            Cancel
+                        </Button>
+                        <Button colorScheme="red" onClick={deleteOrganization}>
+                            Delete
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+            <Modal isOpen={isOpen} onClose={onClose}>
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>Add New Organization</ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody>
+                        {/* Name Input */}
+                        <FormControl id="organizationName" isRequired mb={4}>
+                            <FormLabel>Name</FormLabel>
+                            <Input
+                                placeholder="Enter organization name"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                            />
+                        </FormControl>
+                        {/* Free Mode Checkbox */}
+                        <FormControl id="freeMode">
+                            <Checkbox
+                                isChecked={freeMode}
+                                onChange={(e) => setFreeMode(e.target.checked)}
+                            >
+                                Free Mode
+                            </Checkbox>
+                        </FormControl>
+                    </ModalBody>
+                    <ModalFooter>
+                        {/* Cancel Button */}
+                        <Button onClick={onClose} mr={3}>
+                            Cancel
+                        </Button>
+                        {/* Create Button */}
+                        <Button
+                            colorScheme="blue"
+                            onClick={() => createOrganization(name, freeMode)}
+                            isDisabled={!name.trim()} // Disable button if name is empty
+                        >
+                            Create
+                        </Button>
+                    </ModalFooter>
+                </ModalContent>
+            </Modal>
+            <HStack align={'center'} justifyContent={'space-between'} gutterBottom>
+                <Heading >
                     Admin Panel
-                </Typography>
+                </Heading>
+                {/* Add Organization Button */}
+                <Button colorScheme="blue" onClick={onOpen} mb={4}>
+                    Add Organization
+                </Button>
+            </HStack>
+            <ThemeProvider theme={colorMode.colorMode === "dark" ? darkTheme : theme}>
+
+
+                {/* Chakra Modal */}
+
                 {loading ? (
                     <Box
                         sx={{
