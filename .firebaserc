@@ -1,5 +1,9 @@
 {
   "projects": {
-    "default": "artist-tracker-e5cce"
-  }
+    "default": "artist-tracker-e5cce",
+    "prod": "artist-tracker-e5cce",
+    "dev": "artist-tracker-e5cce"
+  },
+  "targets": {},
+  "etags": {}
 }

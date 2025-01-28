@@ -20,11 +20,10 @@ from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilte
 #     }
 
 class EvalController():
-  def __init__(self, spotify: SpotifyClient, youtube: YoutubeClient, db, sql, tracking_controller):
+  def __init__(self, spotify: SpotifyClient, youtube: YoutubeClient, db, tracking_controller):
     self.spotify = spotify
     self.youtube = youtube
     self.db = db
-    self.sql = sql
     self.tracking_controller = tracking_controller
     self.evaluator = CopyrightEvaluator()
 
@@ -114,7 +113,7 @@ class EvalController():
     if len(yt_evals) > 0:
       yt_evals = sorted(yt_evals, key=lambda x: x['release'], reverse=True)
 
-    cache_ref.update({'processed': True})
+    cache_ref.reference.update({'processed': True})
 
     # eval spotify
     sp_evals = []

@@ -45,7 +45,17 @@ fi
 # deploy functions
 if [ "$1" = "functions" ] 
 then
+
   echo "[Indiestack] Deploying functions..."
+  if [ ! -e ".env.prod" ]; then
+      echo ".env.prod does not exist."
+      exit 1
+  fi
+  if [ ! -e ".env" ]; then
+        echo ".env does not exist."
+        exit 1
+  fi
+  firebase use prod
   firebase deploy --only functions;
 fi
 

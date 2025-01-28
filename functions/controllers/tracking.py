@@ -36,11 +36,10 @@ DEPRECATED_STATS = {
 
 
 class TrackingController():
-  def __init__(self, spotify: SpotifyClient, songstats : SongstatsClient, sql: CloudSQLClient, db: Client, twilio = None):
+  def __init__(self, spotify: SpotifyClient, songstats : SongstatsClient, db: Client, twilio = None):
     self.spotify = spotify
     self.songstats = songstats
     self.db = db
-    self.sql = sql
     self.statistic_types = None
     self.users = None
     self.twilio = twilio
@@ -422,7 +421,7 @@ class TrackingController():
 
   def update_sql_meta(self, sql_session, sql_ref, doc):
       sql_ref.avatar = doc.get('avatar')
-      sql_links = self.convert_links(doc, sql_ref.id)
+      sql_links = self.convert_links(sql_session, doc, sql_ref.id)
       if sql_ref.avatar is not None or len(sql_links) > 0:
           sql_ref.onboard_wait_until = None
       final = list()
@@ -607,11 +606,10 @@ class TrackingController():
     else:
         return None
     return eval
-  def import_sql(self, old_artists, attribution = None, tags = None):
+  def import_sql(self, sql_session, old_artists, attribution = None, tags = None):
 
       if not isinstance(old_artists, QueryResultsList):
           old_artists = [old_artists]
-      sql_session = self.sql.get_session()
       stat_types = list(sql_session.scalars(select(StatisticType)).all())
       userOrgs = dict()
       if self.users is None:
@@ -720,7 +718,7 @@ class TrackingController():
                           organization_id=userOrgs[user_id],
                           created_at=found_details.get('found_on')
                       ))
-                  filtered_links = self.convert_links(artist)
+                  filtered_links = self.convert_links(sql_session, artist)
                   attributions_list = list()
                   if attribution is not None:
                       attributions_list = list([Attribution(
@@ -761,8 +759,8 @@ class TrackingController():
         avg = (end-start) / imported
       return imported, skipped, avg, fails
 
-  def convert_links(self, artist, sql_id = None):
-      link_sources = self.sql.load_all_for_model(LinkSource)
+  def convert_links(self, sql_session, artist, sql_id = None):
+      link_sources = sql_session.scalars(select(LinkSource)).all()
       links = list()
       dict_artist = artist.to_dict()
       if 'links' in dict_artist:

@@ -7,18 +7,19 @@ from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
 from firebase_functions.options import RetryConfig, MemoryOption
 from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter, Or
-from sqlalchemy import select, or_, update, text
-from sqlalchemy.orm import joinedload
+from sqlalchemy import select, or_, update, text, and_
+from sqlalchemy.orm import joinedload, close_all_sessions
 from sqlalchemy.util.preloaded import sql_dml
 
 from controllers.artists import ArtistController
 from controllers.twilio import TwilioController
 from cron_jobs import eval_cron, stats_cron, onboarding_cron, spotify_cron
+from lib.stripe_client import StripeController
 from lib.utils import get_function_url
 from lib.config import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
     CloudSQLClient, LinkSource, OrganizationArtist, StatisticType, \
-    ArtistTag, Playlist
+    ArtistTag, Playlist, Subscription
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController, LookalikeController
 import flask
 from datetime import datetime, timedelta
@@ -41,10 +42,12 @@ app = initialize_app()
 #################################
 
 spotify_client = None
+artists_controller = None
 stat_types = None
 link_sources = None
-
-sql = None
+twilio_client = None
+youtube_client = None
+task_controller = None
 
 def get_tag_types():
     return dict({
@@ -60,25 +63,23 @@ def get_tag_types():
         }
     })
 
-def get_sql() -> CloudSQLClient:
-    global sql
-    if sql is None:
-        sql = CloudSQLClient(PROJECT_ID.value, LOCATION.value, SQL_INSTANCE.value, SQL_USER.value, SQL_PASSWORD.value, SQL_DB.value)
-    return sql
+
+sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD, SQL_DB)
+stripe = StripeController(STRIPE_KEY, STRIPE_WEBHOOK_SECRET)
+songstats = SongstatsClient(SONGSTATS_API_KEY)
 
 @tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, max_backoff_seconds=60), memory=MemoryOption.MB_512)
 def addartisttask(req: tasks_fn.CallableRequest) -> str:
     db = firestore.client(app)
-    songstats = SongstatsClient(SONGSTATS_API_KEY.value)
     spotify = get_spotify_client()
-    twilio = TwilioController(get_sql(), spotify)
-    tracking_controller = TrackingController(spotify, songstats, get_sql(), db, twilio)
+    twilio = get_twilio_client()
+    tracking_controller = TrackingController(spotify, songstats, db, twilio)
     uid = req.data.get('uid')
     spotify_id = req.data.get('spotify_id')
     playlist_id = req.data.get('playlist_id', None)
     tags = req.data.get('tags', None)
     user_data = get_user(uid, db)
-    sql_session = get_sql().get_session()
+    sql_session = sql.get_session()
     message, code = tracking_controller.add_artist(sql_session, spotify_id, uid, user_data['organization'], playlist_id, tags)
     sql_session.close()
     return message
@@ -96,15 +97,14 @@ def reimportsql(req: tasks_fn.CallableRequest) -> str:
 
 def reimport_artists_eval(page = 0, page_size = 50):
     db = firestore.client(app)
-    songstats = SongstatsClient(SONGSTATS_API_KEY.value)
     spotify = get_spotify_client()
 
-    tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
+    tracking_controller = TrackingController(spotify, songstats, db)
     offset = page * page_size
     old_artists = db.collection("artists_v2").limit(page_size).offset(offset).get()
     spotifys = list(map(lambda x: x.get('spotify_id'), old_artists))
 
-    sql_session = get_sql().get_session()
+    sql_session = sql.get_session()
     found = 0
     updated = 0
     new = 0
@@ -160,17 +160,16 @@ def bulk_update(sql_session, ids: list, set: str):
 
 @https_fn.on_request(memory=512)
 def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
-    sql_session = get_sql().get_session()
+    sql_session = sql.get_session()
     db = firestore.client(app)
-    songstats = SongstatsClient(SONGSTATS_API_KEY.value)
     spotify = get_spotify_client()
-    twilio = TwilioController(get_sql(), spotify)
+    twilio = get_twilio_client()
+    youtube = get_youtube_client()
+    tracking_controller = TrackingController(spotify, songstats, db, twilio)
 
-    tracking_controller = TrackingController(spotify, songstats, get_sql(), db, twilio)
-    youtube = YoutubeClient(YOUTUBE_TOKEN.value, YOUTUBE_TOKEN_ALT.value)
-    eval_controller = EvalController(spotify, youtube, db, get_sql(), tracking_controller)
+    eval_controller = EvalController(spotify, youtube, db, tracking_controller)
     lookalike_controller = LookalikeController(spotify, songstats, youtube, sql_session, db)
-    # artist_controller = ArtistController(PROJECT_ID, LOCATION, get_sql())
+    # artist_controller = ArtistController(PROJECT_ID, LOCATION, sql)
 
     v2_api = flask.Flask(__name__)
 
@@ -183,10 +182,15 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         traceback.print_exc()
         return flask.jsonify({'error': "An unknown error occurred (500, responding 299 to cancel retry)"}), 299
 
+    @v2_api.post("/stripe")
+    def stripe_route():
+        return stripe.webhook(flask.request, sql_session)
+
     @v2_api.post("/debug")
     def debug():
-        artists_controller = ArtistController(PROJECT_ID.value, LOCATION.value, get_sql())
-        return artists_controller.queues(sql_session, app, 'q9HMKTU1S7hUlpNdtBB5braS1VJ3')
+        return stripe.generate_checkout("8AasHpt0Y2CNmogY6TpM", sql_session)
+        # artists_controller = ArtistController(PROJECT_ID, LOCATION, sql)
+        # return artists_controller.queues(sql_session, app, 'q9HMKTU1S7hUlpNdtBB5braS1VJ3')
         # return "artists"
         # return json.dumps(body).encode()
         # return spotify.get_playlist('3WxQaPZsG56Tl6Wrllkqas')
@@ -350,7 +354,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     # @v2_api.post('/import-artists-csv')
     # def import_artists_csv():
     #     df = pandas.read_csv('/Users/qrcf/Downloads/tagged 2.csv')
-    #     sql_session = get_sql().get_session()
+    #     sql_session = sql.get_session()
     #     tags = list()
     #     for index, row in df.iterrows():
     #         tags.append(ArtistTag(
@@ -374,7 +378,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     # @v2_api.post("/get-artists-csv")
     # def get_artists_csv():
-    #     sql_session = get_sql().get_session()
+    #     sql_session = sql.get_session()
     #     artists_query = artist_joined_query()
     #     artists_query = artists_query.outerjoin(Statistic, Artist.statistics).filter(Statistic.statistic_type_id == 30)
     #     dynamic_eval = aliased(Evaluation)
@@ -466,14 +470,13 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 @scheduler_fn.on_schedule(schedule=f"*/2 * * * *", memory=512)
 def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     db = firestore.client(app)
-    youtube = YoutubeClient(YOUTUBE_TOKEN.value, YOUTUBE_TOKEN_ALT.value)
-    songstats = SongstatsClient(SONGSTATS_API_KEY.value)
+    youtube = get_youtube_client()
     spotify = get_spotify_client()
-    twilio = TwilioController(get_sql(), spotify)
-    tracking_controller = TrackingController(spotify, songstats, get_sql(), db, twilio)
-    eval_controller = EvalController(spotify, youtube, db, get_sql(), tracking_controller)
-    task_controller = TaskController(PROJECT_ID.value, LOCATION.value, V1_API_ROOT.value, V2_API_ROOT.value, V3_API_ROOT.value)
-    sql_session = get_sql().get_session()
+    twilio = get_twilio_client()
+    tracking_controller = TrackingController(spotify, songstats, db, twilio)
+    eval_controller = EvalController(spotify, youtube, db, tracking_controller)
+    task_controller = get_task_controller()
+    sql_session = sql.get_session()
 
     try:
         spotify_cron(sql_session, task_controller, eval_controller, bulk_update)
@@ -496,9 +499,9 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
 #################################
 def add_artist(sql_session, uid, spotify_url = None, identifier = False, tags = None, preview = False):
     db = firestore.client(app)
-    songstats = SongstatsClient(SONGSTATS_API_KEY.value)
+    songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
-    tracking_controller = TrackingController(spotify, songstats, get_sql(), db)
+    tracking_controller = TrackingController(spotify, songstats, db)
     print(uid, spotify_url, tags, preview)
     if identifier:
 
@@ -567,7 +570,7 @@ def user_from_request(request: https_fn.Request) -> None|UserRecord:
 def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     user = user_from_request(request)
     v3_api = flask.Flask(__name__)
-    sql_session = get_sql().get_session()
+    sql_session = sql.get_session()
     if user is None:
         return 'Unauthorized', 401
 
@@ -576,6 +579,50 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         response = jsonify(get_type_definitions(sql_session))
         response.headers.add('Cache-Control', 'public, max-age=600')
         return response
+
+    @v3_api.post('/checkout')
+    def checkout_request():
+        db = firestore.client(app)
+        user_data = get_user(user.uid, db)
+
+        existing = sql_session.scalars(select(Subscription).where(Subscription.organization_id == user_data['organization']).where(Subscription.status != 'cancelled').order_by(Subscription.created_at.desc())).first()
+        if existing:
+            if existing.status == 'active':
+                return {
+                    'subscription': existing.as_dict()
+                }, 400
+            elif existing.status == 'open':
+                try:
+                    stripe.cancel_checkout(existing.checkout_id)
+                    existing.status = 'cancelled'
+                    sql_session.add(existing)
+                    sql_session.commit()
+                except Exception as e:
+                    print(e)
+
+        return {'checkout': stripe.generate_checkout(user_data.get('organization'), sql_session)}, 200
+
+    @v3_api.get('/subscriptions')
+    def load_subscriptions():
+        db = firestore.client(app)
+        user_data = get_user(user.uid, db)
+        query = (select(Subscription)
+                 .where(Subscription.organization_id == user_data['organization'])
+                 .where(or_(Subscription.status.in_(['active', 'paused']), and_(Subscription.status == 'canceled', Subscription.renews_at > datetime.now())))
+                 .order_by(Subscription.created_at.desc()))
+        subs = sql_session.scalars(query)
+
+        return list(map(lambda x: x.as_dict(), subs))
+
+    @v3_api.post('/subscription-portal')
+    def billing_portal_url():
+        db = firestore.client(app)
+        user_data = get_user(user.uid, db)
+        subscription = sql_session.scalars(select(Subscription).where(Subscription.organization_id == user_data['organization']).where(Subscription.id == flask.request.get_json()['subscription_id'])).first()
+        if subscription is None:
+            return 'Failed', 400
+
+        return stripe.portal_url(subscription.customer_id), 200
 
     @v3_api.get('/organizations')
     def get_organizations_request():
@@ -611,7 +658,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
 
     @v3_api.get('/artists')
     def get_artists_request():
-        artists_controller = ArtistController(PROJECT_ID.value, LOCATION.value, get_sql())
+        artists_controller = get_artists_controller()
         args = request.args.to_dict()
         filterModel = json.loads(args.get('filterModel', None)) if args.get('filterModel', None) else None
         if filterModel is not None:
@@ -641,7 +688,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         uid = user.uid
         spotify = get_spotify_client()
         data = flask.request.get_json()
-        twilio = TwilioController(get_sql(), spotify)
+        twilio = get_twilio_client()
         code = data.get('code', None)
         if code is not None:
             success, status = twilio.verify_code(uid, db, data.get('number'), code)
@@ -669,12 +716,13 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     @v3_api.after_request
     def after_request(response):
         # Code to run after each request
-        sql_session.close()
+        close_all_sessions()
         return response
 
     with v3_api.request_context(request.environ):
         resp = v3_api.full_dispatch_request()
-        sql_session.close()
+        close_all_sessions()
+        print("After")
         return resp
 
 def get_type_definitions(sql_session):
@@ -711,21 +759,48 @@ def get_existing_tags(sql_session, user):
         "current_user": user_data,
     }
 
+def get_twilio_client():
+    global twilio_client
+    if twilio_client is None:
+        twilio_client = TwilioController(get_spotify_client(), TWILIO_ACCOUNT, TWILIO_TOKEN, TWILIO_VERIFY_SERVICE, TWILIO_MESSAGE_SERVICE)
+    return twilio_client
+
+def get_artists_controller():
+    global artists_controller
+    if artists_controller is None:
+        artists_controller = ArtistController(PROJECT_ID, LOCATION)
+    return artists_controller
+
+
+def get_task_controller():
+    global task_controller
+    if task_controller is None:
+        task_controller = TaskController(PROJECT_ID, LOCATION, V1_API_ROOT, V2_API_ROOT, V3_API_ROOT)
+
+    return task_controller
+
 def get_spotify_client():
     global spotify_client
     if spotify_client is None:
-        spotify_client = SpotifyClient(firestore.client(app))
+        spotify_client = SpotifyClient(firestore.client(app), SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_ALT_CLIENT_ID, SPOTIFY_ALT_CLIENT_SECRET, SPOTIFY_USER_FACING_CLIENT_ID, SPOTIFY_USER_FACING_CLIENT_SECRET)
 
     return spotify_client
 
+def get_youtube_client():
+    global youtube_client
+    if youtube_client is None:
+        youtube_client = YoutubeClient(YOUTUBE_TOKEN, YOUTUBE_TOKEN_ALT)
+
+    return youtube_client
+
 def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = False ):
     spotify = get_spotify_client()
-    task_controller = TaskController(PROJECT_ID.value, LOCATION.value, V1_API_ROOT.value, V2_API_ROOT.value, V3_API_ROOT.value)
+    task_controller = get_task_controller()
     try:
         db = firestore.client(app)
-        songstats = SongstatsClient(SONGSTATS_API_KEY.value)
+        songstats = SongstatsClient(SONGSTATS_API_KEY)
 
-        tracking_controller = TrackingController(spotify, songstats, get_sql(), db, None)
+        tracking_controller = TrackingController(spotify, songstats, db, None)
 
         spotify_id = spotify.url_to_id(spotify_url)
         if spotify_id == 'invalid':

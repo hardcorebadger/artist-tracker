@@ -8,7 +8,7 @@ from sqlalchemy import Column, Integer, SmallInteger, JSON, Float, Boolean, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import Mapped, relationship, mapped_column
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from lib.utils import pop_default
 
@@ -43,6 +43,27 @@ class Attribution(Base):
 
     def __repr__(self):
         return f"<Attribution({self.id=}, {self.artist_id=}, {self.user_id=}, {self.playlist_id=}, {self.created_at})>"
+
+class Subscription(Base):
+    __tablename__ = 'subscriptions'
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
+    organization_id = Column(String(28), nullable=False)
+    checkout_id = Column(String(255), nullable=True)
+    subscription_id = Column(String(255), nullable=True)
+    customer_id = Column(String(255), nullable=True)
+    status = Column(String(16), nullable=False)
+    expires_at = Column(TIMESTAMP, nullable=True)
+    amount = Column(Float, nullable=False)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
+    updated_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
+    payment_method_details = Column(JSONB, nullable=True)
+    live = Column(Boolean, nullable=False, default=False)
+    payment_method_id = Column(String(255), nullable=True)
+    payment_interval = Column(String(16), nullable=True)
+    renews_at = Column(TIMESTAMP, nullable=True)
+
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 class Artist(Base):
     __tablename__ = 'artists'

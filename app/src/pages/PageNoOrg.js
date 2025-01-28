@@ -39,7 +39,8 @@ function PageDefault() {
         console.log("doc exists")
         console.log(user)
         await updateDoc(doc(db, "users", user.auth.uid), {
-          organization: orgID
+          organization: orgID,
+          organizations: [orgID]
         });
       } else {
         console.log("No such document!");

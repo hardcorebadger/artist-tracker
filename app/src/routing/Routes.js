@@ -10,7 +10,6 @@ import GuestGuard from './GuestGuard';
 import AccessGuard from './AccessGuard';
 
 import LoadingScreen from './LoadingScreen';
-import PageCallback from "../pages/PageCallback";
 // ----------------------------------------------------------------------
 
 function path(root, sublink) {
@@ -50,6 +49,7 @@ export default function Router() {
         { path: 'upgrade', element: <PageUpgrade />},
         { path: 'callback', children: [
             { path: 'spotify', element: <PageCallback /> },
+
             // { path: '*', element: <Navigate to="/404" replace /> },
           ]},
 
@@ -58,7 +58,7 @@ export default function Router() {
           children: [
             { index: true, element: <Navigate to="account" replace />   },
             { path: 'account', element: <PageSettings /> },
-            { path: 'billing', element: <PageBilling /> },
+            { path: 'billing', element: <PageBillingNew /> },
           ]
         },
         { path: 'reports',
@@ -121,7 +121,8 @@ const PageDefault = Loadable(lazy(() => import('../pages/PageDefault')));
 const PageSettings = Loadable(lazy(() => import('../pages/PageSettings')));
 const PageUpgrade = Loadable(lazy(() => import('../pages/PageUpgrade')));
 const PagePaywalled = Loadable(lazy(() => import('../pages/PagePaywalled')));
-const PageBilling = Loadable(lazy(() => import('../pages/PageBilling')));
+// const PageBilling = Loadable(lazy(() => import('../pages/PageBilling')));
+const PageBillingNew = Loadable(lazy(() => import('../pages/PageBillingNew')));
 
 const PageResetPassword = Loadable(lazy(() => import('../pages/PageResetPassword')));
 const PageCreateAccount = Loadable(lazy(() => import('../pages/PageCreateAccount')));
@@ -129,3 +130,4 @@ const PageLogin = Loadable(lazy(() => import('../pages/PageLogin')));
 const Page404 = Loadable(lazy(() => import('../pages/Page404')));
 
 const PageLanding = Loadable(lazy(() => import('../pages/PageLanding')));
+const PageCallback = Loadable(lazy(() => import('../pages/PageCallback')));

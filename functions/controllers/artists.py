@@ -16,10 +16,9 @@ count_by_query = None
 
 class ArtistController():
 
-    def __init__(self, project_id, location, sql):
+    def __init__(self, project_id, location):
         self.project_id = project_id
         self.location = location
-        self.sql = sql
 
 
     def queues(self, sql_session, app, uid):
@@ -35,8 +34,8 @@ class ArtistController():
         }
 
 
-    def get_artists_test(self, data, app):
-        return (self.get_artists('9sRMdvFDUKVKckwpzeARiG6x2LG2', data, app, self.sql.get_session()))
+    # def get_artists_test(self, data, app):
+        # return (self.get_artists('9sRMdvFDUKVKckwpzeARiG6x2LG2', data, app, self.sql.get_session()))
     def get_artists(self, uid, data, app, sql_session):
         id_lookup = data.get('id', None)
 

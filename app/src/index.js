@@ -17,10 +17,10 @@ LicenseInfo.setLicenseKey(
 );
 root.render(
 
-      <StrictMode>
+      <>
         <ColorModeScript initialColorMode={theme.config.initialColorMode} />
         <App />
-      </StrictMode>
+      </>
 
 );
 

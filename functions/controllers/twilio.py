@@ -9,16 +9,16 @@ from twilio.rest import Client
 
 from controllers.artists import artist_with_meta
 from lib import SpotifyClient, Artist, OrganizationArtist, ErrorResponse
-from lib.config import TWILIO_ACCOUNT, TWILIO_TOKEN, TWILIO_VERIFY_SERVICE, TWILIO_MESSAGE_SERVICE
 
 
 class TwilioController():
 
-  def __init__(self, sql, spotify: SpotifyClient):
-    self.sql = sql
+  def __init__(self, spotify: SpotifyClient, account, token, verify, message):
     self.spotify = spotify
-    account_sid = TWILIO_ACCOUNT.value
-    self.client = Client(account_sid, TWILIO_TOKEN.value)
+    account_sid = account
+    self.client = Client(account_sid, token)
+    self.verify_service = verify
+    self.message_service = message
 
   def load_user_ref(self, uid, db):
     ref = db.collection("users").document(uid)
@@ -27,7 +27,7 @@ class TwilioController():
   def send_code(self, uid, db, number):
     verification = self.client.verify \
       .v2 \
-      .services(TWILIO_VERIFY_SERVICE.value) \
+      .services(self.verify_service) \
       .verifications \
       .create(to=number, channel='sms')
     user, user_ref = self.load_user_ref(uid, db)
@@ -43,7 +43,7 @@ class TwilioController():
 
   def verify_code(self, uid, db, number, code):
     verification_check = self.client.verify.v2.services(
-      TWILIO_VERIFY_SERVICE.value
+      self.verify_service
     ).verification_checks.create(to=number, code=code)
     if verification_check.status == 'approved':
       user, user_ref = self.load_user_ref(uid, db)
@@ -185,7 +185,7 @@ class TwilioController():
     self.client.messages.create(
       content_sid=template,
       to=user.get('sms').get('number'),
-      messaging_service_sid=TWILIO_MESSAGE_SERVICE.value,
+      messaging_service_sid=self.message_service,
       content_variables=json.dumps(vars),
     )
     return True
@@ -217,7 +217,7 @@ class TwilioController():
 
     self.client.messages.create(
       body=message,
-      messaging_service_sid=TWILIO_MESSAGE_SERVICE.value,
+      messaging_service_sid=self.message_service,
       to=user.get('sms').get('number'),
     )
     return True
