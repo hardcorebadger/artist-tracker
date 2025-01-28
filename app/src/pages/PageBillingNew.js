@@ -256,7 +256,7 @@ export default function PageBillingNew() {
           <HStack mb={8} align={'center'} justify={'space-between'}>
 
             <Heading >Billing</Heading>
-            <Button colorScheme={'primary'} disabled={activeSubscription !== false && activeSubscription !== null} isLoading={subscribeLoading} onClick={checkout}>Subscribe</Button>
+            <Button colorScheme={'primary'} disabled={activeSubscription !== false || activeSubscription === null} isLoading={subscribeLoading} onClick={checkout}>Subscribe</Button>
           </HStack>
           {subscriptions === null ? <LoadingWidget height={'30vh'}/> : <Subscriptions checkout={checkout} checkoutLoading={subscribeLoading} subscriptions={subscriptions} activeSubscription={activeSubscription} />}
 
