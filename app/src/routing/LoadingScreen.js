@@ -11,11 +11,11 @@ export default function LoadingScreen() {
   );
 }
 
-export function LoadingWidget({width = '100%', height = '100vh'}) {
+export function LoadingWidget({width = '100%', height = '100vh', iconSize = '48px'}) {
   return (
     <Box minH={height} textAlign="center" position='relative'>
         <AbsoluteCenter w={width}><Box w={width}>
-          <CircularProgress color="primary.default" isIndeterminate />
+          <CircularProgress color="primary.default" isIndeterminate size={iconSize} />
         </Box></AbsoluteCenter>
     </Box>
   );

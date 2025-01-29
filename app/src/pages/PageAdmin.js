@@ -71,7 +71,7 @@ export default function PageAdmin({}) {
                 // Check if the item exists
                 if (index !== -1) {
                     // Update the item with the new values
-                    newRows[index] = { ...newRows[index], ...{"subscription": org.subscription, "users": org.users, "artists": org.artists} };
+                    newRows[index] = { ...newRows[index], ...{"subscription": org.subscription, "users": org.users, "active_artists": org.active_artists, "inactive_artists": org.inactive_artists} };
                     setRows(newRows)
                 }
             }
@@ -285,8 +285,8 @@ export default function PageAdmin({}) {
                     );
                 } else {
                     return (
-                        <Box sx={{ pl: 4}}>
-                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{params.row.artists}</Typography>
+                        <Box sx={{}}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{(params.row?.active_artists ?? null) === null ? null : ((params.row.active_artists + params.row.inactive_artists) +" ("+params.row.active_artists +" active)")}</Typography>
                         </Box>
                     )
                 }
@@ -304,7 +304,7 @@ export default function PageAdmin({}) {
                     return null;
                 } else {
                     return (
-                        <Box sx={{ pl: 4}}>
+                        <Box>
                             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{params.row.users}</Typography>
                         </Box>
                     )
@@ -325,11 +325,11 @@ export default function PageAdmin({}) {
                 } else {
                     const substatus = 'subscription' in params.row ? (params.row.subscription?.status ?? (params.row.free_mode ? 'free' : 'none')) : null
                     if (!substatus) {
-                        return (<LoadingWidget width={'30px'} height={'30px'}/> )
+                        return (<LoadingWidget iconSize={'25px'}/>)
                     }
 
                     return (
-                        <Box sx={{ pl: 4}}>
+                        <Box sx={{ }}>
                             <Chip variant={'outlined'} color={substatus === 'free' ? 'warning' : (substatus === 'none' ? 'error' : 'success')} label={substatus.ucwords()}/>
                         </Box>
                     )
