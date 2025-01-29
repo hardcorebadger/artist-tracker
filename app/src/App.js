@@ -36,7 +36,7 @@ function App() {
     }
 
     const [users, setUsers] = useState(null)
-    const loadOrgFilters = async (user) => {
+    const loadOrgFilters = async (user, force = false) => {
         if (!user) {
             return;
         }
@@ -49,8 +49,8 @@ function App() {
                 setTagTypes(response?.tag_types)
             });
         }
-        if (existingTags === null) {
-            goFetch(user, 'GET','get-existing-tags').then((response) => {
+        if (existingTags === null || force) {
+            goFetch(user, 'GET','get-existing-tags'+(force ? '?force='+(new Date()) : '')).then((response) => {
                 setExistingTags(response.tags)
                 const newUsers = {}
                 for (const index in response.users) {

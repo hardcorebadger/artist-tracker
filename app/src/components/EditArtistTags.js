@@ -49,7 +49,7 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
             setLoading(false)
             if (resp.status === 200) {
                 onTagSave()
-                refreshFilters(user)
+                refreshFilters(user, true)
                 onClose()
                 toast({
                     title: 'Tags saved!',
