@@ -35,7 +35,7 @@ function TagInput({setSelectedTags, initialTags, disabled}) {
     }
     return (
 
-        <FormControl id="tags" w="100">
+        <Field.Root id="tags" w="100">
             <FormLabel>Tags</FormLabel>
             <AutoComplete  values={localTags}  isLoading={disabled}  creatable closeOnBlur={true} openOnFocus multiple
 
@@ -78,6 +78,6 @@ function TagInput({setSelectedTags, initialTags, disabled}) {
                     <AutoCompleteCreatable/>
                 </AutoCompleteList>
             </AutoComplete>
-        </FormControl>
+        </Field.Root>
     );
 }

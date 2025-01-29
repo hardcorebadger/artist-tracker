@@ -4,12 +4,11 @@ import PageUpgrade from "../pages/PageUpgrade";
 import {useContext, useEffect, useState} from "react";
 import {ColumnDataContext, ToastContext} from "../App";
 import {LoadingWidget} from "./LoadingScreen";
-import {useToast} from "@chakra-ui/react";
+import {toaster} from "../components/ui/toaster";
 
 export default function AccessGuard({level = null, children}) {
   const user = useUser()
   const {organization} = useContext(ColumnDataContext)
-  const toast = useToast();
   const loca = useLocation()
 
   const navigate = useNavigate()
@@ -19,7 +18,7 @@ export default function AccessGuard({level = null, children}) {
     }
     if (user.profile.admin && !(organization.free_mode || organization.subscription !== null)) {
       if (!toast.isActive("no-subscription")) {
-        toast({
+        toaster.create({
           id: "no-subscription",
           title: "Organization has no subscription.",
           description: "You are viewing this page as an admin, normal users will see the paywall.",

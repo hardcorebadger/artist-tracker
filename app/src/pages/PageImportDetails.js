@@ -15,18 +15,15 @@ import {
 import { db } from "../firebase";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme, theme } from "../components/MuiDataGridServer";
-import {theme as chakraTheme} from '../theme'
 import {
     Avatar,
-    Button, ChakraProvider, Checkbox, FormControl, FormLabel, Heading, HStack, Input,
+    Button, Checkbox, FormControl, FormLabel, Heading, HStack, Input,
     Menu,
     MenuButton,
     MenuItem,
     MenuList, Modal, ModalBody, ModalCloseButton,
     ModalContent, ModalFooter, ModalHeader, ModalOverlay,
-    Portal, Text,
-    useColorMode, useDisclosure,
-    useToast
+    Portal, Text, useDisclosure,
 } from "@chakra-ui/react";
 import Iconify from "../components/Iconify";
 import {goFetch} from "../App";
@@ -36,6 +33,8 @@ import {useOutletContext, useParams} from "react-router-dom";
 import {LoadingWidget} from "../routing/LoadingScreen";
 import moment from "moment";
 import UserAvatar from "../components/UserAvatar";
+import {Provider} from "../components/ui/provider";
+import {useColorMode} from "../components/ui/color-mode";
 
 export default function PageImportDetails({}) {
     const user = useUser()
@@ -90,7 +89,7 @@ export default function PageImportDetails({}) {
             renderCell: (params) => {
                 const link = 'https://open.spotify.com/artist/' + params.row['spotify_id']
                 return (
-                    <ChakraProvider theme={chakraTheme}>
+                    <Provider>
                     <HStack align={'center'}>
                         <Avatar size={'xs'} borderRadius={2} name={params.value}  src={params.row.artist?.avatar}/>
 
@@ -98,7 +97,7 @@ export default function PageImportDetails({}) {
                         <MUILink href={link} target={'_blank'}><Iconify icon="mdi:external-link" /></MUILink>
 
                     </HStack>
-                    </ChakraProvider>
+                    </Provider>
                 )
             }
         },

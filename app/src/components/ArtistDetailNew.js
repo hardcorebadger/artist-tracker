@@ -10,14 +10,11 @@ import {
   Image,
   Link, List, ListItem,
   Stack,
-  Tab,
-  TabList,
   Tabs,
   Tag,
-  Text, UnorderedList, useColorMode,
+  Text,
   useDisclosure,
   VStack,
-  Wrap,
 } from '@chakra-ui/react';
 import Iconify from './Iconify';
 import Chart from "react-apexcharts";
@@ -32,6 +29,7 @@ import UserAvatar from "./UserAvatar";
 import ArtistTagsModal from "./EditArtistTags";
 import moment from "moment";
 import {InlineIcon} from "@iconify/react";
+import {useColorMode} from "./ui/color-mode";
 
 const chartOptions = {
 
@@ -96,7 +94,7 @@ function CopyrightCard({artist, linkSources}) {
         {artist.evaluation ? (
             <Stack w="100%" spacing={3}>
               <Heading size="xs">Copyright Evaluation</Heading>
-              <Wrap><Badge colorScheme={statusColor}>{status}</Badge><Badge colorScheme={typeColor}>{type}</Badge><Badge colorScheme={priorsColor}>{prios}</Badge></Wrap>
+              <HStack wrap={'wrap'}><Badge colorScheme={statusColor}>{status}</Badge><Badge colorScheme={typeColor}>{type}</Badge><Badge colorScheme={priorsColor}>{prios}</Badge></HStack>
               <Text fontSize="xs" fontWeight="bold">Distributor</Text>
               <Text >{artist.evaluation?.distributor}</Text>
               <Text fontSize="xs" fontWeight="bold" textDecor="uppercase">Label</Text>
@@ -121,9 +119,9 @@ function CopyrightCard({artist, linkSources}) {
             return (
                 <ThemeProvider theme={colorMode === 'dark' ? darkTheme : theme} key={"detail_" + key}>
                  <MUILink color='primary' href={value}>
-                   <Wrap align={'center'}>
+                   <HStack wrap={'wrap'} align={'center'}>
                      <Iconify icon={source?.logo}/> {source?.display_name} <Iconify icon="mdi:external-link" />
-                   </Wrap>
+                   </HStack>
                  </MUILink>
                 </ThemeProvider>
             )
@@ -207,18 +205,18 @@ const { isOpen, onOpen, onClose } = useDisclosure()
       <Grid templateColumns={{base: '1fr', md: 'repeat(4, 1fr)'}} gap={5}>
         <GridItem colSpan={{base: 1, md: 3}}>
           <Tabs onChange={(index) => setTabIndex(index)}>
-            <TabList>
+            <Tabs.List>
               {stats.map((s, i) => (
-                  <Tab key={i} sx={{fontSize: '12px'}}>
+                  <Tabs.Trigger key={i} sx={{fontSize: '12px'}}>
                     <Iconify icon={s.sourceLogo} size={20}/>
                     &nbsp;{s.statName}
-                  </Tab>
+                  </Tabs.Trigger>
               ))}
               {/* <Tab>Global Streams</Tab>
               <Tab>Spotify Streams</Tab>
               <Tab>Tiktok Views</Tab>
               <Tab>Youtube Views</Tab> */}
-            </TabList>
+            </Tabs.List>
             <Card variant="outline" p={2} mt={5}>
               <Heading size={'md'}>{stats[tabIndex].headerName}{(filteredData && filteredData.length > 0 ? '' : ' - (No Data Available)')}</Heading>
               {filteredData && filteredData.length > 0 ? (
@@ -256,7 +254,7 @@ const { isOpen, onOpen, onClose } = useDisclosure()
 
             </Card>
             <Card variant={"unstyled"} p={2} mt={5}>
-              <Wrap justify={'center'}>
+              <HStack wrap={'wrap'} justify={'center'}>
               {
                 attributionGroups.map((item, index) => {
                   let selected = false
@@ -264,7 +262,7 @@ const { isOpen, onOpen, onClose } = useDisclosure()
                     selected = true
                   }
                   return [
-                      (<Wrap onClick={() => {
+                      (<HStack wrap={'wrap'} onClick={() => {
                         if (expandedAttributionGroup === index) {
                           setExpandedAttributionGroup(null)
                         } else {
@@ -294,14 +292,14 @@ const { isOpen, onOpen, onClose } = useDisclosure()
                                 </ThemeProvider>
                             ) : null
                         }
-                      </Wrap>),
+                      </HStack>),
                       (selected && item.length > 1 ? (
                         <List>
                         {item.map((item) => {
                           const user = users ? users[item.user_id] : null
 
                           return (
-                              <ListItem><Wrap align={'center'} key={item.id} justify={'center'} style={{width: '100%'}}>
+                              <ListItem><HStack wrap={'wrap'} align={'center'} key={item.id} justify={'center'} style={{width: '100%'}}>
 
                                 {/*<UserAvatar inline={true} userId={item.user_id}/>*/}
                                 <Text color={"text.subtle"} fontSize={"14px"} ml={"-5px"}>
@@ -319,7 +317,7 @@ const { isOpen, onOpen, onClose } = useDisclosure()
                                         </ThemeProvider>
                                     ) : null
                                 }
-                              </Wrap></ListItem>
+                              </HStack></ListItem>
                           )
                         })}
                       </List>) : null)
@@ -327,7 +325,7 @@ const { isOpen, onOpen, onClose } = useDisclosure()
 
                 })
               }
-              </Wrap>
+              </HStack>
             </Card>
           </Tabs>
 

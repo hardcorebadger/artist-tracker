@@ -11,7 +11,7 @@ import {
   Th,
   Td,
   Tbody,
-  HStack, useColorMode,
+  HStack,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../routing/AuthGuard';
@@ -23,6 +23,7 @@ import { format } from "date-fns"
 import { defaultColumnOrder, defaultFilterModel, defaultReportName} from '../components/ColumnConfig';
 import {useState, useContext} from 'react';
 import UserAvatar from './UserAvatar'
+import {useColorMode} from "./ui/color-mode";
 
 export default function ReportsList() {
 

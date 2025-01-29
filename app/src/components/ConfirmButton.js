@@ -1,6 +1,8 @@
-import { Button, HStack, Heading, IconButton, Input, InputGroup, InputRightElement, Modal, ModalBody, ModalCloseButton, ModalContent, ModalFooter, ModalHeader, ModalOverlay, useDisclosure } from "@chakra-ui/react";
+
+import { Button, HStack, Heading, IconButton, Input, InputGroup, InputRightElement, Dialog, DialogBody, DialogContent, DialogFooter, DialogHeader, DialogBackdrop, useDisclosure } from "@chakra-ui/react";
 import { cloneElement, isValidElement, useState } from "react";
 import Iconify from "./Iconify";
+import {DialogCloseTrigger} from "./ui/dialog";
 
 export default function ConfirmButton({button, title, body, affirmative, onAffirm, affirmativeColor='red'}) {
   const { isOpen, onOpen, onClose } = useDisclosure()
@@ -13,23 +15,23 @@ export default function ConfirmButton({button, title, body, affirmative, onAffir
   return (
     <>
       {propedButton}
-      <Modal isOpen={isOpen} onClose={onClose}>
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>{title}</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
+      <Dialog isOpen={isOpen} onClose={onClose}>
+        <DialogBackdrop />
+        <DialogContent>
+          <DialogHeader>{title}</DialogHeader>
+          <DialogCloseTrigger />
+          <DialogBody>
             {body}
-          </ModalBody>
+          </DialogBody>
 
-          <ModalFooter>
+          <DialogFooter>
             <Button colorScheme={affirmativeColor} mr={3} onClick={affirm}>
               {affirmative}
             </Button>
             <Button variant='ghost' onClick={onClose}>Cancel</Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 

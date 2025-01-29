@@ -8,8 +8,6 @@ import {
     Badge,
     chakra,
     Box,
-    Wrap,
-    useColorMode,
     Stack
 } from "@chakra-ui/react";
 import {DataGridPro, GridColumnHeaderItem, GridHeader, useGridApiContext, useGridApiRef} from '@mui/x-data-grid-pro';
@@ -29,6 +27,7 @@ import { functions } from '../firebase';
 import {ColumnDataContext, CurrentReportContext, goFetch} from "../App";
 import { buildColumnOptions, buildColumns } from "./ColumnConfig";
 import {useUser} from "../routing/AuthGuard";
+import {useColorMode} from "./ui/color-mode";
 
 // const ChakraDataGrid = chakra(DataGrid);
 

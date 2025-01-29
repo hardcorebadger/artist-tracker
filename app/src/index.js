@@ -9,7 +9,6 @@ import curry from "@inovua/reactdatagrid-community/packages/select-parent/curry"
 
 import './style/styles.css'
 
-import {theme} from './theme'
 const container = document.getElementById('root');
 const root = ReactDOM.createRoot(container);
 LicenseInfo.setLicenseKey(

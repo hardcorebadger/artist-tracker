@@ -15,7 +15,7 @@ import {
   Link,
   Badge,
   Card,
-  Stack, useToast,
+  Stack,
 } from '@chakra-ui/react';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import { updateEmail, updatePassword } from "firebase/auth";
@@ -30,6 +30,7 @@ import { httpsCallable } from 'firebase/functions';
 import {goFetch} from "../App";
 import Iconify from "../components/Iconify";
 import {LoadingWidget} from "../routing/LoadingScreen";
+import {toaster} from "../components/ui/toaster";
 
 
 
@@ -68,7 +69,6 @@ function SubscriptionCard({user, subscription, activeSubscription}) {
     price : "$"+(subscription.amount/100),
     suffix : subscription.payment_interval === 'ltd' ? "" : " / "+subscription.payment_interval
   }
-  const toast = useToast();
 
   let badge_color = 'green'
   const s = subscription.status
@@ -92,7 +92,7 @@ function SubscriptionCard({user, subscription, activeSubscription}) {
       if (response.hasOwnProperty("url")) {
         window.open(response.url, '_blank');
       } else {
-        toast({
+        toaster.create({
           title: 'Failed to load billing profile',
           description: "We were unable to generate a link for your Stripe profile.",
           status: 'failed',
@@ -177,7 +177,6 @@ export default function PageBillingNew() {
   const user = useUser()
   const [subscriptions, setSubscriptions] = useState(null)
   const [subscribeLoading, setSubscribeLoading] = useState(false)
-  const toast = useToast()
   const [activeSubscription, setActiveSubscription] = useState(null)
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -202,7 +201,7 @@ export default function PageBillingNew() {
       }
     })
     if (searchParams.has('success')) {
-      toast({
+      toaster.create({
         title: 'Successfully Subscribed!',
         description: "If the page does not update to show your subscription please wait and refresh the page.",
         status: 'success',
@@ -211,7 +210,7 @@ export default function PageBillingNew() {
       })
       setSearchParams({})
     } else if (searchParams.has('canceled')) {
-      toast({
+      toaster.create({
         title: 'Checkout Cancelled!',
         description: "You or our payment provider failed to complete checkout.",
         status: 'failed',
@@ -233,7 +232,7 @@ export default function PageBillingNew() {
   //     if (response.hasOwnProperty("checkout")) {
   //       window.location.href = (response.checkout.url);
   //     } else {
-  //       toast({
+  //       toaster.create({
   //         title: 'Failed to generate checkout',
   //         description: "We were unable to generate a link for your Stripe checkout.",
   //         status: 'error',
@@ -244,7 +243,7 @@ export default function PageBillingNew() {
   //   }).catch((error) => {
   //     setSubscribeLoading(false);
   //
-  //     toast({
+  //     toaster.create({
   //       title: 'Failed to generate checkout',
   //       description: "We were unable to generate a link for your Stripe checkout.",
   //       status: 'error',

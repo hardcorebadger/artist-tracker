@@ -1,3 +1,4 @@
+
 import {useContext, useEffect, useState} from "react";
 import {ColumnDataContext, goFetch} from "../App";
 import {
@@ -5,11 +6,10 @@ import {
     Box, Button,
     FormControl,
     FormLabel,
-    Modal, ModalBody,
-    ModalCloseButton,
-    ModalContent, ModalFooter,
-    ModalHeader,
-    ModalOverlay, Text, useToast, VStack
+    Dialog, DialogBody,
+    DialogContent, DialogFooter,
+    DialogHeader,
+    DialogBackdrop, Text, VStack
 } from "@chakra-ui/react";
 import {
     AutoComplete, AutoCompleteCreatable,
@@ -22,12 +22,13 @@ import TagInput from "./TagInput";
 import {httpsCallable} from "firebase/functions";
 import {functions} from "../firebase";
 import {useUser} from "../routing/AuthGuard";
+import {DialogCloseTrigger} from "./ui/dialog";
+import {toaster} from "./ui/toaster";
 
 export default
 function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
     const [selectedTags, setSelectedTags] = useState([]);
     const [loading, setLoading] = useState(false)
-    const toast = useToast();
     const {refreshFilters} = useContext(ColumnDataContext)
     const user = useUser()
 
@@ -51,7 +52,7 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
                 onTagSave()
                 refreshFilters(user, true)
                 onClose()
-                toast({
+                toaster.create({
                     title: 'Tags saved!',
                     description: "Your tags were saved to the artist.",
                     status: 'success',
@@ -61,7 +62,7 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
             } else {
                 setLoading(false)
                 onClose()
-                toast({
+                toaster.create({
                     title: 'Failed to save artist tags.',
                     description: resp.status == 400 ? resp.data.message : "Something went wrong while saving, try refreshing and add again.",
                     status: 'error',
@@ -72,7 +73,7 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
         } catch (e) {
             setLoading(false)
             onClose()
-            toast({
+            toaster.create({
                 title: 'Failed to save artist tags.',
                 description: resp.status == 400 ? resp.message : "Something went wrong while saving, try refreshing and add again.",
                 status: 'error',
@@ -83,12 +84,12 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
     }
     return (
 
-        <Modal onClose={onClose} isOpen={isOpen} isCentered>
-            <ModalOverlay />
-            <ModalContent>
-                <ModalHeader>Edit Tags</ModalHeader>
-                <ModalCloseButton onClick={onClose} />
-                <ModalBody>
+        <Dialog onClose={onClose} isOpen={isOpen} isCentered>
+            <DialogBackdrop />
+            <DialogContent>
+                <DialogHeader>Edit Tags</DialogHeader>
+                <DialogCloseTrigger/>
+                <DialogBody>
                     <Box sx={{display:'flex', width: '100%', alignItems:'center'}} mb={2}>
                         <Avatar size={'lg'} borderRadius={2} name={artist?.name}  src={artist?.avatar}/>
                         <Box p={2}>
@@ -98,16 +99,16 @@ function ArtistTagsModal({artist, onTagSave, onClose, onOpen, isOpen}) {
                     <TagInput disabled={loading} initialTags={artist?.tags.map((tag) => tag.tag)} setSelectedTags={setSelectedTags}/>
 
 
-                </ModalBody>
-                <ModalFooter>
+                </DialogBody>
+                <DialogFooter>
                     <VStack sx={{width: '100%'}}>
 
                         <Button width={'100%'} disabled={loading} onClick={onClose}>{"Cancel"}</Button>
 
                         <Button width={'100%'} disabled={loading} onClick={setTags}>{"Save Tags"}</Button>
                     </VStack>
-                </ModalFooter>
-            </ModalContent>
-        </Modal>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }

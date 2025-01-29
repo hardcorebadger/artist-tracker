@@ -15,17 +15,12 @@ import {
 import { db } from "../firebase";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme, theme } from "../components/MuiDataGridServer";
-import {theme as chakraTheme} from '../theme'
 import {
-    Button, ChakraProvider, Checkbox, FormControl, FormLabel, Heading, HStack, Input,
+    Button, Checkbox, FormControl, FormLabel, Heading, HStack, Input,
     Menu,
     MenuButton,
     MenuItem,
-    MenuList, Modal, ModalBody, ModalCloseButton,
-    ModalContent, ModalFooter, ModalHeader, ModalOverlay,
-    Portal, Text,
-    useColorMode, useDisclosure,
-    useToast
+    Portal, Text, useDisclosure,
 } from "@chakra-ui/react";
 import Iconify from "../components/Iconify";
 import {goFetch} from "../App";
@@ -35,6 +30,7 @@ import {useNavigate, useOutletContext} from "react-router-dom";
 import {LoadingWidget} from "../routing/LoadingScreen";
 import moment from "moment";
 import UserAvatar from "../components/UserAvatar";
+import {useColorMode} from "../components/ui/color-mode";
 
 export default function PageImports({}) {
     const user = useUser()

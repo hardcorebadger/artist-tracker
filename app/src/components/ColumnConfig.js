@@ -1,5 +1,5 @@
 import {
-    Box, Text, useColorMode, Wrap
+    Box, Text
 } from '@chakra-ui/react';
 import Iconify from '../components/Iconify';
 import numeral from 'numeral';
@@ -9,6 +9,7 @@ import { getGridDateOperators } from "@mui/x-data-grid-pro";
 import Moment from 'react-moment';
 import moment from 'moment';
 import { deepCopy } from "../util/objectUtil";
+import {useColorMode} from "./ui/color-mode";
 
 
 // Defaults
@@ -300,10 +301,10 @@ export const linkColumnFactory = (suffix, linkDef) => {
         ],
         renderHeader: (params) => (
             <Tooltip title={linkDef['display_name'] + ' Link'}>
-            <Wrap align={'center'}>
+            <HStack wrap={'wrap'} align={'center'}>
                 {linkDef['logo'] ? <Iconify sx={{display: 'inline-block'}} icon={linkDef['logo']}></Iconify> : null}
                 Link
-            </Wrap>
+            </HStack>
             </Tooltip>
         ),
         renderCell: (params) => ( <MUILink color='primary' href={params.value}>{linkDef['display_name']} <Iconify icon="mdi:external-link" sx={{display:'inline-block'}} /></MUILink> ),

@@ -12,16 +12,13 @@ import {
   Grid,
   GridItem,
   Input,
-  useToast,
   useDisclosure,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalCloseButton,
-  ModalBody,
-  ModalFooter,
-  WrapItem, Wrap, Avatar, Flex, FormHelperText, FormLabel, FormControl, Link, useColorMode, Alert
+  Dialog,
+  DialogBackdrop,
+  DialogContent,
+  DialogHeader,
+  DialogBody,
+  DialogFooter, Avatar, Flex, FormHelperText, FormLabel, FormControl, Link, Alert
 } from '@chakra-ui/react';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import { Link as RouterLink } from 'react-router-dom';
@@ -44,6 +41,8 @@ import {
 import {ColumnDataContext, goFetch} from "../App";
 import TagInput from "../components/TagInput";
 import {LoadingWidget} from "../routing/LoadingScreen";
+import {DialogCloseTrigger} from "../components/ui/dialog";
+import {toaster} from "../components/ui/toaster";
 const client_id = 'aa08e3eb52f24d9a9f772e2c544b39b5';
 const scope = 'user-read-private user-read-email playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public user-library-read user-read-recently-played';
 
@@ -61,7 +60,6 @@ function StatCard({title, value}) {
 function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
   const [selectedTags, setSelectedTags] = useState([]);
   const [loading, setLoading] = useState(false)
-  const toast = useToast();
   const {refreshFilters} = useContext(ColumnDataContext)
   const user = useUser()
 
@@ -78,7 +76,7 @@ function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
       setAddPreview(null)
       refreshFilters(user)
       onClose()
-      toast({
+      toaster.create({
         title: resp.added_count + ' artist(s) added!',
         description: "We're running some analysis, the new artist(s) will be available soon.",
         status: 'success',
@@ -88,7 +86,7 @@ function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
     } else {
       setAddPreview(null)
       onClose()
-      toast({
+      toaster.create({
         title: 'Failed to add artists',
         description: resp.status == 400 ? resp.message : "Something went wrong while adding, try refrshing and add again.",
         status: 'error',
@@ -99,12 +97,12 @@ function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
   }
 
   return (
-        <Modal onClose={onClose} isOpen={isOpen} isCentered>
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>{addPreview?.type === 'artist' ? "Import Artist" : "Scrape Playlist"}</ModalHeader>
-            <ModalCloseButton onClick={onClose} />
-            <ModalBody>
+        <Dialog onClose={onClose} isOpen={isOpen} isCentered>
+          <DialogBackdrop />
+          <DialogContent>
+            <DialogHeader>{addPreview?.type === 'artist' ? "Import Artist" : "Scrape Playlist"}</DialogHeader>
+            <DialogCloseTrigger/>
+            <DialogBody>
               <Box sx={{display:'flex', width: '100%', alignItems:'center'}} mb={2}>
                 <Avatar size={'lg'} borderRadius={2} name={addPreview?.name}  src={addPreview?.avatar}/>
                 <Box p={2}>
@@ -114,17 +112,16 @@ function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
               </Box>
               <TagInput disabled={loading} initialTags={[]} setSelectedTags={setSelectedTags}/>
 
-            </ModalBody>
-            <ModalFooter>
+            </DialogBody>
+            <DialogFooter>
               <Button width={'100%'} disabled={loading} onClick={addArtistURL}>{addPreview?.type === 'artist' ? "Import Artist" : "Scrape Playlist"}</Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
   )
 }
 
 function AddLinkCard({setAddPreview, onOpen}) {
-  const toast = useToast()
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const user = useUser()
@@ -144,7 +141,7 @@ function AddLinkCard({setAddPreview, onOpen}) {
       setAddPreview(resp)
       onOpen()
     } else {
-      toast({
+      toaster.create({
         title: 'Failed to find ' + (type === 'playlist' ? 'playlist' : (type === 'artist' ? 'artist' : 'artist or playlist')),
         description: resp?.found === false ? (type === 'playlist' ? "Make sure it is a standard public playlist on your account" : "Make sure to get the URL directly from Spotify") : "Something went wrong",
         status: 'error',

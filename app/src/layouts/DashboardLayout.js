@@ -7,8 +7,8 @@ import {
   Button, IconButton,
   Text, Container,
   VStack, useControllableState, VisuallyHidden,
-  Accordion, AccordionItem, AccordionPanel, AccordionButton,
-  Link, Avatar, Menu, MenuButton, MenuList, MenuItem, useDisclosure, useColorMode
+  Accordion, AccordionItem,
+  Link, Avatar, Menu, MenuItem, useDisclosure, MenuTrigger, MenuContent, AccordionItemTrigger, AccordionItemContent
 } from '@chakra-ui/react';
 import { useMediaQuery } from '@chakra-ui/react'
 import { Outlet, useNavigate } from "react-router-dom";
@@ -27,6 +27,7 @@ import {ColumnDataContext, CurrentReportContext, goFetch} from "../App";
 import {AutoComplete, AutoCompleteInput, AutoCompleteItem, AutoCompleteList} from "@choc-ui/chakra-autocomplete";
 import ChangeOrganizationModal from "../components/ChangeOrganizationModal";
 import UserAvatar from "../components/UserAvatar";
+import {useColorMode} from "../components/ui/color-mode";
 
 const basePadding = 6
 
@@ -54,14 +55,14 @@ function UserBlock({currentUser, openOrgModal}) {
     <HStack align="center" justify="space-between">
         <UserAvatar userId={user.auth.uid} userAuth={user} subtext={user.org.info.name}/>
       <Menu computePositionOnMount={true}>
-        <MenuButton
+        <MenuTrigger
           as={IconButton}
           aria-label='Account'
           icon={<Iconify size={20} icon="mdi:dots-horizontal"/>}
           variant='ghost'
 
         />
-        <MenuList>
+        <MenuContent>
           <MenuItem onClick={signOut} >
             Log Out
           </MenuItem>
@@ -76,7 +77,7 @@ function UserBlock({currentUser, openOrgModal}) {
               Change Organization
             </MenuItem>
           ) : null}
-        </MenuList>
+        </MenuContent>
       </Menu>
     </HStack>
     </Box>
@@ -131,12 +132,12 @@ function NavItem({icon, path, display, index, children, clickFirst}) {
     {hasChildren &&
     <Accordion p={0} index={accordionIndex} allowMultiple>
       <AccordionItem p={0} border="none">
-      <VisuallyHidden><AccordionButton></AccordionButton></VisuallyHidden>
-        <AccordionPanel pt={2} pl={0} pr={0} pb={0} >
+      <VisuallyHidden><AccordionItemTrigger></AccordionItemTrigger></VisuallyHidden>
+        <AccordionItemContent pt={2} pl={0} pr={0} pb={0} >
           <VStack spacing={2}>
             {children}
           </VStack>
-        </AccordionPanel>
+        </AccordionItemContent>
       </AccordionItem>
     </Accordion>
     }

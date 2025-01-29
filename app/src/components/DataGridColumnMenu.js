@@ -9,9 +9,7 @@ import {
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
-  DrawerOverlay,
   DrawerContent,
-  DrawerCloseButton,
   useDisclosure,
   Checkbox
 } from '@chakra-ui/react';
@@ -19,6 +17,7 @@ import Iconify from '../components/Iconify';
 import MenuMiniList from "./MenuMiniList";
 import MenuMiniListItem from "./MenuMiniListItem";
 import { deepCopy } from '../util/objectUtil';
+import {DrawerBackdrop, DrawerCloseTrigger} from "./ui/drawer";
 
 
 export default function DatGridColumnMenu({columnOptions, columnOrder, setColumnOrder}) {
@@ -70,9 +69,9 @@ export default function DatGridColumnMenu({columnOptions, columnOrder, setColumn
         onClose={cancelAndClose}
         finalFocusRef={btnRef}
       >
-        <DrawerOverlay />
+        <DrawerBackdrop />
         <DrawerContent>
-        <DrawerCloseButton />
+        <DrawerCloseTrigger />
         <DrawerHeader>Edit Columns</DrawerHeader>
         {isOpen &&
         <DrawerBody  p={4}>

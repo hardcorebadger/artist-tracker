@@ -6,8 +6,8 @@ import {useNavigate, useParams} from "react-router-dom";
 import {ColumnDataContext, CurrentReportContext, goFetch} from "../App";
 import {httpsCallable} from "firebase/functions";
 import {functions} from "../firebase";
-import {useToast} from "@chakra-ui/react";
 import {useUser} from "../routing/AuthGuard";
+import {toaster} from "../components/ui/toaster";
 
 function PageArtist() {
     const { artistId } = useParams()
@@ -15,7 +15,6 @@ function PageArtist() {
     const [activeArtistId, setActiveArtistId] = useState(artistId)
     const {  setActiveArtist, activeArtist, linkSources, statisticTypes } = useContext(ColumnDataContext);
     const {currentQueryModel} = useContext(CurrentReportContext);
-    const toast = useToast();
     const navigate = useNavigate()
     const loadArtist = async (force = false) => {
         const getArtist = (data) => {
@@ -30,7 +29,7 @@ function PageArtist() {
                         setActiveArtist(response.artist)
                     }
                 } else {
-                    toast({
+                    toaster.create({
                         title: 'Failed to load artist',
                         description: "An error occurred while loading the artist.",
                         status: 'error',

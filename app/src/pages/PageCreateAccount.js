@@ -6,7 +6,7 @@ import {
   VStack,
   Code,
   AbsoluteCenter,
-  Container, useColorModeValue,AlertIcon,
+  Container,AlertIcon,
   Heading, FormControl, Divider, Input, FormLabel, FormHelperText, FormErrorMessage, Button, Alert, HStack
 } from '@chakra-ui/react';
 import Logo  from '../components/Logo';

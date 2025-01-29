@@ -5,17 +5,17 @@ import {
   Container,
   SimpleGrid,
   RadioGroup,
-  Button, useToast,
+  Button,
 } from "@chakra-ui/react";
 import { PageLayoutContained } from "../layouts/DashboardLayout";
 import PlanCard from "../components/PlanCard";
 import { useState } from "react";
 import {goFetch} from "../App";
 import {useUser} from "../routing/AuthGuard";
+import {toaster} from "../components/ui/toaster";
 
 function PageUpgrade() {
   const [selectedPlan, setSelectedPlan] = useState("Indiestack Trial Monthly");
-  const toast = useToast()
     const [subscribeLoading, setSubscribeLoading] = useState(false);
   const handlePlanChange = (value) => {
     setSelectedPlan(value);
@@ -31,7 +31,7 @@ function PageUpgrade() {
       if (response.hasOwnProperty("checkout")) {
         window.location.href = (response.checkout.url);
       } else {
-        toast({
+        toaster.create({
           title: 'Failed to generate checkout',
           description: "We were unable to generate a link for your Stripe checkout.",
           status: 'error',
@@ -42,7 +42,7 @@ function PageUpgrade() {
     }).catch((error) => {
       setSubscribeLoading(false);
 
-      toast({
+      toaster.create({
         title: 'Failed to generate checkout',
         description: "We were unable to generate a link for your Stripe checkout.",
         status: 'error',

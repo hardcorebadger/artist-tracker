@@ -12,7 +12,6 @@ import {
   SimpleGrid,
   Card,
   Circle,
-  useColorModeValue,
   Avatar
 } from '@chakra-ui/react';
 import Logo from '../components/Logo';

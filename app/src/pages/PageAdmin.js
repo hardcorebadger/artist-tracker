@@ -15,17 +15,17 @@ import {
 import { db } from "../firebase";
 import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme, theme } from "../components/MuiDataGridServer";
-import {theme as chakraTheme} from '../theme'
 import {
-    Button, ChakraProvider, Checkbox, FormControl, FormLabel, Heading, HStack, Input,
+    Button, Checkbox, FormControl, FormLabel, Heading, HStack, Input,
     Menu,
-    MenuButton,
     MenuItem,
-    MenuList, Modal, ModalBody, ModalCloseButton,
-    ModalContent, ModalFooter, ModalHeader, ModalOverlay,
-    Portal, Text,
-    useColorMode, useDisclosure,
-    useToast
+    Portal, Text, useDisclosure,
+    Dialog,
+    DialogBackdrop,
+    DialogContent,
+    DialogHeader,
+    DialogBody,
+    DialogFooter, DialogCloseTrigger, MenuTrigger, MenuContent,
 } from "@chakra-ui/react";
 import Iconify from "../components/Iconify";
 import {goFetch} from "../App";
@@ -33,6 +33,9 @@ import {useUser} from "../routing/AuthGuard";
 import {ChevronDownIcon, ChevronRightIcon} from "@chakra-ui/icons";
 import {useOutletContext} from "react-router-dom";
 import {LoadingWidget} from "../routing/LoadingScreen";
+import {Provider} from "../components/ui/provider";
+import {useColorMode} from "../components/ui/color-mode";
+import {toaster} from "../components/ui/toaster";
 
 export default function PageAdmin({}) {
     const [rows, setRows] = useState([]); // Holds all rows (organizations and users)
@@ -44,7 +47,6 @@ export default function PageAdmin({}) {
     const [currentPage, setCurrentPage] = useState(0); // Current page
     const [lastVisible, setLastVisible] = useState(null); // Keeps track of the last document (for Firestore pagination)
     const user = useUser();
-    const toast = useToast()
     const [layoutRef] = useOutletContext()
     const [selectedOrgDelete, setSelectedOrgDelete] = useState(null); // For tracking organization to delete
     const {
@@ -349,19 +351,19 @@ export default function PageAdmin({}) {
                 } else {
                     return (
                         <Box >
-                            <ChakraProvider theme={chakraTheme}>
+                            <Provider>
 
                             <Menu computePositionOnMount={true}>
                                 {({ isOpen }) => (
                                     <>
                                         {/* Menu Button */}
-                                        <MenuButton as={Button} rightIcon={( <Iconify size={'10px'} icon={'bx:down-arrow'}/>)}>
+                                        <MenuTrigger as={Button} rightIcon={( <Iconify size={'10px'} icon={'bx:down-arrow'}/>)}>
                                             {isOpen ? "Actions" : "Actions"}
-                                        </MenuButton>
+                                        </MenuTrigger>
 
                                         {/* Menu List with resolved background visibility */}
                                         <Portal containerRef={layoutRef}>
-                                            <MenuList>
+                                            <MenuContent>
                                                 <MenuItem className={'menu-item-org'} onClick={() => handleCopy(params.row.id)}>
                                                     Copy Org ID
                                                 </MenuItem>
@@ -371,12 +373,12 @@ export default function PageAdmin({}) {
                                                 <MenuItem className={'menu-item-org'} onClick={() => handleDeleteClick(params.row)}>
                                                     <Iconify icon={'mdi:trash'}/> Delete
                                                 </MenuItem>
-                                            </MenuList>
+                                            </MenuContent>
                                         </Portal>
                                     </>
                                 )}
                             </Menu>
-                            </ChakraProvider>
+                            </Provider>
 
                         </Box>
                     )
@@ -392,7 +394,7 @@ export default function PageAdmin({}) {
     const handleCopy = async (text) => {
         try {
             await navigator.clipboard.writeText(text); // Copy the text to the clipboard
-            toast({
+            toaster.create({
                 title: 'Copied to clipboard',
                 description: "Successfully copied: " + text + " to clipboard!",
                 status: 'success',
@@ -400,7 +402,7 @@ export default function PageAdmin({}) {
                 isClosable: true,
             })
         } catch (error) {
-            toast({
+            toaster.create({
                 title: 'Failed to copy',
                 description: "Failed to copy: " + text + " to clipboard!",
                 status: 'error',
@@ -417,7 +419,7 @@ export default function PageAdmin({}) {
     const deleteOrganization = async () => {
         const index = rows.findIndex(item => (item.organization_id ?? "NA") === selectedOrgDelete.organization_id && item.type === 'organization');
         if (index === -1) {
-            toast({
+            toaster.create({
                 title: "Organization has Users",
                 description: "Cannot delete organization with users.",
                 status: "error",
@@ -431,7 +433,7 @@ export default function PageAdmin({}) {
         }
         const org = rows[index]
         if (org.users === null || org.users > 0) {
-            toast({
+            toaster.create({
                 title: "Organization has Users",
                 description: "Cannot delete organization with users.",
                 status: "error",
@@ -451,7 +453,7 @@ export default function PageAdmin({}) {
             await deleteDoc(docRef);
 
             // Show success toast
-            toast({
+            toaster.create({
                 title: "Organization deleted",
                 description: "The organization has been successfully deleted.",
                 status: "success",
@@ -466,7 +468,7 @@ export default function PageAdmin({}) {
             console.error("Error deleting organization:", error);
 
             // Show error toast
-            toast({
+            toaster.create({
                 title: "Error",
                 description: "Failed to delete the organization. Please try again.",
                 status: "error",
@@ -491,7 +493,7 @@ export default function PageAdmin({}) {
             console.error("Error adding organization:", error);
 
             // Show error toast
-            toast({
+            toaster.create({
                 title: "Error",
                 description: "Failed to add organization. Please try again.",
                 status: "error",
@@ -501,7 +503,7 @@ export default function PageAdmin({}) {
         }
 
         // Example: Show a toast notification
-        toast({
+        toaster.create({
             title: "Organization created successfully!",
             description: `Organization ${orgName} has been added.`,
             status: "success",
@@ -523,30 +525,31 @@ export default function PageAdmin({}) {
     };
     return (
         <Box sx={{ height: '80vh', width: "100%" }} p={5}>
-            <Modal isOpen={isDeleteOpen} onClose={onDeleteClose}>
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalHeader>Confirm Deletion</ModalHeader>
-                    <ModalCloseButton />
-                    <ModalBody>
+            <Dialog isOpen={isDeleteOpen} onClose={onDeleteClose}>
+                <DialogBackdrop />
+                <DialogContent>
+                    <DialogHeader>Confirm Deletion</DialogHeader>
+                    <DialogCloseTrigger />
+                    <DialogBody>
                         Are you sure you want to delete the organization: "{selectedOrgDelete?.name}"? This action cannot be undone.
-                    </ModalBody>
-                    <ModalFooter>
+                    </DialogBody>
+                    <DialogFooter>
                         <Button onClick={onDeleteClose} mr={3}>
                             Cancel
                         </Button>
                         <Button colorScheme="red" onClick={deleteOrganization}>
                             Delete
                         </Button>
-                    </ModalFooter>
-                </ModalContent>
-            </Modal>
-            <Modal isOpen={isOpen} onClose={onClose}>
-                <ModalOverlay />
-                <ModalContent>
-                    <ModalHeader>Add New Organization</ModalHeader>
-                    <ModalCloseButton />
-                    <ModalBody>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog isOpen={isOpen} onClose={onClose}>
+                <DialogBackdrop />
+                <DialogContent>
+                    <DialogHeader>Add New Organization</DialogHeader>
+                    <DialogCloseTrigger />
+                    <DialogBody>
                         {/* Name Input */}
                         <FormControl id="organizationName" isRequired mb={4}>
                             <FormLabel>Name</FormLabel>
@@ -565,8 +568,8 @@ export default function PageAdmin({}) {
                                 Free Mode
                             </Checkbox>
                         </FormControl>
-                    </ModalBody>
-                    <ModalFooter>
+                    </DialogBody>
+                    <DialogFooter>
                         {/* Cancel Button */}
                         <Button onClick={onClose} mr={3}>
                             Cancel
@@ -579,9 +582,9 @@ export default function PageAdmin({}) {
                         >
                             Create
                         </Button>
-                    </ModalFooter>
-                </ModalContent>
-            </Modal>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
             <HStack align={'center'} justifyContent={'space-between'} mb={1}>
                 <Heading >
                     Admin Panel

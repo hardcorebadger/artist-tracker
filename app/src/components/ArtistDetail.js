@@ -3,25 +3,14 @@ import {
   Button,
   Heading,
   Card,
-  TableContainer,
-  Table,
-  TableCaption,
-  Thead,
-  Tr,
-  Th,
-  Td,
-  Tbody,
   HStack,
   IconButton,
   Grid,
   GridItem,
   Tabs,
-  TabList,
-  Tab,
-  Wrap,
   Badge,
   Stack,
-  Text,
+  Text, TabList, Tab,
 } from '@chakra-ui/react';
 import { useNavigate } from 'react-router-dom';
 import { useUser } from '../routing/AuthGuard';
@@ -78,7 +67,7 @@ function CopyrightCard({artist}) {
     <Card p={25} variant="outline" mt={10}>
       <Stack w="100%" spacing={3}>
         <Heading size="xs">Copyright Evaluation</Heading>
-        <Wrap><Badge colorScheme={statusColor}>{artist.eval_status}</Badge><Badge colorScheme={typeColor}>{artist.eval_distro_type}</Badge><Badge colorScheme={priorsColor}>{artist.eval_prios}</Badge></Wrap>
+        <HStack wrap={'wrap'}><Badge colorScheme={statusColor}>{artist.eval_status}</Badge><Badge colorScheme={typeColor}>{artist.eval_distro_type}</Badge><Badge colorScheme={priorsColor}>{artist.eval_prios}</Badge></HStack>
         <Text fontSize="xs" fontWeight="bold">Distributor</Text>
         <Text >{artist.eval_distro}</Text>
         <Text fontSize="xs" fontWeight="bold" textDecor="uppercase">Label</Text>

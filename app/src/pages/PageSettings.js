@@ -13,7 +13,7 @@ import {
   HStack,
   Avatar,
   Link,
-  Badge, useToast,
+  Badge,
 } from '@chakra-ui/react';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import { updateEmail, updatePassword } from "firebase/auth";
@@ -29,6 +29,7 @@ import {PhoneNumberInput} from "../components/PhoneNumberInput";
 import {httpsCallable} from "firebase/functions";
 
 import {goFetch} from "../App";
+import {toaster} from "../components/ui/toaster";
 function ChangeNameSection({disabled}) {
   const user = useUser()
 
@@ -92,7 +93,6 @@ function ChangePhoneSection({disabled}) {
   const [verify, setVerify] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const toast = useToast()
   const auth = getAuth()
   const user = useUser()
   const now = new Date();
@@ -128,7 +128,7 @@ function ChangePhoneSection({disabled}) {
       } catch(e) {
         setLoading(false)
         console.error(e);
-        toast({
+        toaster.create({
           title: 'Phone validation failed.',
           description: "We were unable to verify your phone number, please confirm the information or try again.",
           status: 'error',
@@ -148,7 +148,7 @@ function ChangePhoneSection({disabled}) {
       const resp = await verifyCode({number: '+'+curPhone, code: verify})
       console.log(resp)
 
-      toast({
+      toaster.create({
         title: 'Phone number updated',
         description: "Your phone number has been successfully updated.",
         status: 'success',
@@ -162,7 +162,7 @@ function ChangePhoneSection({disabled}) {
       setLoading(false)
       console.error(e);
 
-      toast({
+      toaster.create({
         title: 'Failed to validate code',
         description: "We were unable to verify your one time code, please confirm the information or try again.",
         status: 'error',

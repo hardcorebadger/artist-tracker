@@ -3,13 +3,7 @@ import {ColumnDataContext, goFetch} from "../App";
 import {
     Avatar,
     Box, Button,
-    FormControl,
-    FormLabel,
-    Modal, ModalBody,
-    ModalCloseButton,
-    ModalContent, ModalFooter,
-    ModalHeader,
-    ModalOverlay, Text, useToast
+    Text
 } from "@chakra-ui/react";
 import {
     AutoComplete, AutoCompleteCreatable,
@@ -22,6 +16,8 @@ import TagInput from "./TagInput";
 import {httpsCallable} from "firebase/functions";
 import {functions} from "../firebase";
 import {useUser} from "../routing/AuthGuard";
+import {Dialog} from "@chakra-ui/icons";
+import {DialogBackdrop, DialogBody, DialogCloseTrigger, DialogContent, DialogFooter, DialogHeader} from "./ui/dialog";
 
 export default
 function ChangeOrganizationModal({currentUser, organizations, onOpen, onClose, isOpen}) {
@@ -40,12 +36,12 @@ function ChangeOrganizationModal({currentUser, organizations, onOpen, onClose, i
 
     return (
 
-        <Modal onClose={onClose} isOpen={isOpen} isCentered>
-            <ModalOverlay />
-            <ModalContent>
-                <ModalHeader>Change Organization</ModalHeader>
-                <ModalCloseButton onClick={onClose} />
-                <ModalBody>
+        <Dialog onClose={onClose} isOpen={isOpen} isCentered>
+            <DialogBackdrop />
+            <DialogContent>
+                <DialogHeader>Change Organization</DialogHeader>
+                <DialogCloseTrigger/>
+                <DialogBody>
                     <Box sx={{display:'flex', width: '100%', alignItems:'center'}} mb={2}>
                         <Text fontWeight={'bold'}>Current: {currentOrganization?.name}</Text>
                     </Box>
@@ -65,10 +61,10 @@ function ChangeOrganizationModal({currentUser, organizations, onOpen, onClose, i
                         </AutoCompleteList>
                     </AutoComplete>
 
-                </ModalBody>
-                <ModalFooter>
-                </ModalFooter>
-            </ModalContent>
-        </Modal>
+                </DialogBody>
+                <DialogFooter>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }

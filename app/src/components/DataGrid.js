@@ -14,22 +14,14 @@ import {
   IconButton,
   filter,
   Menu,
-  MenuButton,
-  MenuList,
   MenuItem,
-  MenuItemOption,
-  MenuGroup,
-  MenuOptionGroup,
-  MenuDivider,
   Drawer,
   DrawerBody,
   DrawerFooter,
   DrawerHeader,
-  DrawerOverlay,
   DrawerContent,
-  DrawerCloseButton,
   useDisclosure,
-  Checkbox
+  Checkbox, MenuTrigger, MenuContent
 } from '@chakra-ui/react';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
 import { Link as RouterLink } from 'react-router-dom';
@@ -42,6 +34,7 @@ import { useCollection } from 'react-firebase-hooks/firestore';
 import { db } from '../firebase';
 import Chart from "react-apexcharts";
 import numeral from 'numeral'
+import {DrawerBackdrop, DrawerCloseTrigger} from "./ui/drawer";
 
 const customTableStyles = {
   rows: {
@@ -342,9 +335,9 @@ export default function DataGridController({}) {
       finalFocusRef={btnRef}
       customTableStyles={customTableStyles}
     >
-      <DrawerOverlay />
+      <DrawerBackdrop />
       <DrawerContent>
-        <DrawerCloseButton />
+        <DrawerCloseTrigger />
         <DrawerHeader>Edit Columns</DrawerHeader>
 
         <DrawerBody  p={4}>
@@ -360,16 +353,16 @@ export default function DataGridController({}) {
                 <Box w="100%" p={2} borderRadius="md">
                   <HStack justifyContent="space-between"><Text fontSize="sm">{v.name}</Text>
                   <Menu>
-                    <MenuButton colorScheme={total_enabled > 0 ? 'primary' : 'gray'} size="xs" as={Button} rightIcon={<Iconify icon="mdi:caret-down" />}>
+                    <MenuTrigger colorScheme={total_enabled > 0 ? 'primary' : 'gray'} size="xs" as={Button} rightIcon={<Iconify icon="mdi:caret-down" />}>
                       {total_enabled > 0 ? total_enabled : "-"}
-                    </MenuButton>
-                    <MenuList>
+                    </MenuTrigger>
+                    <MenuContent>
                       {Object.entries(metricFunctions).map(([mk,mv]) => (
                         <MenuItem key={mk}>
                         <HStack w="100%" justifyContent="space-between"><Text fontSize="sm">{mv.name}</Text><Checkbox colorScheme='primary' isChecked={columnSelection[k][mk]} onChange={e => setColumn(e.target.checked, k, mk)}></Checkbox></HStack>
                         </MenuItem>
                       ))}
-                    </MenuList>
+                    </MenuContent>
                   </Menu>
                   </HStack>
                 </Box>
