@@ -107,19 +107,21 @@ class Artist(Base):
 
     attributions_needing_notified: Mapped[List["Attribution"]] = relationship(primaryjoin=and_(Attribution.artist_id == id, Attribution.notified == False, Attribution.playlist_id == None), overlaps="attributions,artist")
 
-    def as_dict(self, organization_id = None):
+    def as_dict(self, organization_id = None, light=False):
         dict = {c.name: getattr(self, c.name) for c in self.__table__.columns}
-        dict['evaluation'] = None
-        if (self.evaluation != None):
-            dict['evaluation'] = self.evaluation.as_dict()
+        if light == False:
+            dict['evaluation'] = None
+            if (self.evaluation != None):
+                dict['evaluation'] = self.evaluation.as_dict()
         # dict['links'] = list(map(lambda link: link.as_dict(), self.links))
         for link in self.links:
             dict['link_' + link.source.key] = link.url
 
-        dict['organization'] = pop_default(list(map(lambda org: org.as_dict(), filter(lambda org: org.organization_id == organization_id or organization_id is None, self.organizations))), None)
-        dict['statistics'] = list(map(lambda stat: stat.as_dict(), self.statistics))
-        dict['users'] = sorted(list(map(lambda user: user.as_dict(), filter(lambda user: user.organization_id == organization_id or organization_id is None, self.users))), key=lambda x: x["created_at"])
-        dict['tags'] = list(map(lambda tag: tag.as_dict(), filter(lambda tag: tag.organization_id == organization_id or tag.organization_id is None, self.tags)))
+        if light == False:
+            dict['organization'] = pop_default(list(map(lambda org: org.as_dict(), filter(lambda org: org.organization_id == organization_id or organization_id is None, self.organizations))), None)
+            dict['statistics'] = list(map(lambda stat: stat.as_dict(), self.statistics))
+            dict['users'] = sorted(list(map(lambda user: user.as_dict(), filter(lambda user: user.organization_id == organization_id or organization_id is None, self.users))), key=lambda x: x["created_at"])
+            dict['tags'] = list(map(lambda tag: tag.as_dict(), filter(lambda tag: tag.organization_id == organization_id or tag.organization_id is None, self.tags)))
 
         # for stat in self.statistics:
         #     dict['stat_' + stat.type.source + '__' + stat.type.key + '-latest'] = stat.latest
@@ -346,6 +348,71 @@ class LinkSource(Base):
     def __repr__(self):
         return f"<LinkSource({self.id=}, {self.key=}, {self.logo=}, {self.url_scheme=}, {self.display_name})>"
 
+class Import(Base):
+    __tablename__ = 'imports'
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
+    organization_id = Column(String(28), nullable=False)
+    user_id = Column(String(28), nullable=False)
+    playlist_id: Mapped[int] = mapped_column(Integer, ForeignKey('playlists.id'), nullable=False)
+    lookalike_id: Mapped[int] = mapped_column(Integer, ForeignKey('lookalikes.id'), nullable=False)
+    status = Column(String(16), nullable=False, default='pending')
+    completed_at = Column(TIMESTAMP, nullable=True)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
+    updated_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
+
+    playlist: Mapped["Playlist"] = relationship(back_populates="imports")
+    lookalike: Mapped["Lookalike"] = relationship()
+    artists: Mapped[List["ImportArtist"]] = relationship(cascade="all, delete-orphan")
+
+    def as_dict(self):
+        resp = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        resp['type'] = 'playlist' if self.playlist else 'lookalike'
+
+        if self.playlist_id is not None:
+            resp['playlist'] = self.playlist.as_dict()
+        else:
+            resp['playlist'] = None
+        if self.lookalike_id is not None:
+            resp['lookalike'] = self.lookalike.as_dict()
+        else:
+            resp['lookalike'] = None
+        return resp
+
+class ImportArtist(Base):
+    __tablename__ = 'import_artists'
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
+    import_id: Mapped[int] = mapped_column(Integer, ForeignKey('imports.id'), nullable=False)
+    spotify_id = Column(String(22), nullable=False)
+    artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
+    name = Column(Text, nullable=True)
+    status = Column(Integer, nullable=False, default=0)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
+    updated_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
+
+    artist: Mapped['Artist'] = relationship()
+
+    def as_dict(self):
+        resp = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        if self.artist_id is not None:
+            resp['artist'] = self.artist.as_dict(None, True)
+        else:
+            resp['artist'] = None
+        return resp
+
+class Lookalike(Base):
+    __tablename__ = 'lookalikes'
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
+    organization_id = Column(String(28), nullable=False)
+    target_artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
+    status = Column(Integer, nullable=False, default=0)
+    created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
+    updated_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
+    target_artist: Mapped["Artist"] = relationship()
+    def as_dict(self):
+        resp = {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        resp['target_artist'] = self.target_artist
+        return resp
+
 class Playlist(Base):
     __tablename__ = 'playlists'
     id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
@@ -354,6 +421,10 @@ class Playlist(Base):
     created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
     updated_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
     organization_id = Column(String(28), nullable=False)
+    first_user = Column(String(28), nullable=True)
+    last_user = Column(String(28), nullable=True)
+
+    imports: Mapped[List["Import"]] = relationship(back_populates="playlist")
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 

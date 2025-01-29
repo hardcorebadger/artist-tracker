@@ -62,6 +62,12 @@ export default function Router() {
             { path: 'billing', element: <PageBillingNew /> },
           ]
         },
+        { path: 'playlists', element: <PagePlaylists/>},
+        { path: 'imports', children: [
+            { index: true, element:  <PageImports/>  },
+            { path: ':importId', element: <PageImportDetails /> },
+
+          ]},
         { path: 'reports',
           children: [
             { index: true, element: <Navigate to="all" replace />   },
@@ -133,3 +139,6 @@ const Page404 = Loadable(lazy(() => import('../pages/Page404')));
 const PageLanding = Loadable(lazy(() => import('../pages/PageLanding')));
 const PageCallback = Loadable(lazy(() => import('../pages/PageCallback')));
 const PageAdmin = Loadable(lazy(() => import('../pages/PageAdmin')));
+const PagePlaylists = Loadable(lazy(() => import('../pages/PagePlaylists')));
+const PageImports = Loadable(lazy(() => import('../pages/PageImports')));
+const PageImportDetails = Loadable(lazy(() => import('../pages/PageImportDetails')));

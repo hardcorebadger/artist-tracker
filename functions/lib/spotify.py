@@ -178,6 +178,7 @@ class SpotifyClient():
   def get_playlist_artists(self, id, alt_token=False):
     p = self.get_playlist(id, alt_token=alt_token)
     artist_ids = []
+    artists = []
     dedupe_set = set()
     for i in p['tracks']['items']:
       if i['track'] != None:
@@ -185,10 +186,11 @@ class SpotifyClient():
         if id not in dedupe_set:
           dedupe_set.add(id)
           artist_ids.append(id)
+          artists.append({'id': id, 'name': i['track']['artists'][0]['name']})
     image = None
     if len(p.get('images', list())) > 0:
       image = p.get('images')[0]['url']
-    return artist_ids, p['name'], image
+    return artist_ids, p['name'], image, artists
   
   def find_artist(self, name):
     search = self.get('/search', {

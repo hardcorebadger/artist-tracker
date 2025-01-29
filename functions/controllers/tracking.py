@@ -2,7 +2,7 @@ import time
 
 from google.cloud.firestore_v1 import Client
 from google.cloud.firestore_v1.query_results import QueryResultsList
-from sqlalchemy import select, or_, func, and_
+from sqlalchemy import select, or_, func, and_, text
 from sqlalchemy.orm import joinedload, contains_eager
 import traceback
 
@@ -112,143 +112,167 @@ class TrackingController():
         sql_session.add(sql_ref)
         sql_session.commit()
 
-  def add_artist(self, sql_session, spotify_id, user_id, org_id, sql_playlist_id = None, tags = None):
-    if tags is None:
-        tags = list()
+  def add_artist(self, sql_session, spotify_id, user_id, org_id, sql_playlist_id = None, tags = None, import_id = None):
+    try:
+        if tags is None:
+            tags = list()
 
-    sqlRef = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id).options(
-        joinedload(Artist.tags, innerjoin=False),
-        joinedload(Artist.organizations, innerjoin=False),
-        joinedload(Artist.users, innerjoin=False)
-    )).first()
-    if sqlRef is not None:
-        if not sqlRef.active:
-            sqlRef.active = True
-            sql_session.add(sqlRef)
-            sql_session.commit()
-    ref = self.db.collection("artists_v2").document(spotify_id)
-    attribution = Attribution(
-        user_id=user_id,
-        organization_id=org_id,
-        playlist_id=sql_playlist_id,
-    )
-    doc = ref.get()
-    # if artist exists add the user/org to tracking
-    if doc.exists:
+        sqlRef = sql_session.scalars(select(Artist).where(Artist.spotify_id == spotify_id).options(
+            joinedload(Artist.tags, innerjoin=False),
+            joinedload(Artist.organizations, innerjoin=False),
+            joinedload(Artist.users, innerjoin=False)
+        )).first()
+        if sqlRef is not None:
+            if not sqlRef.active:
+                sqlRef.active = True
+                sql_session.add(sqlRef)
+                sql_session.commit()
+        ref = self.db.collection("artists_v2").document(spotify_id)
+        attribution = Attribution(
+            user_id=user_id,
+            organization_id=org_id,
+            playlist_id=sql_playlist_id,
+        )
+        doc = ref.get()
+        # if artist exists add the user/org to tracking
+        if doc.exists:
 
-      data = doc.to_dict()
+          data = doc.to_dict()
 
-      if org_id not in data['watching']:
-        data['watching'].append(org_id)
-        data['watching_details'][org_id] = {
-          "added_on": datetime.now().strftime("%Y-%m-%d")
-        }
-        if user_id not in data['found_by_first']:
-          data['found_by_first'].append(user_id)
-      
-      if user_id not in data['found_by']:
-        data['found_by'].append(user_id)
-        data['found_by_details'][user_id] = {
-          "found_on": datetime.now().strftime("%Y-%m-%d")
-        }
-      
-      ref.update({
-          "watching": data['watching'],
-          "watching_details": data['watching_details'],
-          "found_by_first": data['found_by_first'],
-          "found_by": data['found_by'],
-          "found_by_details": data['found_by_details'],
-      })
-      if sqlRef is None:
-        print('Artist needs migration; importing to SQL')
-        self.import_sql(sql_session, doc, attribution)
-        sqlRef = artist_with_meta(sql_session, spotify_id)
-      else:
-          if len(list(filter(lambda x: x.user_id == user_id, sqlRef.users))) == 0:
-              sqlRef.users.append(UserArtist(
-                  user_id=user_id,
-                  organization_id=org_id,
-              ))
-          if len(list(filter(lambda x: x.organization_id == org_id, sqlRef.organizations))) == 0:
-              sqlRef.organizations.append(OrganizationArtist(
-                  organization_id=org_id,
-                  last_playlist_id=sql_playlist_id,
-                  added_by=user_id
-              ))
+          if org_id not in data['watching']:
+            data['watching'].append(org_id)
+            data['watching_details'][org_id] = {
+              "added_on": datetime.now().strftime("%Y-%m-%d")
+            }
+            if user_id not in data['found_by_first']:
+              data['found_by_first'].append(user_id)
+
+          if user_id not in data['found_by']:
+            data['found_by'].append(user_id)
+            data['found_by_details'][user_id] = {
+              "found_on": datetime.now().strftime("%Y-%m-%d")
+            }
+
+          ref.update({
+              "watching": data['watching'],
+              "watching_details": data['watching_details'],
+              "found_by_first": data['found_by_first'],
+              "found_by": data['found_by'],
+              "found_by_details": data['found_by_details'],
+          })
+          if sqlRef is None:
+            print('Artist needs migration; importing to SQL')
+            self.import_sql(sql_session, doc, attribution)
+            sqlRef = artist_with_meta(sql_session, spotify_id)
           else:
-              org = list(filter(lambda x: x.organization_id == org_id, sqlRef.organizations)).pop()
-              if sql_playlist_id is not None:
-                  org.last_playlist_id = sql_playlist_id
-                  sql_session.add(org)
-          attribution.artist_id = sqlRef.id
-          sql_session.add(sqlRef)
-          sql_session.add(attribution)
-          sql_session.commit()
-      self.add_tags(sql_session, sqlRef, org_id, tags)
-      return 'Artist exists, added to tracking', 200
-    
-    # check if the ID is valid (this will raise a 400 if the artist is invalid)
-    artist = self.spotify.get_artist(spotify_id)
-    # create an artist
-    new_schema = {
-        "id": spotify_id,
-        "spotify_id": spotify_id,
-        "spotify_url": f"https://open.spotify.com/artist/{spotify_id}",
-        "name": artist['name'],
-        "genres": artist['genres'],
-        "ob_status": "needs_ingest",
-        "ob_wait_till": None,
-        "avatar": None,
-        "stats_as_of": datetime(2000, 1, 1, 1, 1, 1, 1),
-        "stat_dates": [],
-        "eval_as_of": datetime(2000, 1, 1, 1, 1, 1, 1),
-        "eval_status": "no_eval",
-        "eval_distro_type": "unknown",
-        "eval_distro": "",
-        "eval_label": "",
-        "eval_prios": "unknown",
-        "watching": [org_id],
-        "watching_details": {
-          org_id: {
-            "added_on": datetime.now().strftime("%Y-%m-%d"),
-            "favorite": False,
-            "tags": []
-          }
-        },
-        "found_by": [user_id],
-        "found_by_first": [user_id],
-        "found_by_details": {
-          user_id: {
-            "found_on": datetime.now().strftime("%Y-%m-%d")
-          }
+              if len(list(filter(lambda x: x.user_id == user_id, sqlRef.users))) == 0:
+                  sqlRef.users.append(UserArtist(
+                      user_id=user_id,
+                      organization_id=org_id,
+                  ))
+              if len(list(filter(lambda x: x.organization_id == org_id, sqlRef.organizations))) == 0:
+                  sqlRef.organizations.append(OrganizationArtist(
+                      organization_id=org_id,
+                      last_playlist_id=sql_playlist_id,
+                      added_by=user_id
+                  ))
+              else:
+                  org = list(filter(lambda x: x.organization_id == org_id, sqlRef.organizations)).pop()
+                  if sql_playlist_id is not None:
+                      org.last_playlist_id = sql_playlist_id
+                      sql_session.add(org)
+              attribution.artist_id = sqlRef.id
+              sql_session.add(sqlRef)
+              sql_session.add(attribution)
+              sql_session.commit()
+          self.add_tags(sql_session, sqlRef, org_id, tags)
+
+          if import_id is not None:
+              sql_query = text('UPDATE import_artists SET status=2, artist_id=\''+str(sqlRef.id)+'\' WHERE import_id='+str(import_id)+' AND spotify_id=\''+str(spotify_id)+'\'')
+              sql_session.execute(sql_query)
+              sql_query = text('UPDATE imports SET status=\'complete\' WHERE id='+str(import_id)+' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0)')
+              sql_session.execute(sql_query)
+              sql_session.commit()
+
+
+          return 'Artist exists, added to tracking', 200
+
+        # check if the ID is valid (this will raise a 400 if the artist is invalid)
+        artist = self.spotify.get_artist(spotify_id)
+        # create an artist
+        new_schema = {
+            "id": spotify_id,
+            "spotify_id": spotify_id,
+            "spotify_url": f"https://open.spotify.com/artist/{spotify_id}",
+            "name": artist['name'],
+            "genres": artist['genres'],
+            "ob_status": "needs_ingest",
+            "ob_wait_till": None,
+            "avatar": None,
+            "stats_as_of": datetime(2000, 1, 1, 1, 1, 1, 1),
+            "stat_dates": [],
+            "eval_as_of": datetime(2000, 1, 1, 1, 1, 1, 1),
+            "eval_status": "no_eval",
+            "eval_distro_type": "unknown",
+            "eval_distro": "",
+            "eval_label": "",
+            "eval_prios": "unknown",
+            "watching": [org_id],
+            "watching_details": {
+              org_id: {
+                "added_on": datetime.now().strftime("%Y-%m-%d"),
+                "favorite": False,
+                "tags": []
+              }
+            },
+            "found_by": [user_id],
+            "found_by_first": [user_id],
+            "found_by_details": {
+              user_id: {
+                "found_on": datetime.now().strftime("%Y-%m-%d")
+              }
+            }
+            # "organizations": [
+            #   {
+            #     "org_id": org_id,
+            #     "favorite": False
+            #   }
+            # ],
+            # "found_by": [
+            #   {
+            #     "organization": org_id,
+            #     "user_id": user_id,
+            #     "user_first": user['first_name'],
+            #     "user_last": user['last_name'],
+            #     "found_on": datetime.now().strftime("%Y-%m-%d")
+            #   }
+            # ],
         }
-        # "organizations": [
-        #   {
-        #     "org_id": org_id,
-        #     "favorite": False
-        #   }
-        # ],
-        # "found_by": [
-        #   {
-        #     "organization": org_id,
-        #     "user_id": user_id,
-        #     "user_first": user['first_name'],
-        #     "user_last": user['last_name'],
-        #     "found_on": datetime.now().strftime("%Y-%m-%d")
-        #   }
-        # ],
-    }
 
-    for s in HOT_TRACKING_FIELDS:
-      new_schema[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = []
-    ref.set(new_schema)
-    imported, skipped, avg, fails = self.import_sql(sql_session, ref.get(), attribution)
-    if len(fails) > 0:
-        print(str(fails))
-        return 'Artist failed to import, please try again', 500
-    self.add_tags(sql_session, artist_with_meta(sql_session, spotify_id), org_id, tags)
-
-
+        for s in HOT_TRACKING_FIELDS:
+          new_schema[f"stat_{s}__{HOT_TRACKING_FIELDS[s]}"] = []
+        ref.set(new_schema)
+        imported, skipped, avg, fails = self.import_sql(sql_session, ref.get(), attribution)
+        if len(fails) > 0:
+            print(str(fails))
+            return 'Artist failed to import, please try again', 500
+        artist_ref = artist_with_meta(sql_session, spotify_id)
+        self.add_tags(sql_session, artist_ref, org_id, tags)
+        if import_id is not None:
+            sql_query = text('UPDATE import_artists SET status=2, artist_id=\'' + str(artist_ref.id) + '\' WHERE import_id=' + str(import_id) + ' AND spotify_id=\'' + str(spotify_id) + '\'')
+            sql_session.execute(sql_query)
+            sql_query = text('UPDATE imports SET status=\'complete\', completed_at=NOW() WHERE id=' + str(import_id) + ' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL')
+            sql_session.execute(sql_query)
+            sql_session.commit()
+    except Exception|ErrorResponse as e:
+        print(e)
+        print(traceback.format_exc())
+        if import_id is not None:
+            sql_query = text('UPDATE import_artists SET status=1 WHERE import_id=' + str(import_id) + ' AND spotify_id=\'' + str(spotify_id) + '\'')
+            sql_session.execute(sql_query)
+            sql_query = text('UPDATE imports SET status=\'complete\', completed_at=NOW() WHERE id=' + str(import_id) + ' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL')
+            sql_session.execute(sql_query)
+            sql_session.commit()
     return 'success', 200
   
   def ingest_artist(self, sql_session, spotify_id : str):

@@ -8,11 +8,13 @@ from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
 from firebase_functions.options import RetryConfig, MemoryOption
 from flask import jsonify
 from google.cloud.firestore_v1 import FieldFilter, Or
+from openai import organization
 from sqlalchemy import select, or_, update, text, and_
 from sqlalchemy.orm import joinedload, close_all_sessions
 from sqlalchemy.util.preloaded import sql_dml
 
 from controllers.artists import ArtistController
+from controllers.playlists import PlaylistController
 from controllers.twilio import TwilioController
 from cron_jobs import eval_cron, stats_cron, onboarding_cron, spotify_cron
 from lib.stripe_client import StripeController
@@ -20,7 +22,7 @@ from lib.utils import get_function_url
 from lib.config import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
     CloudSQLClient, LinkSource, OrganizationArtist, StatisticType, \
-    ArtistTag, Playlist, Subscription, pop_default
+    ArtistTag, Playlist, Subscription, pop_default, Attribution, Import, ImportArtist
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController, LookalikeController
 import flask
 from datetime import datetime, timedelta
@@ -75,10 +77,11 @@ def addartisttask(req: tasks_fn.CallableRequest) -> str:
     uid = req.data.get('uid')
     spotify_id = req.data.get('spotify_id')
     playlist_id = req.data.get('playlist_id', None)
+    import_id = req.data.get('import_id', None)
     tags = req.data.get('tags', None)
     user_data = get_user(uid, db)
     sql_session = sql.get_session()
-    message, code = tracking_controller.add_artist(sql_session, spotify_id, uid, user_data['organization'], playlist_id, tags)
+    message, code = tracking_controller.add_artist(sql_session, spotify_id, uid, user_data['organization'], playlist_id, tags, import_id)
     sql_session.close()
     return message
 
@@ -190,22 +193,42 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        page = auth.list_users()
-        docs = db.collection("users").stream()
+        playlists = sql_session.query(Playlist).options(joinedload(Playlist.imports)).all()
+        for playlist in playlists:
+            if len(playlist.imports) == 0:
+                attrs = sql_session.query(Attribution).options(joinedload(Attribution.artist)).filter(Attribution.playlist_id == playlist.id).all()
+                import_artists = []
+                for attr in attrs:
+                    import_artists.append(ImportArtist(
+                        spotify_id=attr.artist.spotify_id,
+                        artist_id=attr.artist.id,
+                        status=2,
+                        created_at=attr.created_at,
+                        updated_at=attr.created_at,
 
-        # Create a dictionary where key = document ID and value = document data
-        users_dict = {doc.id: doc for doc in docs}
-        print(users_dict)
-        while page:
-            for user in page.users:
-                if user.uid not in users_dict:
-                    print("User not found: " + user.uid + " " + user.email)
-                    continue
-                user_doc = users_dict[user.uid]
-                user_doc.reference.update({'email': user.email})
-                print(user_doc.get('first_name') + " " + user.email)
-            # Get the next page
-            page = page.get_next_page()
+                    ))
+                playlist.imports.append(
+                    Import(
+                        organization_id=playlist.organization_id,
+                        playlist_id=playlist.id,
+                        status="complete",
+                        user_id=playlist.first_user,
+                        completed_at=playlist.updated_at,
+                        created_at=playlist.created_at,
+                        updated_at=playlist.updated_at,
+                        artists=import_artists,
+                    )
+                )
+                sql_session.add(playlist)
+                sql_session.commit()
+                print("Done with playlist: "+  str(playlist.id))
+            # user = sql_session.query(Attribution).order_by(Attribution.id.desc()).filter(Attribution.playlist_id == playlist.id).first()
+            # if user is None:
+            #     print ("??? " + str(playlist.id) + " has no attribution")
+            #     continue
+            # playlist.first_user = user.user_id
+            # playlist.last_user = user.user_id
+
         return "",200
         # artists_controller = ArtistController(PROJECT_ID, LOCATION, sql)
         # return artists_controller.queues(sql_session, app, 'q9HMKTU1S7hUlpNdtBB5braS1VJ3')
@@ -591,6 +614,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     sql_session = sql.get_session()
     if user is None:
         return 'Unauthorized', 401
+    playlist_controller = PlaylistController(sql_session)
 
 
     @v3_api.get('/get-type-defs')
@@ -720,6 +744,58 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         user_data.reference.update({'organization': data.get('organization')})
 
         return {"organization": data.get('organization')}, 200
+
+
+
+    @v3_api.get('/imports')
+    def get_imports():
+        db = firestore.client(app)
+        user_data = get_user(user.uid, db)
+        req = flask.request.args.to_dict()
+        page_size = int(req.get('pageSize', 10))
+        page = int(req.get('page', 0))
+
+        import_id = req.get('id', None)
+        if import_id is None:
+            imports, total = playlist_controller.get_imports(user_data.get('organization'), page, page_size)
+            response = jsonify({
+                "imports": imports,
+                "page": page,
+                "pageSize": page_size,
+                "total": total
+            })
+        else:
+            import_obj, total = playlist_controller.get_import(user_data.get('organization'), int(import_id), page, page_size)
+            response = jsonify({
+                "import": import_obj,
+                "page": page,
+                "pageSize": page_size,
+                "total": total
+            })
+        response.headers.add('Cache-Control', 'private, max-age=5')
+        response.headers.add('X-Organization', request.headers.get('X-Organization'))
+        response.headers.add('Vary', 'X-Organization')
+        return response
+
+
+    @v3_api.get('/playlists')
+    def get_playlists():
+        db = firestore.client(app)
+        user_data = get_user(user.uid, db)
+        req = flask.request.args.to_dict()
+        page_size = req.get('pageSize', 10)
+        page = req.get('page', 0)
+        playlists, total = playlist_controller.get_playlists(user_data.get('organization'), page, page_size)
+        response = jsonify({
+            "playlists": playlists,
+            "page": page,
+            "pageSize": page_size,
+            "total": total
+        })
+        response.headers.add('Cache-Control', 'private, max-age=5')
+        response.headers.add('X-Organization', request.headers.get('X-Organization'))
+        response.headers.add('Vary', 'X-Organization')
+        return response
 
 
     @v3_api.get('/get-existing-tags')
@@ -900,7 +976,7 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
             else:
                 user_data = get_user(uid, db)
                 try:
-                    aids, playlist_name, playlist_picture = spotify.get_playlist_artists(spotify_id, "user")
+                    aids, playlist_name, playlist_picture, artists = spotify.get_playlist_artists(spotify_id, "user")
 
                     sql_playlist = sql_session.scalars(
                         select(Playlist).where(Playlist.spotify_id == spotify_id).where(Playlist.organization_id == user_data.get('organization'))).first()
@@ -920,19 +996,44 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                             spotify_id=spotify_id,
                             name=playlist_name,
                             organization_id=user_data.get('organization'),
+                            first_user=uid,
+                            last_user=uid
                         )
                         sql_session.add(sql_playlist)
                         sql_session.commit()
                         sql_session.refresh(sql_playlist)
+                    else:
+                        sql_playlist.last_user = uid
+                        sql_playlist.updated_at = datetime.now()
+                        sql_session.add(sql_playlist)
+                        sql_session.commit()
 
-                    aid_chunks = spotify.chunk_list(aids, 50)
-                    for aid_chunk in aid_chunks:
-                        body = {"spotify_ids": list(map(lambda x: str(x), aid_chunk))}
+                    sql_playlist_dict = sql_playlist.as_dict()
+
+                    import_obj = Import(
+                        organization_id=user_data.get('organization'),
+                        user_id=uid,
+                        playlist_id=sql_playlist_dict.get('id'),
+                        status='pending',
+                        artists=[]
+                    )
+                    for artist in artists:
+                        import_obj.artists.append(ImportArtist(
+                            spotify_id=artist['id'],
+                            name=artist['name'],
+                            status=0
+                        ))
+                    sql_session.add(import_obj)
+                    sql_session.commit()
+                    sql_session.refresh(import_obj)
+                    artist_chunks = spotify.chunk_list(artists, 50)
+                    for aid_chunk in artist_chunks:
+                        body = {"spotify_ids": list(map(lambda x: str(x['id']), aid_chunk))}
                         task_controller.enqueue_task('SpotifyQueue', 2, '/spotify-cache-ids', body)
                     for a in aids:
                         task_queue = functions.task_queue("addartisttask")
                         target_uri = get_function_url("addartisttask")
-                        body = {"data": {"spotify_id": a, "uid": uid, "playlist_id": sql_playlist.id, "tags": tags}}
+                        body = {"data": {"spotify_id": a, "uid": uid, "import_id": import_obj.id,  "playlist_id": sql_playlist.id, "tags": tags}}
                         task_options = functions.TaskOptions(schedule_time=datetime.now() + timedelta(seconds=20), uri=target_uri)
                         task_queue.enqueue(body, task_options)
                     return {'message': 'success', 'status': 200, 'added_count': len(aids)}
