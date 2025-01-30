@@ -188,9 +188,9 @@ class TrackingController():
           self.add_tags(sql_session, sqlRef, org_id, tags)
 
           if import_id is not None:
-              sql_query = text('UPDATE import_artists SET status=2, artist_id=\''+str(sqlRef.id)+'\' WHERE import_id='+str(import_id)+' AND spotify_id=\''+str(spotify_id)+'\'')
+              sql_query = text('UPDATE import_artists SET status=2, artist_id=\''+str(sqlRef.id)+'\', updated_at=NOW() WHERE import_id='+str(import_id)+' AND spotify_id=\''+str(spotify_id)+'\'')
               sql_session.execute(sql_query)
-              sql_query = text('UPDATE imports SET status=\'complete\' WHERE id='+str(import_id)+' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0)')
+              sql_query = text('UPDATE imports SET status=\'complete\', completed_at=NOW(), updated_at=NOW() WHERE id='+str(import_id)+' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0)')
               sql_session.execute(sql_query)
               sql_session.commit()
 
@@ -259,9 +259,9 @@ class TrackingController():
         artist_ref = artist_with_meta(sql_session, spotify_id)
         self.add_tags(sql_session, artist_ref, org_id, tags)
         if import_id is not None:
-            sql_query = text('UPDATE import_artists SET status=2, artist_id=\'' + str(artist_ref.id) + '\' WHERE import_id=' + str(import_id) + ' AND spotify_id=\'' + str(spotify_id) + '\'')
+            sql_query = text('UPDATE import_artists SET status=2, artist_id=\'' + str(artist_ref.id) + '\', updated_at=NOW() WHERE import_id=' + str(import_id) + ' AND spotify_id=\'' + str(spotify_id) + '\'')
             sql_session.execute(sql_query)
-            sql_query = text('UPDATE imports SET status=\'complete\', completed_at=NOW() WHERE id=' + str(import_id) + ' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL')
+            sql_query = text('UPDATE imports SET status=\'complete\', completed_at=NOW(), updated_at=NOW() WHERE id=' + str(import_id) + ' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL')
             sql_session.execute(sql_query)
             sql_session.commit()
     except Exception|ErrorResponse as e:
@@ -270,7 +270,7 @@ class TrackingController():
         if import_id is not None:
             sql_query = text('UPDATE import_artists SET status=1 WHERE import_id=' + str(import_id) + ' AND spotify_id=\'' + str(spotify_id) + '\'')
             sql_session.execute(sql_query)
-            sql_query = text('UPDATE imports SET status=\'complete\', completed_at=NOW() WHERE id=' + str(import_id) + ' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL')
+            sql_query = text('UPDATE imports SET status=\'complete\', completed_at=NOW(), updated_at=NOW() WHERE id=' + str(import_id) + ' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL')
             sql_session.execute(sql_query)
             sql_session.commit()
     return 'success', 200
