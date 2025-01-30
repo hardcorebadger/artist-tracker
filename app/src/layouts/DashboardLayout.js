@@ -36,6 +36,7 @@ const navItemConfig = [
   children: [
   ]
   },
+  {path: "/app/imports", name: "Imports", icon: "mdi:upload"},
   // {path: "/app/paywalled", name: "Paywalled", icon: "mdi:disk"},
   {path: "/app/settings", name: "Settings", icon: "mdi:settings",
   children: [

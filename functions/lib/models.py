@@ -376,6 +376,7 @@ class Import(Base):
             resp['lookalike'] = self.lookalike.as_dict()
         else:
             resp['lookalike'] = None
+
         return resp
 
 class ImportArtist(Base):
@@ -423,7 +424,7 @@ class Playlist(Base):
     organization_id = Column(String(28), nullable=False)
     first_user = Column(String(28), nullable=True)
     last_user = Column(String(28), nullable=True)
-
+    image = Column(Text, nullable=True)
     imports: Mapped[List["Import"]] = relationship(back_populates="playlist")
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}

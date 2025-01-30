@@ -1,7 +1,7 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session, joinedload
 
-from lib import Playlist, pop_default, Import, ImportArtist, Artist
+from lib import Playlist, pop_default, Import, ImportArtist, Artist, ArtistLink
 
 
 class PlaylistController:
@@ -27,7 +27,7 @@ class PlaylistController:
         return playlists, total
 
     def get_import(self, organization: str, import_id: int, page: int, page_size: int):
-        query = self.sql_session.query(Import).where(Import.organization_id == organization).where(Import.id == import_id)
+        query = self.sql_session.query(Import).options(joinedload(Import.playlist), joinedload(Import.lookalike)).where(Import.organization_id == organization).where(Import.id == import_id)
         import_obj = query.first()
         if import_obj is None:
             return None
@@ -35,7 +35,7 @@ class PlaylistController:
         import_obj['artists'] = list()
         offset = int(page) * int(page_size)
 
-        artists_query = self.sql_session.query(ImportArtist).options(joinedload(ImportArtist.artist, innerjoin=False).joinedload(Artist.links, innerjoin=False)).where(ImportArtist.import_id == import_id)
+        artists_query = self.sql_session.query(ImportArtist).options(joinedload(ImportArtist.artist, innerjoin=False).joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=False)).where(ImportArtist.import_id == import_id)
         total = artists_query.count()
         artists_query = artists_query.order_by(ImportArtist.id.desc()).limit(int(page_size))
         if offset > 0:

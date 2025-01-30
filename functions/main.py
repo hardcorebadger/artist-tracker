@@ -2,7 +2,7 @@ import json
 
 import math
 
-from firebase_admin import initialize_app, firestore, functions, auth
+from firebase_admin import initialize_app, firestore, functions, auth, credentials
 from firebase_admin.auth import UserRecord
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
 from firebase_functions.options import RetryConfig, MemoryOption
@@ -36,7 +36,6 @@ from firebase_functions.params import IntParam, StringParam
 #################################
 # App Initialization
 #################################
-
 app = initialize_app()
 
 #################################
@@ -997,7 +996,8 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                             name=playlist_name,
                             organization_id=user_data.get('organization'),
                             first_user=uid,
-                            last_user=uid
+                            last_user=uid,
+                            image=playlist_picture
                         )
                         sql_session.add(sql_playlist)
                         sql_session.commit()
@@ -1005,6 +1005,7 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                     else:
                         sql_playlist.last_user = uid
                         sql_playlist.updated_at = datetime.now()
+                        sql_playlist.image = playlist_picture
                         sql_session.add(sql_playlist)
                         sql_session.commit()
 
@@ -1036,7 +1037,7 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                         body = {"data": {"spotify_id": a, "uid": uid, "import_id": import_obj.id,  "playlist_id": sql_playlist.id, "tags": tags}}
                         task_options = functions.TaskOptions(schedule_time=datetime.now() + timedelta(seconds=20), uri=target_uri)
                         task_queue.enqueue(body, task_options)
-                    return {'message': 'success', 'status': 200, 'added_count': len(aids)}
+                    return {'message': 'success', 'status': 200, 'added_count': len(aids), "import_id": import_obj.id}
                 except ErrorResponse as e:
                     print(str(e))
                     if preview:

@@ -18,13 +18,13 @@ import { darkTheme, theme } from "../components/MuiDataGridServer";
 import {theme as chakraTheme} from '../theme'
 import {
     Avatar,
-    Button, ChakraProvider, Checkbox, FormControl, FormLabel, Heading, HStack, Input,
+    Button, ChakraProvider, Checkbox, FormControl, FormLabel, Heading, HStack, Image, Input,
     Menu,
     MenuButton,
     MenuItem,
     MenuList, Modal, ModalBody, ModalCloseButton,
     ModalContent, ModalFooter, ModalHeader, ModalOverlay,
-    Portal, Text,
+    Portal, Stack, Tag, Text,
     useColorMode, useDisclosure,
     useToast
 } from "@chakra-ui/react";
@@ -32,10 +32,9 @@ import Iconify from "../components/Iconify";
 import {goFetch} from "../App";
 import {useUser} from "../routing/AuthGuard";
 import {ChevronDownIcon, ChevronRightIcon} from "@chakra-ui/icons";
-import {useOutletContext, useParams} from "react-router-dom";
+import {useNavigate, useOutletContext, useParams} from "react-router-dom";
 import {LoadingWidget} from "../routing/LoadingScreen";
 import moment from "moment";
-import UserAvatar from "../components/UserAvatar";
 
 export default function PageImportDetails({}) {
     const user = useUser()
@@ -44,6 +43,7 @@ export default function PageImportDetails({}) {
     const [importObj, setImportObj] = useState(null)
 
     const { importId } = useParams()
+    const navigate = useNavigate()
 
 
     const [queryModel, setQueryModel] = useState({
@@ -136,19 +136,23 @@ export default function PageImportDetails({}) {
             }
         },
     ]
+    if (importObj === null) {
+        return <LoadingWidget/>
+    }
 
     const rows = importObj?.import?.artists.map((playlist, index) => {
         playlist['index'] = (index + 1) + (importObj?.page * importObj?.pageSize)
         return playlist
     }) ?? []
-
+    const type = importObj?.import?.playlist_id ? 'Playlist' : 'Lookalike'
+    const import_target_name = importObj?.import?.playlist?.name ?? importObj?.import?.lookalike?.artist?.name
     return (
         <Box sx={{ height: '80vh', width: "100%" }} p={5}>
 
-            <HStack align={'center'} justifyContent={'space-between'} mb={1}>
-                <Heading >
-                    {importObj?.import?.playlist_id === null ? 'Lookalike' : 'Playlist'} Import
-                </Heading>
+            <HStack align={'center'} justifyContent={'flex-start'} mb={5}>
+                <Avatar size={'lg'} borderRadius={2} name={import_target_name}  src={importObj?.import?.playlist?.image ?? importObj?.import?.lookalike?.artist?.avatar}/>
+                <Heading size="lg">"{import_target_name}" {type} Import</Heading>
+
                 {/*/!* Add Organization Button *!/*/}
                 {/*<Button colorScheme="blue" onClick={onOpen} mb={4}>*/}
                 {/*    Import Playlist*/}
@@ -190,6 +194,9 @@ export default function PageImportDetails({}) {
                             pageSize: newPageSize
                         }
                     })}
+                    // onRowClick={(params) => {
+                        // navigate('/app/imports/' + importId +'/artists/' + params.row.artist.id)
+                    // }}
                     loading={loading}
                     getRowId={(row) => row.id}
                 />

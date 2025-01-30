@@ -65,7 +65,10 @@ export default function Router() {
         { path: 'playlists', element: <PagePlaylists/>},
         { path: 'imports', children: [
             { index: true, element:  <PageImports/>  },
-            { path: ':importId', element: <PageImportDetails /> },
+            { path: ':importId', children: [
+                { index: true, element: <PageImportDetails/> },
+                { path: 'artists/:artistId', element: <AccessGuard><PageArtist/></AccessGuard> }
+            ]},
 
           ]},
         { path: 'reports',

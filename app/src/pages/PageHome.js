@@ -24,7 +24,7 @@ import {
   WrapItem, Wrap, Avatar, Flex, FormHelperText, FormLabel, FormControl, Link, useColorMode, Alert
 } from '@chakra-ui/react';
 import { PageLayoutContained } from '../layouts/DashboardLayout';
-import { Link as RouterLink } from 'react-router-dom';
+import {Link as RouterLink, useNavigate} from 'react-router-dom';
 import { useUser } from '../routing/AuthGuard';
 import { AccessSkeleton, AccessOverlay } from '../components/AccessGates';
 import Iconify from '../components/Iconify';
@@ -44,6 +44,7 @@ import {
 import {ColumnDataContext, goFetch} from "../App";
 import TagInput from "../components/TagInput";
 import {LoadingWidget} from "../routing/LoadingScreen";
+import {navigate} from "@inovua/reactdatagrid-community/packages/Calendar/src/DecadeView";
 const client_id = 'aa08e3eb52f24d9a9f772e2c544b39b5';
 const scope = 'user-read-private user-read-email playlist-read-private playlist-read-collaborative playlist-modify-private playlist-modify-public user-library-read user-read-recently-played';
 
@@ -64,7 +65,7 @@ function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
   const toast = useToast();
   const {refreshFilters} = useContext(ColumnDataContext)
   const user = useUser()
-
+  const navigate = useNavigate()
   const addArtistURL = async () => {
     console.log("attempting callable add")
     setLoading(true);
@@ -78,6 +79,7 @@ function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
       setAddPreview(null)
       refreshFilters(user)
       onClose()
+
       toast({
         title: resp.added_count + ' artist(s) added!',
         description: "We're running some analysis, the new artist(s) will be available soon.",
@@ -85,6 +87,9 @@ function AddTagsModal({addPreview, setAddPreview, isOpen, onOpen, onClose}) {
         duration: 9000,
         isClosable: true,
       })
+      if ('import_id' in resp) {
+        navigate('/app/imports/'+resp.import_id)
+      }
     } else {
       setAddPreview(null)
       onClose()

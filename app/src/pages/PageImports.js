@@ -23,7 +23,7 @@ import {
     MenuItem,
     MenuList, Modal, ModalBody, ModalCloseButton,
     ModalContent, ModalFooter, ModalHeader, ModalOverlay,
-    Portal, Text,
+    Portal, Progress, ProgressLabel, Stack, Text,
     useColorMode, useDisclosure,
     useToast
 } from "@chakra-ui/react";
@@ -50,18 +50,22 @@ export default function PageImports({}) {
         }
     })
 
+    const loadImports = async () => {
+        setLoading(true)
+        goFetch(user, 'GET', 'imports', {
+            page: queryModel.pagination.page,
+            pageSize: queryModel.pagination.pageSize,
+        }).then((resp) => {
+            setLoading(false)
+            if ('imports' in resp) {
+                setImports(resp)
+            }
+        })
+    }
+
     useEffect(() => {
         if (queryModel.pagination.page !== imports?.page || queryModel?.pagination?.pageSize !== imports?.pageSize) {
-            setLoading(true)
-            goFetch(user, 'GET', 'imports', {
-                page: queryModel.pagination.page,
-                pageSize: queryModel.pagination.pageSize,
-            }).then((resp) => {
-                setLoading(false)
-                if ('imports' in resp) {
-                    setImports(resp)
-                }
-            })
+            loadImports()
         }
 
     }, [queryModel])
@@ -75,7 +79,7 @@ export default function PageImports({}) {
         {
             field: 'type',
             headerName: 'Type',
-            width: 150,
+            width: 100,
             valueGetter: (data) => data.row['playlist_id'] === null ? 'Lookalike' : 'Playlist',
             renderCell: (params) => {
                 return (
@@ -91,7 +95,7 @@ export default function PageImports({}) {
         {
             field: 'name',
             headerName: 'Name',
-            width: 150,
+            width: 250,
             valueGetter: (data) => {
                 if (data.row['playlist_id'] === null) {
                     return data.row['lookalike']['target_artist']['name'] + " Lookalike"
@@ -113,24 +117,36 @@ export default function PageImports({}) {
         {
             field: 'artists.total',
             headerName: '# Artists',
-            width: 150,
+            width: 75,
             valueGetter: (data) => {
                 return data.row.artists.total
             },
+            renderCell: (params) => {
+                return (
+                    <Box sx={{width: "100%", textAlign: "center"}}>
+
+                        <Typography>{params.value}</Typography>
+                    </Box>
+                )
+            }
 
         },
         {
             field: 'status',
             headerName: 'Status',
             width: 240,
+            valueGetter: (data) => {
+                return Math.round(((data.row.artists.complete + data.row.artists.failed) / data.row.artists.total) * 10000) / 100
+            },
             renderCell: (params) => {
                 return (
-                    <ProgressRoot maxW="240px">
-                        <ProgressLabel info="Uploading document to the server" mb="2">
-                            Uploading
-                        </ProgressLabel>
-                        <ProgressBar />
-                    </ProgressRoot>
+                    <ChakraProvider theme={chakraTheme}>
+                        <Stack w={'100%'}>
+                            <Text>{params.row.status.ucwords()} - {params.value}%</Text>
+                            <Progress size="sm" colorScheme={params.row.status == 'complete' ? 'primary' : (params.row.status === 'failed' ? 'red' : 'yellow')} value={params.value}/>
+
+                        </Stack>
+                    </ChakraProvider>
 
                 )
             }
@@ -159,72 +175,59 @@ export default function PageImports({}) {
     return (
         <Box sx={{ height: '80vh', width: "100%" }} p={5}>
 
-            <HStack align={'center'} justifyContent={'space-between'} mb={1}>
+            <HStack align={'center'} justifyContent={'space-between'} mb={5}>
                 <Heading >
                     Imports
                 </Heading>
                 {/*/!* Add Organization Button *!/*/}
-                {/*<Button colorScheme="blue" onClick={onOpen} mb={4}>*/}
-                {/*    Import Playlist*/}
-                {/*</Button>*/}
+                <Button colorScheme="primary" onClick={loadImports} >
+                    <Iconify icon="mdi:refresh" size={'18px'} />
+                </Button>
             </HStack>
             <ThemeProvider theme={colorMode.colorMode === "dark" ? darkTheme : theme}>
 
 
                 {/* Chakra Modal */}
 
-                {loading ? (
-                    <Box
-                        sx={{
-                            display: "flex",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            height: "100%",
-                        }}
-                    >
-                        <CircularProgress />
-                    </Box>
-                ) : (
-                    <DataGridPro
-                        rows={rows}
-                        columns={columns}
-                        rowCount={imports?.total}
-                        paginationMode="server"
-                        pagination
-                        sx={{'& .MuiDataGrid-columnHeaderTitle': {
-                                fontWeight: '900',
-                            }}}
-                        onPaginationModelChange={(newModel) => {
-                            if (queryModel.pagination.page !== newModel.page || queryModel.pagination.pageSize !== newModel.pageSize) {
-                                setQueryModel({
-                                    pagination: {
-                                        page: newModel.page,
-                                        pageSize: newModel.pageSize,
-                                    }
-                                })
-                            }
-                        }}
-                        onRowClick={(params) => {
-                            navigate(`/app/imports/${params.row.id}`);
-                        }}
-                        initialState={{
-                            pagination: queryModel?.pagination
-                        }}
-                        paginationModel={{
-                            page: imports?.page ?? queryModel?.pagination?.page,
-                            pageSize: imports?.pageSize ?? queryModel?.pagination?.pageSize,
-                        }}
-                        pageSizeOptions={[5, 10, 15, 20]}
-                        onPageSizeChange={(newPageSize) => setQueryModel({
-                            pagination: {
-                                ...queryModel.pagination,
-                                pageSize: newPageSize
-                            }
-                        })}
-                        loading={loading}
-                        getRowId={(row) => row.id}
-                    />
-                )}
+                <DataGridPro
+                    rows={rows}
+                    columns={columns}
+                    rowCount={imports?.total}
+                    paginationMode="server"
+                    pagination
+                    sx={{'& .MuiDataGrid-columnHeaderTitle': {
+                            fontWeight: '900',
+                        }}}
+                    onPaginationModelChange={(newModel) => {
+                        if (queryModel.pagination.page !== newModel.page || queryModel.pagination.pageSize !== newModel.pageSize) {
+                            setQueryModel({
+                                pagination: {
+                                    page: newModel.page,
+                                    pageSize: newModel.pageSize,
+                                }
+                            })
+                        }
+                    }}
+                    onRowClick={(params) => {
+                        navigate(`/app/imports/${params.row.id}`);
+                    }}
+                    initialState={{
+                        pagination: queryModel?.pagination
+                    }}
+                    paginationModel={{
+                        page: imports?.page ?? queryModel?.pagination?.page,
+                        pageSize: imports?.pageSize ?? queryModel?.pagination?.pageSize,
+                    }}
+                    pageSizeOptions={[5, 10, 15, 20]}
+                    onPageSizeChange={(newPageSize) => setQueryModel({
+                        pagination: {
+                            ...queryModel.pagination,
+                            pageSize: newPageSize
+                        }
+                    })}
+                    loading={loading}
+                    getRowId={(row) => row.id}
+                />
             </ThemeProvider>
         </Box>
     );
