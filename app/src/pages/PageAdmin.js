@@ -355,7 +355,7 @@ export default function PageAdmin({}) {
                                 {({ isOpen }) => (
                                     <>
                                         {/* Menu Button */}
-                                        <MenuButton as={Button} rightIcon={( <Iconify size={'10px'} icon={'bx:down-arrow'}/>)}>
+                                        <MenuButton as={Button} size={'sm'} rightIcon={( <Iconify size={'10px'} icon={'bx:down-arrow'}/>)}>
                                             {isOpen ? "Actions" : "Actions"}
                                         </MenuButton>
 

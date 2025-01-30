@@ -157,6 +157,16 @@ export default function PageImports({}) {
 
         },
         {
+            'field': 'user_id',
+            'headerName': 'User',
+            width: 200,
+            renderCell: (params) =>
+                <ChakraProvider theme={chakraTheme}>
+
+                    <UserAvatar userId={params.row.user_id} size={'xs'}/>
+                </ChakraProvider>,
+        },
+        {
             'field': 'created_at',
             'headerName': 'Started',
             width: 200,
