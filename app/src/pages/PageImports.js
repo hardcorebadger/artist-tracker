@@ -146,7 +146,7 @@ export default function PageImports({}) {
                 return (
                     <ChakraProvider theme={chakraTheme}>
                         <Stack w={'100%'}>
-                            <Text>{params.row.status.ucwords()} - {params.value}%</Text>
+                            <Text>{(params.row.status === 'pending' && params.value > 0 ? "In Progress" : params.row.status.ucwords())} - {params.value}%</Text>
                             <Progress size="sm" colorScheme={params.row.status == 'complete' ? 'primary' : (params.row.status === 'failed' ? 'red' : 'yellow')} value={params.value}/>
 
                         </Stack>
