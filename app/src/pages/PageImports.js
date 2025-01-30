@@ -146,8 +146,12 @@ export default function PageImports({}) {
                 return (
                     <ChakraProvider theme={chakraTheme}>
                         <Stack w={'100%'}>
-                            <Text>{(params.row.status === 'pending' && params.value > 0 ? "In Progress" : params.row.status.ucwords())} - {params.value}%</Text>
-                            <Progress size="sm" colorScheme={params.row.status == 'complete' ? 'primary' : (params.row.status === 'failed' ? 'red' : 'yellow')} value={params.value}/>
+                            <HStack>
+                                <Text>{(params.row.status === 'pending' && params.value > 0 ? "In Progress:" : params.row.status.ucwords())}</Text>
+                                {((params.row.status != 'complete') || params.value < 100) ?  (params.value > 0 ? <Text>{params.value}%</Text> : null): <Iconify size={'15px'} icon={'mdi:check'}/>}
+                            </HStack>
+
+                            {((params.row.status === 'pending' && params.value > 0) ? <Progress size="sm" colorScheme={params.row.status == 'complete' ? 'primary' : (params.row.status === 'failed' ? 'red' : 'yellow')} value={params.value}/> : null)}
 
                         </Stack>
                     </ChakraProvider>
