@@ -49,7 +49,7 @@ export default function PageImportDetails({}) {
     const [queryModel, setQueryModel] = useState({
         pagination: {
             page: 0,
-            pageSize: 15,
+            pageSize: 50,
         }
     })
     const loadImport = async () => {
@@ -202,7 +202,7 @@ export default function PageImportDetails({}) {
                         page: importObj?.page ?? queryModel?.pagination?.page,
                         pageSize: importObj?.pageSize ?? queryModel?.pagination?.pageSize,
                     }}
-                    pageSizeOptions={[5, 10, 15, 20]}
+                    pageSizeOptions={[5, 10, 15, 25, 50, 100]}
                     onPageSizeChange={(newPageSize) => setQueryModel({
                         pagination: {
                             ...queryModel.pagination,
