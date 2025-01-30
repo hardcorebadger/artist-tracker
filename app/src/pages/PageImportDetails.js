@@ -52,21 +52,23 @@ export default function PageImportDetails({}) {
             pageSize: 15,
         }
     })
-
+    const loadImport = async () => {
+        setLoading(true)
+        goFetch(user, 'GET', 'imports', {
+            id: importId,
+            page: queryModel.pagination.page,
+            pageSize: queryModel.pagination.pageSize,
+        }).then((resp) => {
+            setLoading(false)
+            if ('import' in resp) {
+                setImportObj(resp)
+            }
+        })
+    }
     useEffect(() => {
         console.log(queryModel)
         if (queryModel.pagination.page !== importObj?.page || queryModel?.pagination?.pageSize !== importObj?.pageSize) {
-            setLoading(true)
-            goFetch(user, 'GET', 'imports', {
-                id: importId,
-                page: queryModel.pagination.page,
-                pageSize: queryModel.pagination.pageSize,
-            }).then((resp) => {
-                setLoading(false)
-                if ('import' in resp) {
-                    setImportObj(resp)
-                }
-            })
+            loadImport()
         }
 
     }, [queryModel])
@@ -149,15 +151,28 @@ export default function PageImportDetails({}) {
     return (
         <Box sx={{ height: '80vh', width: "100%" }} p={5}>
 
-            <HStack align={'center'} justifyContent={'flex-start'} mb={5}>
-                <Avatar size={'lg'} borderRadius={2} name={import_target_name}  src={importObj?.import?.playlist?.image ?? importObj?.import?.lookalike?.artist?.avatar}/>
-                <Heading size="lg">"{import_target_name}" {type} Import</Heading>
 
-                {/*/!* Add Organization Button *!/*/}
-                {/*<Button colorScheme="blue" onClick={onOpen} mb={4}>*/}
-                {/*    Import Playlist*/}
-                {/*</Button>*/}
+            <HStack align={'center'} justifyContent={'space-between'} >
+
+                <HStack align={'center'} justifyContent={'flex-start'} mb={5}>
+                    <Button variant={'outline'} size={'sm'}  onClick={() => navigate('/app/imports')} >
+                        <Iconify icon="mdi:arrow-left"/>
+                    </Button>
+                    <Avatar size={'lg'} borderRadius={2} name={import_target_name}  src={importObj?.import?.playlist?.image ?? importObj?.import?.lookalike?.artist?.avatar}/>
+                    <Heading size="lg">"{import_target_name}" {type} Import</Heading>
+
+                    {/*/!* Add Organization Button *!/*/}
+                    {/*<Button colorScheme="blue" onClick={onOpen} mb={4}>*/}
+                    {/*    Import Playlist*/}
+                    {/*</Button>*/}
+                </HStack>
+                <Button colorScheme={'primary'} onClick={() => {
+                    loadImport()
+                }}>
+                    <Iconify icon={'mdi:refresh'}/>
+                </Button>
             </HStack>
+
             <ThemeProvider theme={colorMode.colorMode === "dark" ? darkTheme : theme}>
 
 
