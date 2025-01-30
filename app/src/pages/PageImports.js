@@ -17,6 +17,7 @@ import { ThemeProvider } from "@mui/material/styles";
 import { darkTheme, theme } from "../components/MuiDataGridServer";
 import {theme as chakraTheme} from '../theme'
 import {
+    Avatar,
     Button, ChakraProvider, Checkbox, FormControl, FormLabel, Heading, HStack, Input,
     Menu,
     MenuButton,
@@ -106,11 +107,14 @@ export default function PageImports({}) {
             renderCell: (params) => {
                 const link = params.row['playlist_id'] === null ? 'https://open.spotify.com/artist/' + params.row['lookalike']['target_artist']['spotify_id'] : 'https://open.spotify.com/playlist/' + params.row['playlist']['spotify_id']
                 return (
+                    <ChakraProvider theme={chakraTheme}>
                     <HStack align={'center'}>
+                        <Avatar size={'xs'} borderRadius={2} name={params.value}  src={params.row.playlist?.image ?? params.row.lookalike?.artist?.avatar ?? null}/>
                         <Typography fontSize={'medium'}>{params.value}</Typography>
                         <MUILink href={link} target={'_blank'}><Iconify icon="mdi:external-link" /></MUILink>
 
                     </HStack>
+                    </ChakraProvider>
                 )
             }
         },
