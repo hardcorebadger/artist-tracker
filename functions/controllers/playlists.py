@@ -60,6 +60,8 @@ class PlaylistController:
         imports = imports_query.all()
 
         ids = list(map(lambda x: x.id, imports))
+        if len(ids) == 0:
+            return [], total
         list_str = ', '.join("'" + str(item) + "'" for item in ids)
         sql_query = text('SELECT import_id, status, COUNT(*) FROM import_artists WHERE import_artists.import_id IN (' + list_str + ') GROUP BY import_id, status')
         resp = self.sql_session.execute(sql_query).all()

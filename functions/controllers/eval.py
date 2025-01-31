@@ -1,4 +1,4 @@
-from google.cloud.firestore_v1 import SERVER_TIMESTAMP
+from google.cloud.firestore_v1 import SERVER_TIMESTAMP, Client, DocumentSnapshot
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import joinedload
 
@@ -20,7 +20,7 @@ from google.cloud.firestore_v1.base_query import FieldFilter, BaseCompositeFilte
 #     }
 
 class EvalController():
-  def __init__(self, spotify: SpotifyClient, youtube: YoutubeClient, db, tracking_controller):
+  def __init__(self, spotify: SpotifyClient, youtube: YoutubeClient, db: Client, tracking_controller):
     self.spotify = spotify
     self.youtube = youtube
     self.db = db
@@ -66,7 +66,6 @@ class EvalController():
     )).order_by('created_at', "DESCENDING").get()
 
     cache_ref = check_cache.pop() if len(check_cache) > 0 else None
-
     if cache_ref is None:
         cache_data = {"data": top_tracks, "spotify_id": spotify_id, "type": "top-tracks", "processed": False, "created_at": SERVER_TIMESTAMP}
         update_time, cache_ref = self.db.collection("spotify_cache").add(cache_data)
@@ -113,8 +112,10 @@ class EvalController():
     if len(yt_evals) > 0:
       yt_evals = sorted(yt_evals, key=lambda x: x['release'], reverse=True)
 
-    cache_ref.reference.update({'processed': True})
-
+    if isinstance(cache_ref, DocumentSnapshot):
+        cache_ref.reference.update({'processed': True})
+    else:
+        cache_ref.set({'processed': True})
     # eval spotify
     sp_evals = []
     p_lines = self.spotify.get_artist_recent_plines_with_dates(spotify_id)

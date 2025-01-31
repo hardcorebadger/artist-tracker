@@ -122,6 +122,23 @@ export default function PageImportDetails({}) {
             }
         },
         {
+            field: 'processed',
+            headerName: 'Processed',
+            width: 150,
+            renderCell: (params) => {
+
+                return (
+                    <Chip
+                        variant={'outlined'}
+                        size={'small'}
+                        label={params.row.evaluation_id === null ? 'Processing' : (params.row.onboarded == false ? 'Onboarding' : 'Processed')}
+                        color={params.row.evaluation_id === null || params.row.onboarded == false ? 'warning' : 'primary'}
+                    />
+
+                )
+            }
+        },
+        {
             'field': 'created_at',
             'headerName': 'Created At',
             width: 200,
@@ -209,9 +226,9 @@ export default function PageImportDetails({}) {
                             pageSize: newPageSize
                         }
                     })}
-                    // onRowClick={(params) => {
-                        // navigate('/app/imports/' + importId +'/artists/' + params.row.artist.id)
-                    // }}
+                    onRowClick={(params) => {
+                        navigate('/app/imports/' + importId +'/artists/' + params.row.artist.id)
+                    }}
                     loading={loading}
                     getRowId={(row) => row.id}
                 />

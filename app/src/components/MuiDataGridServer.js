@@ -29,6 +29,7 @@ import { functions } from '../firebase';
 import {ColumnDataContext, CurrentReportContext, goFetch} from "../App";
 import { buildColumnOptions, buildColumns } from "./ColumnConfig";
 import {useUser} from "../routing/AuthGuard";
+import ReportToolbar from "./ReportToolbar";
 
 // const ChakraDataGrid = chakra(DataGrid);
 
@@ -320,6 +321,7 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                             onSortModelChange={setSortModel}
                             onFilterModelChange={setFilterModel}
                             onColumnOrderChange={handleColumnOrderChange}
+                            checkboxSelection disableRowSelectionOnClick
                             pagination
                             ref={apiRef}
                             onCellClick={(e) => {
@@ -337,6 +339,9 @@ export default function MuiDataGridController({initialReportName, initialColumnO
                                 pagination: currentQueryModel?.pagination ?? initialPagination,
                             }}
                             pageSizeOptions={[10, 20, 50, 100, 200]}
+                            // slots={{
+                            //     toolbar: ReportToolbar,
+                            // }}
                         />
 
                     </ThemeProvider>

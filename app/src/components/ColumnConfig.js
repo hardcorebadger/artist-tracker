@@ -32,6 +32,7 @@ export const columnBootstrap = [
         order: 0,
         flex: 1,
         minWidth: 150,
+        width: 200,
         cellClassName: 'hover-cell',
         renderCell: (params) => (<strong>{params.value}</strong>)
     }

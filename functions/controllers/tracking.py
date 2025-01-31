@@ -305,6 +305,13 @@ class TrackingController():
           })
           self.set_onboard_wait(sql_session, sql_ref, datetime.now() + timedelta(minutes=10))
           return 'Waiting for data', 201
+      elif e.status_code == 302:
+          ref.update({
+            "ob_status": "waiting_ingest",
+            "ob_wait_till": datetime.now() + timedelta(minutes=10)
+          })
+          self.set_onboard_wait(sql_session, sql_ref, datetime.now() + timedelta(minutes=10))
+          return 'Waiting for data', 201
       elif e.status_code == 429:
           ref.update({
             "ob_status": "waiting_ingest",
@@ -314,9 +321,8 @@ class TrackingController():
           return 'Waiting for data', 201
       else:
           self.set_onboard_wait(sql_session, sql_ref, None)
-
-      print(traceback.format_exc())
-      raise e
+          print(traceback.format_exc())
+          raise e
 
     print("[INGEST] has info")
     print(str(info))

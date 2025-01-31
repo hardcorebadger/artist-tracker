@@ -192,41 +192,43 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        playlists = sql_session.query(Playlist).options(joinedload(Playlist.imports)).all()
-        for playlist in playlists:
-            if len(playlist.imports) == 0:
-                attrs = sql_session.query(Attribution).options(joinedload(Attribution.artist)).filter(Attribution.playlist_id == playlist.id).all()
-                import_artists = []
-                for attr in attrs:
-                    import_artists.append(ImportArtist(
-                        spotify_id=attr.artist.spotify_id,
-                        artist_id=attr.artist.id,
-                        status=2,
-                        created_at=attr.created_at,
-                        updated_at=attr.created_at,
 
-                    ))
-                playlist.imports.append(
-                    Import(
-                        organization_id=playlist.organization_id,
-                        playlist_id=playlist.id,
-                        status="complete",
-                        user_id=playlist.first_user,
-                        completed_at=playlist.updated_at,
-                        created_at=playlist.created_at,
-                        updated_at=playlist.updated_at,
-                        artists=import_artists,
-                    )
-                )
-                sql_session.add(playlist)
-                sql_session.commit()
-                print("Done with playlist: "+  str(playlist.id))
-            # user = sql_session.query(Attribution).order_by(Attribution.id.desc()).filter(Attribution.playlist_id == playlist.id).first()
-            # if user is None:
-            #     print ("??? " + str(playlist.id) + " has no attribution")
-            #     continue
-            # playlist.first_user = user.user_id
-            # playlist.last_user = user.user_id
+        # playlists = sql_session.query(Playlist).options(joinedload(Playlist.imports)).all()
+        # generate imports from attrib
+        # for playlist in playlists:
+        #     if len(playlist.imports) == 0:
+        #         attrs = sql_session.query(Attribution).options(joinedload(Attribution.artist)).filter(Attribution.playlist_id == playlist.id).all()
+        #         import_artists = []
+        #         for attr in attrs:
+        #             import_artists.append(ImportArtist(
+        #                 spotify_id=attr.artist.spotify_id,
+        #                 artist_id=attr.artist.id,
+        #                 status=2,
+        #                 created_at=attr.created_at,
+        #                 updated_at=attr.created_at,
+        #
+        #             ))
+        #         playlist.imports.append(
+        #             Import(
+        #                 organization_id=playlist.organization_id,
+        #                 playlist_id=playlist.id,
+        #                 status="complete",
+        #                 user_id=playlist.first_user,
+        #                 completed_at=playlist.updated_at,
+        #                 created_at=playlist.created_at,
+        #                 updated_at=playlist.updated_at,
+        #                 artists=import_artists,
+        #             )
+        #         )
+        #         sql_session.add(playlist)
+        #         sql_session.commit()
+        #         print("Done with playlist: "+  str(playlist.id))
+        #     # user = sql_session.query(Attribution).order_by(Attribution.id.desc()).filter(Attribution.playlist_id == playlist.id).first()
+        #     # if user is None:
+        #     #     print ("??? " + str(playlist.id) + " has no attribution")
+        #     #     continue
+        #     # playlist.first_user = user.user_id
+        #     # playlist.last_user = user.user_id
 
         return "",200
         # artists_controller = ArtistController(PROJECT_ID, LOCATION, sql)
