@@ -299,9 +299,17 @@ export default function PageAdmin({}) {
             width: 300,
             renderCell: (params) => {
                 if (params.row.type === "user") {
-                    return null;
+                    return (
+                        <Box sx={{ pl: 4}}>
+                            <Typography variant="body2">{params.row.id}</Typography>
+                        </Box>
+                    );
                 } else if (params.row.type === "header") {
-                    return null;
+                    return (
+                        <Box sx={{ pl: 4}}>
+                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>ID</Typography>
+                        </Box>
+                    );
                 } else {
                     return (
                         <Box>

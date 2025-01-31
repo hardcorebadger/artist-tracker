@@ -140,18 +140,23 @@ export default function PageImports({}) {
             headerName: 'Status',
             width: 240,
             valueGetter: (data) => {
-                return Math.round(((data.row.artists.complete + data.row.artists.failed) / data.row.artists.total) * 10000) / 100
+                const percentImported =  Math.round(((data.row.artists.complete + data.row.artists.failed) / data.row.artists.total) * 10000) / 100
+                if (percentImported < 100) {
+                    return percentImported
+                }
+                return Math.round((Math.min(data.row.artists.onboarded, data.row.artists.evaluated) / data.row.artists.total) * 10000) / 100
             },
             renderCell: (params) => {
+                const stillProcessing = Math.min(params.row.artists.onboarded, params.row.artists.evaluated)
                 return (
                     <ChakraProvider theme={chakraTheme}>
                         <Stack w={'100%'}>
                             <HStack>
-                                <Text>{(params.row.status === 'pending' && params.value > 0 ? "In Progress:" : params.row.status.ucwords())}</Text>
+                                <Text>{(params.row.status === 'pending' && params.value > 0 ? "In Progress:" : ((params.row.status === 'complete' && stillProcessing < params.row.artists.total) ? "Processing" : params.row.status.ucwords()))}</Text>
                                 {((params.row.status != 'complete') || params.value < 100) ?  (params.value > 0 ? <Text>{params.value}%</Text> : null): <Iconify size={'15px'} icon={'mdi:check'}/>}
                             </HStack>
 
-                            {((params.row.status === 'pending' && params.value > 0) ? <Progress size="sm" colorScheme={params.row.status == 'complete' ? 'primary' : (params.row.status === 'failed' ? 'red' : 'yellow')} value={params.value}/> : null)}
+                            {(((params.row.status === 'pending' || stillProcessing < params.row.artists.total) && params.value > 0) ? <Progress size="sm" colorScheme={((params.row.status == 'complete' && stillProcessing >= params.row.artists.total) ? 'primary' : (params.row.status === 'failed' ? 'red' : 'yellow'))} value={params.value}/> : null)}
 
                         </Stack>
                     </ChakraProvider>

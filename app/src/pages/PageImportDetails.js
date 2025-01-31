@@ -126,13 +126,12 @@ export default function PageImportDetails({}) {
             headerName: 'Processed',
             width: 150,
             renderCell: (params) => {
-
                 return (
                     <Chip
                         variant={'outlined'}
                         size={'small'}
-                        label={params.row.evaluation_id === null ? 'Processing' : (params.row.onboarded == false ? 'Onboarding' : 'Processed')}
-                        color={params.row.evaluation_id === null || params.row.onboarded == false ? 'warning' : 'primary'}
+                        label={params.row.artist.evaluation_id === null ? 'Processing' : (params.row.artist.onboarded == false ? 'Onboarding' : 'Processed')}
+                        color={params.row.artist.evaluation_id === null || params.row.artist.onboarded == false ? 'warning' : 'primary'}
                     />
 
                 )

@@ -581,18 +581,37 @@ def load_stat_types(sql_session):
 
 def load_users(organization_id):
     db = firestore.client(app)
-    users = db.collection('users').where(filter=Or(
-        [
-            FieldFilter('organizations', 'array_contains', organization_id),
-            FieldFilter("admin", "==", True),
-        ]
-    )).get()
-    return ({
-        "id": user.id,
-        "first_name": user.get('first_name'),
-        "last_name": user.get('last_name'),
-        "admin": user.get('admin') if 'admin' in user.to_dict() else False,
-    } for user in users)
+    users_ref = db.collection("users").where(
+        filter=Or(
+            [
+                FieldFilter("organizations", "array_contains", organization_id),
+                FieldFilter("organization",  "==", organization_id),
+                FieldFilter("admin", "==", True),
+            ]
+        )
+    )
+
+    users = []
+    docs = users_ref.limit(10).stream()  # Fetch the first batch of documents
+    while True:
+        chunk = list(docs)
+        users.extend(chunk)  # Extend the users list with the current batch
+        if len(chunk) < 10:  # If fewer than 100 results, we've reached the end
+            break
+
+        # Fetch the next batch using the last document as a cursor
+        last_document = chunk[-1]
+        docs = users_ref.start_after(last_document).limit(10).stream()
+    print(len(users))
+    return [
+        {
+            "id": user.id,
+            "first_name": user.get("first_name"),
+            "last_name": user.get("last_name"),
+            "admin": user.get("admin") if "admin" in user.to_dict() else False,
+        }
+        for user in users
+    ]
 
 def user_from_request(request: https_fn.Request) -> None|UserRecord:
     auth_header = request.headers.get('Authorization', "")
