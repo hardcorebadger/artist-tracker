@@ -36,9 +36,7 @@ function PageAddArtist() {
   const user = useUser()
   const navigate = useNavigate()
   const [reports, reportsLoading, reportError] = useCollection(
-    query(collection(db, 'reports'), 
-      where("organization", "==", user.org.id),
-    ),
+    query(collection(db, 'organizations', user.org.id, 'reports')),
     {
       snapshotListenOptions: { includeMetadataChanges: true },
     }

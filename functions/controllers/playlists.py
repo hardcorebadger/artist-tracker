@@ -73,8 +73,8 @@ class PlaylistController:
             import_obj['artists']['pending'] = int(pop_default(list(filter(lambda x: x[1] == 0, tracked)), ['', 0, 0])[2])
             import_obj['artists']['failed'] = int(pop_default(list(filter(lambda x: x[1] == 1, tracked)), ['', 1, 0])[2])
             import_obj['artists']['complete'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0])[2])
-            import_obj['artists']['evaluated'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0])[3])
-            import_obj['artists']['onboarded'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0])[4])
+            import_obj['artists']['evaluated'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0, 0])[3])
+            import_obj['artists']['onboarded'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0, 0, 0])[4])
 
             import_obj['artists']['total'] = sum([import_obj['artists']['pending'], import_obj['artists']['failed'], import_obj['artists']['complete']])
 

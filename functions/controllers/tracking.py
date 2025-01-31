@@ -321,6 +321,7 @@ class TrackingController():
           return 'Waiting for data', 201
       else:
           self.set_onboard_wait(sql_session, sql_ref, None)
+          print(spotify_id  + " failed for unknown reason on songstats: " + str(e.status_code))
           print(traceback.format_exc())
           raise e
 

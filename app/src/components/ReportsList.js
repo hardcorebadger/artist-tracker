@@ -30,20 +30,12 @@ export default function ReportsList() {
   const {colorMode} = useColorMode()
   const user = useUser()
   const navigate = useNavigate()
-  const [reports, reportsLoading, reportError] = useCollection(
-    query(collection(db, 'reports'), 
-      where("organization", "==", user.org.id),
-    ),
-    {
-      snapshotListenOptions: { includeMetadataChanges: true },
-    }
-  )
 
-  const reportItems = reportError || reportsLoading ? null : reports.docs.map((d) => ({'id':d.id, 'path': '/app/reports/'+d.id, ...d.data()}))
+  const reportItems = user.org.reports ? user.org.reports.map((d) => ({'id':d.id, 'path': '/app/reports/'+d.id, ...d})) : null
 
   const createReport = async () => {
     setCreateReportLoading(true)
-    const docRef = await addDoc(collection(db, 'reports'), {
+    const docRef = await addDoc(collection(db, 'organizations', user.org.id, 'reports'), {
       organization: user.org.id,
       created_by: user.auth.uid,
       created_on: Date.now(),

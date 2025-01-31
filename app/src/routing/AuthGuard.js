@@ -118,9 +118,9 @@ function OrganizationGuard({user, profileData, orgId, children}) {
       snapshotListenOptions: { includeMetadataChanges: true },
     }
   )
-  
-  const [products, productsLoading, productsError] = useCollection(
-    collection(db, 'organizations', orgId, 'products'),
+
+  const [reports, reportsLoading, reportsError] = useCollection(
+    collection(db, 'organizations', orgId, 'reports'),
     {
       snapshotListenOptions: { includeMetadataChanges: true },
     }
@@ -135,7 +135,7 @@ function OrganizationGuard({user, profileData, orgId, children}) {
     }
   )
 
-  if (orgLoading || productsLoading || usersLoading) {
+  if (orgLoading || reportsLoading || usersLoading) {
     return <LoadingScreen />;
   }
 
@@ -144,10 +144,13 @@ function OrganizationGuard({user, profileData, orgId, children}) {
     return <Navigate to='/auth/login' />;
   } 
 
-  let productData = null
-  if (products) {
-    productData = {}
-    products.docs.map((doc) => {productData[doc.data().id] = doc.data()})
+  let reportsData = null
+  if (reports) {
+    reportsData = reports.docs.map((doc) => {return {
+      ...doc.data(),
+      id: doc.id
+    }})
+
   }
 
   let orgUsers = {}
@@ -159,24 +162,17 @@ function OrganizationGuard({user, profileData, orgId, children}) {
 
   const main = <UserContext.Provider value={{
     org: {
-      products: productData,
       id: orgId,
       info: org.data(),
-      users: orgUsers
+      ref: org.ref,
+      users: orgUsers,
+      reports: reportsData
     },
     profile: profileData,
     auth: user,
     hasAccessLevel: (level) => {
       let access = false
-      for (const pid in productData) {
-        if (productData[pid].status != "expired") {
-          if (pid in productMap) {
-            if (productMap[pid].access.includes(level)) {
-              access = true
-            }
-          }
-        }
-      }
+
       return access
     }
   }}>{children}</UserContext.Provider>;

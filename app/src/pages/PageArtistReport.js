@@ -21,9 +21,9 @@ function PageArtistReport() {
   const { statisticTypes, linkSources, setActiveArtist, activeArtist } = useContext(ColumnDataContext);
   const { setCurrentReport, currentReport, setCurrentRows, setCurrentQueryModel } = useContext(CurrentReportContext);
 
-  async function getDocument(collectionName, documentId) {
+  async function getReport(documentId) {
     try {
-      const docRef = doc(db, collectionName, documentId);
+      const docRef = doc(db, 'organizations', user.org.id, 'reports', documentId);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -42,7 +42,7 @@ function PageArtistReport() {
       if (currentReport === null || currentReport.id !== id) {
         setCurrentRows(null)
         setCurrentQueryModel(null)
-        const documentData = await getDocument("reports", id);
+        const documentData = await getReport(id);
         if (documentData) {
             setCurrentReport({
               id: id,
@@ -92,7 +92,7 @@ function PageArtistReport() {
   // cause rerender
 
   const onReportSave = async (columnOrder, filterValue, reportName, sortModel) => {
-    await setDoc(doc(db, 'reports', id), {
+    await setDoc(doc(db, 'organizations', user.org.id, 'reports', id), {
       organization: user.org.id,
       last_modified_by: user.auth.uid,
       last_modified_on: Date.now(),
@@ -108,7 +108,7 @@ function PageArtistReport() {
   }
 
   const onReportSaveNew = async (columnOrder, filterValue, reportName, sortModel) => {
-    const docRef = await addDoc(collection(db, 'reports'), {
+    const docRef = await addDoc(collection(db, 'organizations', user.org.id, 'reports'), {
       organization: user.org.id,
       last_modified_by: user.auth.uid,
       last_modified_on: Date.now(),
@@ -124,7 +124,7 @@ function PageArtistReport() {
   }
 
   const onReportDelete = async() => {
-    await deleteDoc(doc(db, 'reports', id))
+    await deleteDoc(doc(db, 'organizations', user.org.id, 'reports', id))
     navigate('/app/reports/all')
   }
   if (statisticTypes === null || linkSources === null) {

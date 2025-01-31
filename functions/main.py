@@ -192,7 +192,18 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-
+        organizations = db.collection("organizations").get()
+        for org in organizations:
+            if org.id == '8AasHpt0Y2CNmogY6TpM':
+                continue
+            reports = db.collection('reports').where(filter=FieldFilter(
+        "organization", "==", org.id
+            )).get()
+            org.reference.collection('reports')
+            for report in reports:
+                print(report.to_dict())
+                org.reference.collection('reports').add(report.to_dict())
+        return "", 200
         # playlists = sql_session.query(Playlist).options(joinedload(Playlist.imports)).all()
         # generate imports from attrib
         # for playlist in playlists:

@@ -333,14 +333,6 @@ export default function DashboardLayout() {
   }, [currentUser])
 
 
-  const [reports, reportsLoading, reportError] = useCollection(
-    query(collection(db, 'reports'), 
-      where("organization", "==", user.org.id),
-    ),
-    {
-      snapshotListenOptions: { includeMetadataChanges: true },
-    }
-  )
 
   const location = useLocation()
   const vh100 = use100vh();
@@ -355,9 +347,8 @@ export default function DashboardLayout() {
 
   useEffect(() => {
 
-  }, [organizations])
-
-  const reportItems = reportError || reportsLoading ? [] : reports.docs.map((d) => ({'name': d.data().name, 'path': '/app/reports/'+d.id}))
+  }, [organizations, user])
+  const reportItems = user.org.reports.map((d) => ({'name': d.name, 'path': '/app/reports/'+d.id}))
   const navItems = bakeNavItems(navItemConfig, reportItems, organizations, currentUser)
   const { isOpen, onOpen, onClose } = useDisclosure()
   const layoutRef = useRef()
