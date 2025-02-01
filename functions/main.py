@@ -837,6 +837,14 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         response.headers.add('Vary', 'X-Organization')
         return response
 
+    @v3_api.get('/get-existing-tags-light')
+    def get_existing_tags_request_light():
+        response = jsonify(get_existing_tags(sql_session, user, True))
+        response.headers.add('Cache-Control', 'public, max-age=60')
+        response.headers.add('X-Organization', request.headers.get('X-Organization'))
+        response.headers.add('Vary', 'X-Organization')
+        return response
+
     @v3_api.get('/artists')
     def get_artists_request():
         artists_controller = get_artists_controller()
@@ -939,7 +947,7 @@ def get_type_definitions(sql_session):
         "tag_types": get_tag_types()
     }
 
-def get_existing_tags(sql_session, user):
+def get_existing_tags(sql_session, user, light = False):
     db = firestore.client(app)
     if user is None:
         return {
@@ -950,15 +958,15 @@ def get_existing_tags(sql_session, user):
     uid = user.uid
     user_snap = get_user(uid, db, False)
     user_data = user_snap.to_dict()
-
-    if ('email' not in user_data or user_data['email'] is None):
-        user_snap.update({'email': user.email})
-    records = select(ArtistTag).distinct(ArtistTag.tag_type_id, ArtistTag.tag).filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))
+    #
+    # if ('email' not in user_data or user_data['email'] is None):
+    #     user_snap.update({'email': user.email})
+    records = select(ArtistTag.tag, ArtistTag.tag_type_id).distinct(ArtistTag.tag_type_id, ArtistTag.tag).filter(ArtistTag.organization_id == user_data.get('organization'))
     records = sql_session.scalars(records).all()
-    records = (tag_type.as_tag_dict() for tag_type in records)
+    records = ({"tag": tag_type[0], "tag_type_id": tag_type[1]} for tag_type in records)
     return {
         "tags": list(records),
-        "users": list(load_users(user_data.get('organization'))),
+        "users": [] if light == True else list(load_users(user_data.get('organization'))),
         "current_user": user_data,
     }
 
