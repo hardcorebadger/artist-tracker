@@ -961,9 +961,9 @@ def get_existing_tags(sql_session, user, light = False):
     #
     # if ('email' not in user_data or user_data['email'] is None):
     #     user_snap.update({'email': user.email})
-    records = select(ArtistTag.tag, ArtistTag.tag_type_id).distinct(ArtistTag.tag_type_id, ArtistTag.tag).filter(ArtistTag.organization_id == user_data.get('organization'))
+    records = select(ArtistTag.tag).distinct(ArtistTag.tag).filter(ArtistTag.organization_id == user_data.get('organization'))
     records = sql_session.scalars(records).all()
-    records = ({"tag": tag_type[0], "tag_type_id": tag_type[1]} for tag_type in records)
+    records = ({"tag": tag_type, "tag_type_id":1} for tag_type in records)
     return {
         "tags": list(records),
         "users": [] if light == True else list(load_users(user_data.get('organization'))),
