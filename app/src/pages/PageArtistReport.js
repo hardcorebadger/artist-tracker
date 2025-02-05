@@ -133,7 +133,7 @@ function PageArtistReport() {
     )
   }
   return (
-    <Box sx={{height:'auto', maxWidth: '100%'}} >
+    <Box sx={{height:'auto', maxWidth: '100%', overflowY: 'scroll'}} >
     <MuiDataGridController
     initialReportName={currentReport?.data.name}
     initialColumnOrder={currentReport?.data.columnOrder}

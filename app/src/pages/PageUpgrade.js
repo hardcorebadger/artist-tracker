@@ -54,13 +54,13 @@ function PageUpgrade() {
 
   const plans = [
     {
-      value: "Indiestack Trial Monthly",
-      planName: "Indiestack Trial Monthly",
+      value: "Indiestack Trial Pricing",
+      planName: "Indiestack Trial Pricing",
       price: "$50/mo",
-      description: "A special limited offer",
+      description: "Throughout the beta period",
       enabled: true,
       features: [
-        { text: "> 1k artists", has: false },
+        { text: "> 1k artists", has: true },
         { text: "Multiple Users", has: true },
         { text: "SMS Support", has: true },
         { text: "Artist Lookalikes", has: true },
@@ -71,7 +71,7 @@ function PageUpgrade() {
     {
       value: "Indiestack Enterprise",
       planName: "Indiestack Enterprise",
-      price: "$500/mo",
+      price: "$899/mo",
       description: "Unleash the firehose",
       enabled: false,
       features: [
@@ -86,16 +86,16 @@ function PageUpgrade() {
   ];
 
   return (
-      <PageLayoutContained size="sm">
-        <Container maxW="700" textAlign="center" pb="50">
+      <PageLayoutContained size="sm" sx={{overflowY: 'hidden'}}>
+        <Container  textAlign="center" pb="50" sx={{overflowY: 'hidden'}}>
           <VStack align="center" spacing={5}>
-            <Heading size="3xl">Upgrade to get access</Heading>
+            <Heading size="3xl">Select a plan</Heading>
             <Text color="text.subtle" size="lg">
-              Subscribe now to our Trial period for only $50/month
+              You've been granted trial access.
             </Text>
           </VStack>
         </Container>
-        <Container maxW="800" pb="100">
+        <Container maxW="800" sx={{maxHeight: '50vh', overflowY: 'hidden'}}>
           <RadioGroup onChange={handlePlanChange} value={selectedPlan}>
             <SimpleGrid columns={2} spacing={10}>
               {plans.map((plan) => (
@@ -113,7 +113,7 @@ function PageUpgrade() {
           </RadioGroup>
           <VStack pt="6">
             <Button colorScheme="primary" onClick={checkout} isLoading={subscribeLoading}>
-              Subscribe to {selectedPlan}
+              Continue to Payment
             </Button>
           </VStack>
         </Container>

@@ -374,7 +374,7 @@ export default function DashboardLayout() {
         <GridItem area={'nav'}>
           <NavBar navItems={navItems} currentUser={currentUser}  organizations={organizations} openOrgModal={onOpen} />
         </GridItem>
-        <GridItem area={'main'} maxW={'calc(100vw - 315px)'} maxH={'calc(100vh - 85px)'} overflowY={'scroll'}  ref={layoutRef}>
+        <GridItem area={'main'} maxW={'calc(100vw - 315px)'} maxH={'calc(100vh - 85px)'} overflowY={'auto'}  ref={layoutRef}>
           <Outlet context={[layoutRef]} />
         </GridItem>
 

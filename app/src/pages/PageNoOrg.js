@@ -42,6 +42,7 @@ function PageDefault() {
           organization: orgID,
           organizations: [orgID]
         });
+        window.location.reload()
       } else {
         console.log("No such document!");
         setError({show:true,severity:'error',display:'Organization not found'})
