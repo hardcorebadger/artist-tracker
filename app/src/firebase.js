@@ -50,7 +50,8 @@ export const signInOrCreateUserWithGoogle = async () => {
   if (!udoc.exists()) {
     await setDoc(d, {
       first_name: first_implied,
-      last_name: last_implied
+      last_name: last_implied,
+      email: auth.currentUser.email
     })
   }
 }
@@ -58,7 +59,8 @@ export const createUserWithEmailAndPassword = async (email, password, first, las
   await fbauth.createUserWithEmailAndPassword(auth, email, password)
   await setDoc(doc(db, 'users', auth.currentUser.uid), {
     first_name: first,
-    last_name: last
+    last_name: last,
+    email: auth.currentUser.email
   })
   await updateProfile(auth.currentUser, {displayName: first + " " + last})
   .then((r) => {

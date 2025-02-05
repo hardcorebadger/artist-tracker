@@ -193,16 +193,28 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/debug")
     def debug():
         organizations = db.collection("organizations").get()
-        for org in organizations:
-            if org.id == '8AasHpt0Y2CNmogY6TpM':
-                continue
-            reports = db.collection('reports').where(filter=FieldFilter(
-        "organization", "==", org.id
-            )).get()
-            org.reference.collection('reports')
-            for report in reports:
-                print(report.to_dict())
-                org.reference.collection('reports').add(report.to_dict())
+        # for org in organizations:
+        #     if org.id == '0dhwhAKcEVTX4kQILMZD':
+        #         continue
+        #     attributions = sql_session.execute(text('SELECT DISTINCT(attribution.user_id) FROM attribution WHERE attribution.organization_id = \'' + org.id+'\''))
+        #     real_users = load_users(org.id)
+        #     final_ids = []
+        #     for user in real_users:
+        #         if user.get('id') not in final_ids:
+        #             final_ids.append(user.get('id'))
+        #     for attribution in attributions:
+        #         if attribution.user_id not in final_ids:
+        #             final_ids.append(attribution.user_id)
+        #     print(org.id, org.get('name'), final_ids)
+        #     newUsers = {}
+        #     for id in final_ids:
+        #         newUsers[id] = {
+        #             "active": True,
+        #             "admin": False
+        #         }
+        #     org.reference.update({
+        #         "users": newUsers
+        #     })
         return "", 200
         # playlists = sql_session.query(Playlist).options(joinedload(Playlist.imports)).all()
         # generate imports from attrib
@@ -613,7 +625,6 @@ def load_users(organization_id):
         # Fetch the next batch using the last document as a cursor
         last_document = chunk[-1]
         docs = users_ref.start_after(last_document).limit(10).stream()
-    print(len(users))
     return [
         {
             "id": user.id,
@@ -647,7 +658,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         return 'Unauthorized', 401
     playlist_controller = PlaylistController(sql_session)
 
-
+    print(request.path)
     @v3_api.get('/get-type-defs')
     def get_type_definitions_request():
         response = jsonify(get_type_definitions(sql_session))
@@ -780,15 +791,14 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
 
     @v3_api.get('/imports')
     def get_imports():
-        db = firestore.client(app)
-        user_data = get_user(user.uid, db)
+        organization_id = request.headers.get('X-Organization')
         req = flask.request.args.to_dict()
         page_size = int(req.get('pageSize', 10))
         page = int(req.get('page', 0))
 
         import_id = req.get('id', None)
         if import_id is None:
-            imports, total = playlist_controller.get_imports(user_data.get('organization'), page, page_size)
+            imports, total = playlist_controller.get_imports(organization_id, page, page_size)
             response = jsonify({
                 "imports": imports,
                 "page": page,
@@ -796,7 +806,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
                 "total": total
             })
         else:
-            import_obj, total = playlist_controller.get_import(user_data.get('organization'), int(import_id), page, page_size)
+            import_obj, total = playlist_controller.get_import(organization_id, int(import_id), page, page_size)
             response = jsonify({
                 "import": import_obj,
                 "page": page,
