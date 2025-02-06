@@ -174,6 +174,7 @@ class TrackingController():
                   sqlRef.organizations.append(OrganizationArtist(
                       organization_id=org_id,
                       last_playlist_id=sql_playlist_id,
+                      muted=False,
                       added_by=user_id
                   ))
               else:
@@ -264,7 +265,7 @@ class TrackingController():
             sql_query = text('UPDATE imports SET status=\'complete\', completed_at=NOW(), updated_at=NOW() WHERE id=' + str(import_id) + ' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL')
             sql_session.execute(sql_query)
             sql_session.commit()
-    except Exception|ErrorResponse as e:
+    except Exception as e:
         print(e)
         print(traceback.format_exc())
         if import_id is not None:
@@ -677,8 +678,8 @@ class TrackingController():
                       orgs.append(OrganizationArtist(
                           organization_id=orgId,
                           added_by=added_by,
+                          muted=False,
                           last_playlist_id=attribution.playlist_id if attribution is not None else None,
-                          favorite=watchDetails.get('favorite'),
                           created_at=watchDetails.get('added_on'),
                       ))
                   eval = self.convert_eval(artist)

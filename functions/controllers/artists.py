@@ -24,7 +24,7 @@ class ArtistController():
         db = firestore.client(app)
 
         user_data = get_user(uid, db)
-        count = self.build_query(uid, user_data, {}, db, sql_session, None, True)
+        count = self.build_query(uid, user_data, {}, db, sql_session, None, 'hide', True)
         return {
             "eval": count.filter(Artist.eval_queued_at != None).count(),
             "spotify": count.filter(Artist.spotify_queued_at != None).count(),
@@ -46,6 +46,7 @@ class ArtistController():
 
             page = int(data.get('page', 0))
             page_size = int(data.get('pageSize', 20))
+            muted = data.get('muted', 'hide')
 
             # filters = data.get('filterModel', [])
             user_data = get_user(uid, db)
@@ -68,10 +69,10 @@ class ArtistController():
             #     if (time.time() - count_object['time']) < 360:
             #         count = count_object['count']
             if count is None and id_lookup is None:
-                count = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup, True).count()
+                count = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup, muted, True).count()
                 # count_by_query[hex_digest] = dict({"count": count, "time": time.time()})
 
-            query = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup).limit(page_size).offset(page * page_size)
+            query = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup, muted).limit(page_size).offset(page * page_size)
 
             artists_set = sql_session.scalars(query).unique()
             artists = None
@@ -113,7 +114,7 @@ class ArtistController():
                 "error": traceback.format_exc()
             }
 
-    def build_query(self, uid, user_data, data, db, sql_session, id_lookup, count = False):
+    def build_query(self, uid, user_data, data, db, sql_session, id_lookup, muted, count = False):
         query = sql_session.query(Artist)
 
         if not count:
@@ -140,7 +141,13 @@ class ArtistController():
             ))
             query = query.filter(Artist.id == id_lookup)
 
-        sub_query = select(func.distinct(OrganizationArtist.artist_id)).filter(OrganizationArtist.organization_id == user_data.get('organization'))
+        org_filter = (OrganizationArtist.organization_id == user_data.get('organization'))
+        if muted == 'hide':
+            org_filter = and_(org_filter, OrganizationArtist.muted == False)
+        elif muted == 'only':
+            org_filter = and_(org_filter, OrganizationArtist.muted == True)
+
+        sub_query = select(func.distinct(OrganizationArtist.artist_id)).filter(org_filter)
         query = query.filter(Artist.active == True)
         query = query.outerjoin(Evaluation, Artist.evaluation)
         query = query.where(Artist.id.in_(sub_query))

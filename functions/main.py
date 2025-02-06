@@ -855,6 +855,33 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         response.headers.add('Vary', 'X-Organization')
         return response
 
+    def artist_mute(artist_ids, value):
+        if isinstance(artist_ids, str):
+            artist_ids = [artist_ids]
+        db = firestore.client(app)
+        user_data = get_user(user.uid, db)
+        stmt = update(OrganizationArtist).where(and_(OrganizationArtist.organization_id == user_data.get('organization'), OrganizationArtist.artist_id.in_(artist_ids))).values(muted=value)
+        sql_session.execute(stmt)
+        sql_session.commit()
+
+    @v3_api.post('/artists/mute')
+    def artist_bulk_mute_request():
+        req = flask.request.get_json()
+        artist_ids = req.get('ids', [])
+        value = req.get('muted', True)
+        artist_mute(artist_ids, value)
+        return {"status": "success"}, 200
+
+    @v3_api.post('/artists/<artist_id>/mute')
+    def artist_mute_request(artist_id):
+        artist_mute(artist_id, True)
+        return {"status": "success"}, 200
+
+    @v3_api.post('/artists/<artist_id>/unmute')
+    def artist_unmute_request(artist_id):
+        artist_mute(artist_id, False)
+        return {"status": "success"}, 200
+
     @v3_api.get('/artists')
     def get_artists_request():
         artists_controller = get_artists_controller()
@@ -870,7 +897,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         if artists.get('error', None) is not None:
             response.status_code = 500
         else:
-            response.headers.add('Cache-Control', 'public, max-age=20')
+            response.headers.add('Cache-Control', 'public, max-age=1')
         response.headers.add('X-Organization', request.headers.get('X-Organization'))
         response.headers.add('Vary', 'X-Organization')
         return response

@@ -175,7 +175,7 @@ class OrganizationArtist(Base):
 
     organization_id = Column(String(28), nullable=False, primary_key=True)
     artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False, primary_key=True)
-    favorite = Column(Boolean, default=False)
+    muted = Column(Boolean, default=False)
     created_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     updated_at = Column(TIMESTAMP, default=datetime.datetime.now(datetime.UTC))
     artist: Mapped["Artist"] = relationship(back_populates="organizations")
@@ -184,14 +184,14 @@ class OrganizationArtist(Base):
     def as_dict(self):
         return {
             'organization_id': self.organization_id,
-            'favorite': self.favorite,
+            'muted': self.muted,
             'created_at': self.created_at,
             'added_by': self.added_by,
             'last_playlist_id': self.last_playlist_id
             }
 
     def __repr__(self):
-        return f"<OrganizationArtist({self.organization_id=}, {self.artist_id=}, {self.favorite=}, {self.created_at=})>"
+        return f"<OrganizationArtist({self.organization_id=}, {self.artist_id=}, {self.muted=}, {self.created_at=})>"
 
 class UserArtist(Base):
     __tablename__ = 'user_artists'
