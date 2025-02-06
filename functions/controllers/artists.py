@@ -35,7 +35,7 @@ class ArtistController():
 
     # def get_artists_test(self, data, app):
         # return (self.get_artists('9sRMdvFDUKVKckwpzeARiG6x2LG2', data, app, self.sql.get_session()))
-    def get_artists(self, uid, data, app, sql_session):
+    def get_artists(self, uid, data, app, sql_session, ids_only = False):
         id_lookup = data.get('id', None)
 
         try:
@@ -46,7 +46,6 @@ class ArtistController():
 
             page = int(data.get('page', 0))
             page_size = int(data.get('pageSize', 20))
-            muted = data.get('muted', 'hide')
 
             # filters = data.get('filterModel', [])
             user_data = get_user(uid, db)
@@ -68,19 +67,23 @@ class ArtistController():
             #     count_object = count_by_query[hex_digest]
             #     if (time.time() - count_object['time']) < 360:
             #         count = count_object['count']
-            if count is None and id_lookup is None:
-                count = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup, muted, True).count()
+            if count is None and id_lookup is None and ids_only == False:
+                count = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup, True).count()
                 # count_by_query[hex_digest] = dict({"count": count, "time": time.time()})
 
-            query = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup, muted).limit(page_size).offset(page * page_size)
+            query = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup, False, ids_only)
+            if not ids_only:
+                query = query.limit(page_size).offset(page * page_size)
 
             artists_set = sql_session.scalars(query).unique()
             artists = None
             if id_lookup is not None:
                 artists = list(map(lambda artist: artist.as_deep_dict(user_data.get('organization')), artists_set))
-            else:
+            elif ids_only == False:
                 artists = list(map(lambda artist: artist.as_dict(user_data.get('organization')), artists_set))
-
+            else:
+                artists = list(artists_set)
+                return artists
             db.close()
             if id_lookup is not None:
                 return {
@@ -114,10 +117,13 @@ class ArtistController():
                 "error": traceback.format_exc()
             }
 
-    def build_query(self, uid, user_data, data, db, sql_session, id_lookup, muted, count = False):
+    def build_query(self, uid, user_data, data, db, sql_session, id_lookup, count = False, ids_only = False):
         query = sql_session.query(Artist)
-
-        if not count:
+        filter_model = data.get('filterModel')
+        muted = 'hide'
+        if filter_model is not None:
+            muted = filter_model.get('muted')
+        if not count and not ids_only:
             query = (select(Artist).options(
                 joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True).defer(StatisticType.created_at).defer(StatisticType.updated_at),
                 joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True).defer(LinkSource.logo),
@@ -127,7 +133,7 @@ class ArtistController():
                 joinedload(Artist.tags, innerjoin=False),
             ))
 
-        if id_lookup is not None:
+        if id_lookup is not None and not ids_only:
             query = (select(Artist).options(
                 joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True).defer(
                     StatisticType.created_at).defer(StatisticType.updated_at),
@@ -141,15 +147,19 @@ class ArtistController():
             ))
             query = query.filter(Artist.id == id_lookup)
 
+        if ids_only:
+            query = (select(Artist.id))
+
         org_filter = (OrganizationArtist.organization_id == user_data.get('organization'))
-        if muted == 'hide':
+        if muted == 'hide' or muted is None:
             org_filter = and_(org_filter, OrganizationArtist.muted == False)
         elif muted == 'only':
             org_filter = and_(org_filter, OrganizationArtist.muted == True)
 
         sub_query = select(func.distinct(OrganizationArtist.artist_id)).filter(org_filter)
         query = query.filter(Artist.active == True)
-        query = query.outerjoin(Evaluation, Artist.evaluation)
+        if not ids_only:
+            query = query.outerjoin(Evaluation, Artist.evaluation)
         query = query.where(Artist.id.in_(sub_query))
         # query = query.filter(UserArtist.organization_id == user_data.get('organization'))
         # query = query.filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))

@@ -193,6 +193,8 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/debug")
     def debug():
         organizations = db.collection("organizations").get()
+        return get_artists_controller().get_artists('q9HMKTU1S7hUlpNdtBB5braS1VJ3', {"filterModel": {"items": [], "muted": 'hide'}}, app, sql_session, True)
+
         # for org in organizations:
         #     if org.id == '0dhwhAKcEVTX4kQILMZD':
         #         continue
@@ -855,6 +857,9 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         response.headers.add('Vary', 'X-Organization')
         return response
 
+    def artist_ids_from_filters(filter_model):
+        return get_artists_controller().get_artists(user.uid, {"filterModel": filter_model}, app, sql_session, True)
+
     def artist_mute(artist_ids, value):
         if isinstance(artist_ids, str):
             artist_ids = [artist_ids]
@@ -867,9 +872,15 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     @v3_api.post('/artists/mute')
     def artist_bulk_mute_request():
         req = flask.request.get_json()
-        artist_ids = req.get('ids', [])
+        artist_ids = req.get('ids', None)
+        filter_model = req.get('filterModel', None)
         value = req.get('muted', True)
-        artist_mute(artist_ids, value)
+        if filter_model is None:
+            artist_mute(artist_ids, value)
+        else:
+            ids = artist_ids_from_filters(filter_model)
+            artist_mute(ids, value)
+
         return {"status": "success"}, 200
 
     @v3_api.post('/artists/<artist_id>/mute')
