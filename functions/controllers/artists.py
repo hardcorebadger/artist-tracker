@@ -127,7 +127,7 @@ class ArtistController():
             query = (select(Artist).options(
                 joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True).defer(StatisticType.created_at).defer(StatisticType.updated_at),
                 joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True).defer(LinkSource.logo),
-                subqueryload(Artist.organizations),
+                contains_eager(Artist.organizations),
                 contains_eager(Artist.evaluation),
                 joinedload(Artist.users, innerjoin=False),
                 joinedload(Artist.tags, innerjoin=False),
@@ -139,7 +139,7 @@ class ArtistController():
                     StatisticType.created_at).defer(StatisticType.updated_at),
                 joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True).defer(
                     LinkSource.logo),
-                subqueryload(Artist.organizations),
+                contains_eager(Artist.organizations),
                 contains_eager(Artist.evaluation),
                 joinedload(Artist.users, innerjoin=False),
                 joinedload(Artist.tags, innerjoin=False),
@@ -160,6 +160,7 @@ class ArtistController():
         query = query.filter(Artist.active == True)
         if not ids_only:
             query = query.outerjoin(Evaluation, Artist.evaluation)
+            query = query.outerjoin(OrganizationArtist, and_(Artist.organizations, OrganizationArtist.organization_id == user_data.get('organization')))
         query = query.where(Artist.id.in_(sub_query))
         # query = query.filter(UserArtist.organization_id == user_data.get('organization'))
         # query = query.filter(or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))

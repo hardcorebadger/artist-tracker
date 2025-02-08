@@ -19,8 +19,8 @@ then
   fi
   export OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES
   export no_proxy=*
-  export FIRESTORE_EMULATOR_HOST=127.0.0.1:8181
-  export FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
+#  export FIRESTORE_EMULATOR_HOST=127.0.0.1:8181
+#  export FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099
   echo "[Indiestack] Running emulators for functions...";
   firebase emulators:start --only functions;
 fi

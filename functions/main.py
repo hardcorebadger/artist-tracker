@@ -3,7 +3,7 @@ import json
 import math
 
 from firebase_admin import initialize_app, firestore, functions, auth, credentials
-from firebase_admin.auth import UserRecord
+from firebase_admin.auth import UserRecord, UserNotFoundError
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
 from firebase_functions.options import RetryConfig, MemoryOption
 from flask import jsonify
@@ -49,6 +49,7 @@ link_sources = None
 youtube_client = None
 # task_controller = None
 
+
 def get_tag_types():
     return dict({
         1: {
@@ -62,7 +63,6 @@ def get_tag_types():
             "key": "genre"
         }
     })
-
 
 sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD, SQL_DB)
 songstats = SongstatsClient(SONGSTATS_API_KEY)
@@ -192,8 +192,12 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
+
+        # invite = db.document("invites/oohAkpkB2Y3UDfbbJnVO").update({'created_at': datetime.now(), 'updated_at': datetime.now(), 'expires_at': datetime.now() + timedelta(days=1)})
+
         organizations = db.collection("organizations").get()
-        return get_artists_controller().get_artists('q9HMKTU1S7hUlpNdtBB5braS1VJ3', {"filterModel": {"items": [], "muted": 'hide'}}, app, sql_session, True)
+        return json.dumps(list(map(lambda org: org.to_dict(), organizations)))
+        # return get_artists_controller().get_artists('q9HMKTU1S7hUlpNdtBB5braS1VJ3', {"filterModel": {"items": [], "muted": 'hide'}}, app, sql_session, True)
 
         # for org in organizations:
         #     if org.id == '0dhwhAKcEVTX4kQILMZD':
@@ -648,6 +652,8 @@ def user_from_request(request: https_fn.Request) -> None|UserRecord:
         return auth.get_user(user_id)
     except ValueError as e:
         return None
+    except UserNotFoundError as e:
+        return None
 
 @https_fn.on_request(min_instances=2, memory=MemoryOption.MB_512, cors=options.CorsOptions(
         cors_origins="*",
@@ -907,10 +913,10 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         response = jsonify(artists )
         if artists.get('error', None) is not None:
             response.status_code = 500
-        else:
-            response.headers.add('Cache-Control', 'public, max-age=1')
-        response.headers.add('X-Organization', request.headers.get('X-Organization'))
-        response.headers.add('Vary', 'X-Organization')
+        # else:
+            # response.headers.add('Cache-Control', 'public, max-age=1')
+        # response.headers.add('X-Organization', request.headers.get('X-Organization'))
+        # response.headers.add('Vary', 'X-Organization')
         return response
 
     @v3_api.post('/add-artist')
