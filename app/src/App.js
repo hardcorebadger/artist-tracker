@@ -28,7 +28,7 @@ function App() {
     const [currentQueryModel, setCurrentQueryModel] = useState(getInitialState('currentQueryModel'))
     const [currentUser, setCurrentUser] = useState(null)
     const [organization, setOrganization] = useState(null)
-    const is_dev = location.hostname === "localhost"
+    const is_dev = location.hostname === "localhost" || location.hostname === '127.0.0.1'
 
     if (!is_dev && !location.hostname.includes('indiestack')) {
         window.location = "https://indiestack.app/" + window.location.pathname;

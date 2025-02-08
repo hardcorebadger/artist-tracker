@@ -3,9 +3,9 @@ import { initializeApp, registerVersion } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import * as fbauth from "firebase/auth";
 import { useAuthState } from 'react-firebase-hooks/auth';
-import { getFirestore } from "firebase/firestore"
+import { getFirestore , connectFirestoreEmulator } from "firebase/firestore"
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from "firebase/functions";
-import { updateProfile, sendEmailVerification } from 'firebase/auth';
+import { updateProfile, sendEmailVerification, connectAuthEmulator } from 'firebase/auth';
 import { setDoc, doc, getDoc } from 'firebase/firestore';
 import { firebaseConfig } from "./config";
 
@@ -20,14 +20,15 @@ export const db = getFirestore(app);
 export const functions = getFunctions(app);
 export const v3_url = is_dev ? 'http://127.0.0.1:5001/artist-tracker-e5cce/us-central1/fn_v3_api/' : 'https://fn-v3-api-wfsh2ttvrq-uc.a.run.app/'
 export const spotify_redirect = is_dev ? 'http://localhost:3000/app/callback/spotify' : 'https://indiestack.app/app/callback/spotify'
+export const auth = fbauth.getAuth(app);
 
 if (is_dev) {
   console.log("Localhost detected. Using emulators.")
   connectFunctionsEmulator(functions, '127.0.0.1', 5001)
+  connectFirestoreEmulator(db, '127.0.0.1', 8181)
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099')
 }
-
 // Initialize Firebase Authentication and get a reference to the service
-export const auth = fbauth.getAuth(app);
 
 export const useAuth = () => useAuthState(auth)
 
