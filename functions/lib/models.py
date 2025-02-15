@@ -181,10 +181,14 @@ class OrganizationArtist(Base):
     artist: Mapped["Artist"] = relationship(back_populates="organizations")
     last_playlist_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('playlists.id'), nullable=True)
     added_by = Column(String(28),  nullable=False, primary_key=True)
+    archived = Column(Boolean, default=False)
+    archived_at = Column(TIMESTAMP, nullable=True)
+    archived_by = Column(String(28), nullable=True)
     def as_dict(self):
         return {
             'organization_id': self.organization_id,
             'muted': self.muted,
+            'archived': self.archived,
             'created_at': self.created_at,
             'added_by': self.added_by,
             'last_playlist_id': self.last_playlist_id

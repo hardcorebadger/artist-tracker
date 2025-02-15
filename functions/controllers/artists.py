@@ -150,7 +150,7 @@ class ArtistController():
         if ids_only:
             query = (select(Artist.id))
 
-        org_filter = (OrganizationArtist.organization_id == user_data.get('organization'))
+        org_filter = and_(OrganizationArtist.organization_id == user_data.get('organization'), OrganizationArtist.archived == False)
         if muted == 'hide' or muted is None:
             org_filter = and_(org_filter, OrganizationArtist.muted == False)
         elif muted == 'only':

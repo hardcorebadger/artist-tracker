@@ -175,12 +175,16 @@ class TrackingController():
                       organization_id=org_id,
                       last_playlist_id=sql_playlist_id,
                       muted=False,
+                      archived=False,
                       added_by=user_id
                   ))
               else:
                   org = list(filter(lambda x: x.organization_id == org_id, sqlRef.organizations)).pop()
                   if sql_playlist_id is not None:
                       org.last_playlist_id = sql_playlist_id
+                      org.archived = False
+                      org.archived_by = None
+                      org.archived_at = None
                       sql_session.add(org)
               attribution.artist_id = sqlRef.id
               sql_session.add(sqlRef)
@@ -541,12 +545,13 @@ class TrackingController():
     return list(sql_ids)
   
   def find_needs_stats_refresh(self, sql_session, limit: int):
-
+    org_filter = (OrganizationArtist.archived == False)
+    sub_query = select(func.distinct(OrganizationArtist.artist_id)).filter(org_filter)
     sql_ids = (select(Artist.id)
              .filter(Artist.evaluation_id != None)
              .filter(~Artist.statistics.any())
              .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
-             .filter(Artist.active == True)).limit(limit)
+             .filter(and_(Artist.active == True, Artist.id.in_(sub_query)))).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()
 
     sql_ids = list(sql_ids)
@@ -557,7 +562,7 @@ class TrackingController():
                .filter(Artist.evaluation.has())
                .filter(Artist.statistics.any(Statistic.updated_at <  func.now() - timedelta(days=1)))
                .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
-               .filter(Artist.active == True)).limit(limit - len(sql_ids))
+               .filter(and_(Artist.active == True, Artist.id.in_(sub_query)))).limit(limit - len(sql_ids))
     sql_ids_two = sql_session.scalars(sql_ids_two).unique()
     for id in sql_ids_two:
         if id not in sql_ids:

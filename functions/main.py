@@ -874,6 +874,14 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         stmt = update(OrganizationArtist).where(and_(OrganizationArtist.organization_id == user_data.get('organization'), OrganizationArtist.artist_id.in_(artist_ids))).values(muted=value)
         sql_session.execute(stmt)
         sql_session.commit()
+    def artist_archive(artist_ids, uid, value):
+        if isinstance(artist_ids, str):
+            artist_ids = [artist_ids]
+        db = firestore.client(app)
+        user_data = get_user(user.uid, db)
+        stmt = update(OrganizationArtist).where(and_(OrganizationArtist.organization_id == user_data.get('organization'), OrganizationArtist.artist_id.in_(artist_ids))).values(archived=value, archived_at=datetime.now(), archived_by=uid)
+        sql_session.execute(stmt)
+        sql_session.commit()
 
     @v3_api.post('/artists/mute')
     def artist_bulk_mute_request():
@@ -886,6 +894,19 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         else:
             ids = artist_ids_from_filters(filter_model)
             artist_mute(ids, value)
+
+        return {"status": "success"}, 200
+
+    @v3_api.delete('/artists')
+    def artist_bulk_archive_request():
+        req = flask.request.get_json()
+        artist_ids = req.get('ids', None)
+        filter_model = req.get('filterModel', None)
+        if filter_model is None:
+            artist_archive(artist_ids, user.uid, True)
+        else:
+            ids = artist_ids_from_filters(filter_model)
+            artist_archive(ids, user.uid,True)
 
         return {"status": "success"}, 200
 
@@ -922,6 +943,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     @v3_api.post('/add-artist')
     def add_artist_request():
         data = flask.request.get_json()
+        print(data.get('spotify_url'), data.get('tags'))
         return add_artist(sql_session, user.uid, data.get('spotify_url', None), data.get('id', False), data.get('tags', None), data.get('preview', False))
 
 

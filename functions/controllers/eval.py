@@ -2,7 +2,7 @@ from google.cloud.firestore_v1 import SERVER_TIMESTAMP, Client, DocumentSnapshot
 from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import joinedload
 
-from lib import SpotifyClient, YoutubeClient, ErrorResponse, Artist, Evaluation, CopyrightEvaluator
+from lib import SpotifyClient, YoutubeClient, ErrorResponse, Artist, Evaluation, CopyrightEvaluator, OrganizationArtist
 from datetime import datetime, timedelta
 import re
 from fuzzywuzzy import fuzz
@@ -252,17 +252,20 @@ class EvalController():
     return 'success', 200
 
   def find_needs_eval_base(self, spotify_id = False):
+      org_filter = (OrganizationArtist.archived == False)
+      sub_query = select(func.distinct(OrganizationArtist.artist_id)).filter(org_filter)
       q = select(Artist.id) if spotify_id == False else select(Artist.spotify_id)
       return q.outerjoin(Evaluation, Artist.evaluation).filter(
               and_(
                   Artist.active == True,
+                  Artist.id.in_(sub_query),
                   or_(
                       or_(
                           and_(Evaluation.updated_at <= func.now() - timedelta(days=10), Evaluation.distributor_type != 1),
                           and_(Evaluation.updated_at <= func.now() - timedelta(days=30), Evaluation.distributor_type == 1),
                       ),
                       Evaluation.id == None
-                  )
+                  ),
               )
           )
 
