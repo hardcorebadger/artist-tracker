@@ -14,7 +14,7 @@ import {goFetch} from "../App";
 import {useUser} from "../routing/AuthGuard";
 
 function PageUpgrade() {
-  const [selectedPlan, setSelectedPlan] = useState("Indiestack Trial Monthly");
+  const [selectedPlan, setSelectedPlan] = useState("Indiestack Trial Pricing");
   const toast = useToast()
     const [subscribeLoading, setSubscribeLoading] = useState(false);
   const handlePlanChange = (value) => {
@@ -95,9 +95,9 @@ function PageUpgrade() {
             </Text>
           </VStack>
         </Container>
-        <Container maxW="800" sx={{maxHeight: '50vh', overflowY: 'hidden'}}>
+        <Container maxW="800" sx={{maxHeight: {xs: 'none', md: '50vh'}, overflowY: 'hidden'}}>
           <RadioGroup onChange={handlePlanChange} value={selectedPlan}>
-            <SimpleGrid columns={2} spacing={10}>
+            <SimpleGrid columns={2} minChildWidth={'250px'} spacing={10}>
               {plans.map((plan) => (
                   <PlanCard
                       key={plan.value}
@@ -105,6 +105,7 @@ function PageUpgrade() {
                       planName={plan.planName}
                       isDisabled={!plan.enabled}
                       price={plan.price}
+                      onChange={handlePlanChange}
                       description={plan.description}
                       features={plan.features}
                   />
