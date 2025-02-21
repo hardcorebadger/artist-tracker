@@ -573,7 +573,7 @@ def add_artist(sql_session, uid, spotify_url = None, identifier = False, tags = 
     songstats = SongstatsClient(SONGSTATS_API_KEY)
     spotify = get_spotify_client()
     tracking_controller = TrackingController(spotify, songstats, db)
-    print(uid, spotify_url, str(tags), preview)
+    print(uid, identifier, spotify_url, str(tags), preview)
     if identifier:
 
         user_data = get_user(uid, db)
@@ -821,9 +821,9 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
                 "pageSize": page_size,
                 "total": total
             })
-        response.headers.add('Cache-Control', 'private, max-age=5')
-        response.headers.add('X-Organization', request.headers.get('X-Organization'))
-        response.headers.add('Vary', 'X-Organization')
+        # response.headers.add('Cache-Control', 'private, max-age=5')
+        # response.headers.add('X-Organization', request.headers.get('X-Organization'))
+        # response.headers.add('Vary', 'X-Organization')
         return response
 
 
@@ -841,26 +841,26 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             "pageSize": page_size,
             "total": total
         })
-        response.headers.add('Cache-Control', 'private, max-age=5')
-        response.headers.add('X-Organization', request.headers.get('X-Organization'))
-        response.headers.add('Vary', 'X-Organization')
+        # response.headers.add('Cache-Control', 'private, max-age=5')
+        # response.headers.add('X-Organization', request.headers.get('X-Organization'))
+        # response.headers.add('Vary', 'X-Organization')
         return response
 
 
     @v3_api.get('/get-existing-tags')
     def get_existing_tags_request():
         response = jsonify(get_existing_tags(sql_session, user))
-        response.headers.add('Cache-Control', 'public, max-age=60')
-        response.headers.add('X-Organization', request.headers.get('X-Organization'))
-        response.headers.add('Vary', 'X-Organization')
+        # response.headers.add('Cache-Control', 'public, max-age=60')
+        # response.headers.add('X-Organization', request.headers.get('X-Organization'))
+        # response.headers.add('Vary', 'X-Organization')
         return response
 
     @v3_api.get('/get-existing-tags-light')
     def get_existing_tags_request_light():
         response = jsonify(get_existing_tags(sql_session, user, True))
-        response.headers.add('Cache-Control', 'public, max-age=60')
-        response.headers.add('X-Organization', request.headers.get('X-Organization'))
-        response.headers.add('Vary', 'X-Organization')
+        # response.headers.add('Cache-Control', 'public, max-age=60')
+        # response.headers.add('X-Organization', request.headers.get('X-Organization'))
+        # response.headers.add('Vary', 'X-Organization')
         return response
 
     def artist_ids_from_filters(filter_model):
@@ -934,6 +934,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         response = jsonify(artists )
         if artists.get('error', None) is not None:
             response.status_code = 500
+
         # else:
             # response.headers.add('Cache-Control', 'public, max-age=1')
         # response.headers.add('X-Organization', request.headers.get('X-Organization'))
