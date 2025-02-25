@@ -192,7 +192,9 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-
+        data = flask.request.get_json()
+        info = songstats.get_artist_info(data.get('spotify_id'))
+        return info, 200
         # invite = db.document("invites/oohAkpkB2Y3UDfbbJnVO").update({'created_at': datetime.now(), 'updated_at': datetime.now(), 'expires_at': datetime.now() + timedelta(days=1)})
 
         organizations = db.collection("organizations").get()

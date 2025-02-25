@@ -302,30 +302,39 @@ class TrackingController():
     try:
       info = self.songstats.get_artist_info(spotify_id)
     except ErrorResponse as e:
-      # Artist didn't exist in songstats, need to requeue 
+      # Artist didn't exist in songstats, need to requeue
+      if e.status_code == 300:
+          ref.update({
+            "ob_status": "waiting_ingest",
+            "ob_wait_till": datetime.now() + timedelta(minutes=10)
+          })
+          sql_ref.onboard_failure = 300
+          sql_session.add_all([sql_ref])
+          sql_session.commit()
+          return 'Waiting for data', 201
       if e.status_code == 404:
           ref.update({
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(minutes=10)
           })
-          self.set_onboard_wait(sql_session, sql_ref, datetime.now() + timedelta(minutes=10))
+          self.set_onboard_wait(sql_session, sql_ref, e.status_code, datetime.now() + timedelta(minutes=10))
           return 'Waiting for data', 201
       elif e.status_code == 302:
           ref.update({
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(minutes=10)
           })
-          self.set_onboard_wait(sql_session, sql_ref, datetime.now() + timedelta(minutes=10))
+          self.set_onboard_wait(sql_session, sql_ref, e.status_code, datetime.now() + timedelta(minutes=10))
           return 'Waiting for data', 201
       elif e.status_code == 429:
           ref.update({
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(days=30)
           })
-          self.set_onboard_wait(sql_session, sql_ref, datetime.now() + timedelta(minutes=10))
+          self.set_onboard_wait(sql_session, sql_ref, e.status_code, datetime.now() + timedelta(minutes=10))
           return 'Waiting for data', 201
       else:
-          self.set_onboard_wait(sql_session, sql_ref, None)
+          self.set_onboard_wait(sql_session, sql_ref, e.status_code,None)
           print(spotify_id  + " failed for unknown reason on songstats: " + str(e.status_code))
           print(traceback.format_exc())
           raise e
@@ -348,9 +357,10 @@ class TrackingController():
 
     return 'success', 200
 
-  def set_onboard_wait(self, sql_session, sql_ref, onboard_wait = None):
+  def set_onboard_wait(self, sql_session, sql_ref, code, onboard_wait = None):
       sql_ref.onboard_wait_until = onboard_wait
       sql_ref.stats_queued_at = None
+      sql_ref.onboard_failure = code
       sql_session.add_all([sql_ref])
       sql_session.commit()
   # #####################
@@ -539,6 +549,7 @@ class TrackingController():
   def find_needs_ob_ingest(self, sql_session, limit: int):
     sql_ids = (select(Artist.spotify_id)
                .filter(Artist.onboarded == False)
+               .filter(Artist.onboard_failure != 300)
                .filter(or_(Artist.onboard_wait_until == None, Artist.onboard_wait_until < func.now()))
                .filter(Artist.active == True)).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()
@@ -550,6 +561,7 @@ class TrackingController():
     sql_ids = (select(Artist.id)
              .filter(Artist.evaluation_id != None)
              .filter(~Artist.statistics.any())
+             .filter(Artist.onboard_failure != 300)
              .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
              .filter(and_(Artist.active == True, Artist.id.in_(sub_query)))).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()
@@ -560,6 +572,7 @@ class TrackingController():
 
     sql_ids_two = (select(Artist.id)
                .filter(Artist.evaluation.has())
+               .filter(Artist.onboard_failure != 300)
                .filter(Artist.statistics.any(Statistic.updated_at <  func.now() - timedelta(days=1)))
                .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
                .filter(and_(Artist.active == True, Artist.id.in_(sub_query)))).limit(limit - len(sql_ids))

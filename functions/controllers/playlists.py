@@ -44,7 +44,7 @@ class PlaylistController:
         for artist in artists:
             import_obj['artists'].append(artist.as_dict())
         sql_query = text(
-            'SELECT import_id, import_artists.status, COUNT(*), COUNT(artists.evaluation_id),  count(CASE WHEN artists.onboarded THEN 1 END) FROM import_artists LEFT JOIN artists ON artists.id = import_artists.artist_id WHERE import_artists.import_id = \''+str(import_obj['id'])+'\' GROUP BY import_id, import_artists.status')
+            'SELECT import_id, import_artists.status, COUNT(*), COUNT(artists.evaluation_id),  count(CASE WHEN artists.onboarded THEN 1 END), count(CASE WHEN artists.onboard_failure = 300 THEN 1 END) FROM import_artists LEFT JOIN artists ON artists.id = import_artists.artist_id WHERE import_artists.import_id = \''+str(import_obj['id'])+'\' GROUP BY import_id, import_artists.status')
         resp = self.sql_session.execute(sql_query).all()
         tracked = list(filter(lambda x: x[0] == import_obj['id'], resp))
         import_obj['artist_stats'] = dict()
@@ -53,6 +53,7 @@ class PlaylistController:
         import_obj['artist_stats']['complete'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0])[2])
         import_obj['artist_stats']['evaluated'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0, 0])[3])
         import_obj['artist_stats']['onboarded'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0, 0, 0])[4])
+        import_obj['artist_stats']['onboard_failure'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0, 0, 0, 0])[5])
 
         import_obj['artist_stats']['total'] = sum([import_obj['artist_stats']['pending'], import_obj['artist_stats']['failed'], import_obj['artist_stats']['complete']])
 
@@ -75,7 +76,7 @@ class PlaylistController:
         if len(ids) == 0:
             return [], total
         list_str = ', '.join("'" + str(item) + "'" for item in ids)
-        sql_query = text('SELECT import_id, import_artists.status, COUNT(*), COUNT(artists.evaluation_id),  count(CASE WHEN artists.onboarded THEN 1 END) FROM import_artists LEFT JOIN artists ON artists.id = import_artists.artist_id WHERE import_artists.import_id IN (' + list_str + ') GROUP BY import_id, import_artists.status')
+        sql_query = text('SELECT import_id, import_artists.status, COUNT(*), COUNT(artists.evaluation_id),  count(CASE WHEN artists.onboarded THEN 1 END), count(CASE WHEN artists.onboard_failure = 300 THEN 1 END) FROM import_artists LEFT JOIN artists ON artists.id = import_artists.artist_id WHERE import_artists.import_id IN (' + list_str + ') GROUP BY import_id, import_artists.status')
         resp = self.sql_session.execute(sql_query).all()
 
         imports = list(map(lambda x: x.as_dict(), imports))
@@ -87,6 +88,7 @@ class PlaylistController:
             import_obj['artist_stats']['complete'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0])[2])
             import_obj['artist_stats']['evaluated'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0, 0])[3])
             import_obj['artist_stats']['onboarded'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0, 0, 0])[4])
+            import_obj['artist_stats']['onboard_failure'] = int(pop_default(list(filter(lambda x: x[1] == 2, tracked)), ['', 2, 0, 0, 0, 0])[5])
 
             import_obj['artist_stats']['total'] = sum([import_obj['artist_stats']['pending'], import_obj['artist_stats']['failed'], import_obj['artist_stats']['complete']])
 
