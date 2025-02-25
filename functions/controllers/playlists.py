@@ -30,7 +30,7 @@ class PlaylistController:
         query = self.sql_session.query(Import).options(joinedload(Import.playlist), joinedload(Import.lookalike)).where(Import.organization_id == organization).where(Import.id == import_id)
         import_obj = query.first()
         if import_obj is None:
-            return None
+            return None, 0
         import_obj = import_obj.as_dict()
         import_obj['artists'] = list()
         offset = int(page) * int(page_size)
