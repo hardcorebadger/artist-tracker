@@ -3,7 +3,7 @@ import json
 import math
 
 from firebase_admin import initialize_app, firestore, functions, auth, credentials
-from firebase_admin.auth import UserRecord, UserNotFoundError
+from firebase_admin.auth import UserRecord, UserNotFoundError, ExpiredIdTokenError, InvalidIdTokenError
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
 from firebase_functions.options import RetryConfig, MemoryOption
 from flask import jsonify
@@ -22,7 +22,7 @@ from lib.utils import get_function_url
 from lib.config import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
     CloudSQLClient, LinkSource, OrganizationArtist, StatisticType, \
-    ArtistTag, Playlist, Subscription, pop_default, Attribution, Import, ImportArtist
+    ArtistTag, Playlist, Subscription, pop_default, Attribution, Import, ImportArtist, Statistic, ArtistLink
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController, LookalikeController
 import flask
 from datetime import datetime, timedelta
@@ -193,12 +193,21 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     @v2_api.post("/debug")
     def debug():
         data = flask.request.get_json()
-        info = songstats.get_artist_info(data.get('spotify_id'))
-        return info, 200
-        # invite = db.document("invites/oohAkpkB2Y3UDfbbJnVO").update({'created_at': datetime.now(), 'updated_at': datetime.now(), 'expires_at': datetime.now() + timedelta(days=1)})
-
-        organizations = db.collection("organizations").get()
-        return json.dumps(list(map(lambda org: org.to_dict(), organizations)))
+        users = db.collection("users").get()
+        for user in users:
+            print(user.id + " " + user.get('first_name'))
+            user_dict = user.to_dict()
+            user_org = user_dict.get('organization')
+            if user_org is not None:
+                if user_dict.get('organization_id') != user_org:
+                    user.reference.update({'organization_id': user_org})
+            # else:
+                # user.reference.update({'organizations':[]})
+        # for org in user_orgs.keys():
+        #     print(org + " " + str(len(user_orgs[org])))
+        #     for user in user_orgs[org]:
+        #         print("   " + user.get('first_name'))
+        return "Yay"
         # return get_artists_controller().get_artists('q9HMKTU1S7hUlpNdtBB5braS1VJ3', {"filterModel": {"items": [], "muted": 'hide'}}, app, sql_session, True)
 
         # for org in organizations:
@@ -273,25 +282,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         #https://open.spotify.com/playlist/3WxQaPZsG56Tl6Wrllkqas?si=85dee54659ef43ef
         # return twilio.receive_message(db, '+19493385918', 'https://open.spotify.com/artist/1UKNeJ3wk2fCZEi0Bzb30O?si=86bfc38017b04740', process_spotify_link, sql_session)
 
-        # users = db.collection("users").get()
-        # user_orgs = {}
-        # for user in users:
-        #     print(user.id + " " + user.get('first_name'))
-        #     user_dict = user.to_dict()
-        #     user_org = user_dict.get('organization')
-        #     if user_org is not None:
-        #         if user_dict.get('organization') not in user_orgs:
-        #             user_orgs[user_dict.get('organization')] = []
-        #         user_orgs[user_dict.get('organization')].append(user_dict)
-        #         if 'organizations' not in user_dict:
-        #             user.reference.update({'organizations': [user_dict.get('organization')], 'admin': False})
-        #     # else:
-        #         # user.reference.update({'organizations':[]})
-        # for org in user_orgs.keys():
-        #     print(org + " " + str(len(user_orgs[org])))
-        #     for user in user_orgs[org]:
-        #         print("   " + user.get('first_name'))
-        # return "Yay"
+
         # spotify = get_spotify_client()
         # return tracking_controller.find_needs_stats_refresh(sql_session, 10)
         # return eval_controller.evaluate_copyrights('7uelPzv7TB20x3wtDt95E9', sql_session, None)
@@ -654,7 +645,11 @@ def user_from_request(request: https_fn.Request) -> None|UserRecord:
         return auth.get_user(user_id)
     except ValueError as e:
         return None
+    except ExpiredIdTokenError as e:
+        return None
     except UserNotFoundError as e:
+        return None
+    except InvalidIdTokenError as e:
         return None
 
 @https_fn.on_request(min_instances=2, memory=MemoryOption.MB_512, cors=options.CorsOptions(
@@ -696,6 +691,214 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
                     print(str(e))
         is_admin = user_data.get('admin') if 'admin' in user_data else False
         return {'checkout': stripe.generate_checkout(user_data.get('organization'), is_admin, sql_session)}, 200
+
+    @v3_api.post('/artists/export')
+    def export_request():
+        try:
+            req = flask.request.get_json()
+            artist_ids = req.get('ids', None)
+            filter_model = req.get('filterModel', None)
+            
+            db = firestore.client(app)
+            user_data = get_user(user.uid, db)
+            
+            # Get artists based on IDs or filter model
+            if filter_model is None and artist_ids is not None:
+                if isinstance(artist_ids, str):
+                    artist_ids = [artist_ids]
+                # Query for specific artist IDs
+                query = (select(Artist).options(
+                    joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True),
+                    joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True),
+                    joinedload(Artist.evaluation, innerjoin=False),
+                    joinedload(Artist.organizations, innerjoin=False),
+                    joinedload(Artist.tags, innerjoin=False),
+                    joinedload(Artist.users, innerjoin=False)
+                ).where(Artist.id.in_(artist_ids)))
+                artists = sql_session.scalars(query).unique().all()
+            else:
+                # Use the filter model to get artist IDs
+                artists_controller = get_artists_controller()
+                artist_ids = artists_controller.get_artists(user.uid, {"filterModel": filter_model}, app, sql_session, True)
+                
+                if not artist_ids or len(artist_ids) == 0:
+                    return flask.jsonify({"error": "No artists found matching the filter criteria"}), 404
+                
+                # Query for artists with these IDs
+                query = (select(Artist).options(
+                    joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True),
+                    joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True),
+                    joinedload(Artist.evaluation, innerjoin=False),
+                    joinedload(Artist.organizations, innerjoin=False),
+                    joinedload(Artist.tags, innerjoin=False),
+                    joinedload(Artist.users, innerjoin=False)
+                ).where(Artist.id.in_(artist_ids)))
+                artists = sql_session.scalars(query).unique().all()
+            
+            if not artists or len(artists) == 0:
+                return flask.jsonify({"error": "No artists found with the provided IDs"}), 404
+
+            # Get all statistic types and link sources for column headers
+            stat_types_list = load_stat_types(sql_session)
+            link_sources_list = load_link_sources(sql_session)
+            
+            # Create CSV header row
+            headers = [
+                "artist_id", "name", "spotify_id", "avatar", "created_at", "updated_at", "onboarded",
+                "distributor", "distributor_type", "label", "status", "back_catalog", 
+                "evaluation_updated_at", "evaluation_created_at"
+            ]
+            
+            # Add link source headers
+            for link_source in link_sources_list:
+                headers.append(f"link_{link_source.get('key')}")
+            
+            # Add statistic headers
+            for stat_type in stat_types_list:
+                source = stat_type.get('source')
+                key = stat_type.get('key')
+                headers.append(f"{source}_{key}-latest")
+                headers.append(f"{source}_{key}-previous")
+                headers.append(f"{source}_{key}-week_over_week")
+                headers.append(f"{source}_{key}-month_over_month")
+                headers.append(f"{source}_{key}-min")
+                headers.append(f"{source}_{key}-max")
+                headers.append(f"{source}_{key}-avg")
+            
+            # Add tags and added_by headers
+            headers.append("tags")
+            headers.append("added_by")
+            headers.append("added_on")
+            
+            # Create CSV rows
+            rows = []
+            rows.append(",".join(headers))
+            
+            # Map for distributor type and status values
+            distributor_type_map = {
+                0: "DIY",
+                1: "Indie",
+                2: "Major",
+                None: "Unknown"
+            }
+            
+            status_map = {
+                0: "Unsigned",
+                1: "Signed",
+                None: "Unknown"
+            }
+            
+            back_catalog_map = {
+                0: "Clean",
+                1: "Dirty",
+                None: "Unknown"
+            }
+            
+            # Load user data for added_by field
+            users_data = {}
+            users = load_users(user_data.get('organization'))
+            for user_info in users:
+                users_data[user_info.get('id')] = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
+            
+            # Helper function to escape CSV fields
+            def escape_csv_field(field):
+                if field is None:
+                    return ""
+                field_str = str(field)
+                if "," in field_str or '"' in field_str or "\n" in field_str:
+                    return f'"{field_str.replace('"', '""')}"'
+                return field_str
+            
+            for artist in artists:
+                row = []
+                
+                # Basic artist fields
+                row.append(escape_csv_field(artist.id))
+                row.append(escape_csv_field(artist.name))
+                row.append(escape_csv_field(artist.spotify_id))
+                row.append(escape_csv_field(artist.avatar))
+                row.append(escape_csv_field(artist.created_at.isoformat() if artist.created_at else ""))
+                row.append(escape_csv_field(artist.updated_at.isoformat() if artist.updated_at else ""))
+                row.append(escape_csv_field(artist.onboarded))
+                
+                # Evaluation fields
+                if artist.evaluation:
+                    row.append(escape_csv_field(artist.evaluation.distributor))
+                    row.append(escape_csv_field(distributor_type_map.get(artist.evaluation.distributor_type, "Unknown")))
+                    row.append(escape_csv_field(artist.evaluation.label))
+                    row.append(escape_csv_field(status_map.get(artist.evaluation.status, "Unknown")))
+                    row.append(escape_csv_field(back_catalog_map.get(artist.evaluation.back_catalog, "Unknown")))
+                    row.append(escape_csv_field(artist.evaluation.updated_at.isoformat() if artist.evaluation.updated_at else ""))
+                    row.append(escape_csv_field(artist.evaluation.created_at.isoformat() if artist.evaluation.created_at else ""))
+                else:
+                    row.extend(["", "Unknown", "", "Unknown", "Unknown", "", ""])
+                
+                # Link fields
+                link_dict = {}
+                for link in artist.links:
+                    if hasattr(link, 'source') and hasattr(link.source, 'key'):
+                        link_dict[link.source.key] = link.url
+                
+                for link_source in link_sources_list:
+                    key = link_source.get('key')
+                    row.append(escape_csv_field(link_dict.get(key, "")))
+                
+                # Statistic fields
+                stat_dict = {}
+                for stat in artist.statistics:
+                    if hasattr(stat, 'type') and hasattr(stat.type, 'source') and hasattr(stat.type, 'key'):
+                        key = f"{stat.type.source}_{stat.type.key}"
+                        stat_dict[key] = {
+                            "latest": stat.latest,
+                            "previous": stat.previous,
+                            "week_over_week": stat.week_over_week,
+                            "month_over_month": stat.month_over_month,
+                            "min": stat.min,
+                            "max": stat.max,
+                            "avg": stat.avg
+                        }
+                
+                for stat_type in stat_types_list:
+                    key = f"{stat_type.get('source')}_{stat_type.get('key')}"
+                    if key in stat_dict:
+                        row.append(escape_csv_field(stat_dict[key]["latest"]))
+                        row.append(escape_csv_field(stat_dict[key]["previous"]))
+                        row.append(escape_csv_field(stat_dict[key]["week_over_week"]))
+                        row.append(escape_csv_field(stat_dict[key]["month_over_month"]))
+                        row.append(escape_csv_field(stat_dict[key]["min"]))
+                        row.append(escape_csv_field(stat_dict[key]["max"]))
+                        row.append(escape_csv_field(stat_dict[key]["avg"]))
+                    else:
+                        row.extend(["", "", "", "", "", "", ""])
+                
+                # Tags field
+                tags = [tag.tag for tag in artist.tags if tag.organization_id == user_data.get('organization')]
+                row.append(escape_csv_field(",".join(tags) if tags else ""))
+                
+                # Added by and added on fields
+                org_artist = next((org for org in artist.organizations if org.organization_id == user_data.get('organization')), None)
+                if org_artist:
+                    added_by_names = []
+                    if hasattr(org_artist, 'added_by') and org_artist.added_by in users_data:
+                        added_by_names.append(users_data[org_artist.added_by])
+                    row.append(escape_csv_field(",".join(added_by_names) if added_by_names else ""))
+                    row.append(escape_csv_field(org_artist.created_at.isoformat() if org_artist.created_at else ""))
+                else:
+                    row.extend(["", ""])
+                
+                rows.append(",".join(row))
+            
+            # Create CSV content
+            csv_content = "\n".join(rows)
+            
+            # Create response with CSV content
+            response = flask.Response(csv_content, mimetype='text/csv')
+            response.headers.set('Content-Disposition', 'attachment', filename='artist_export.csv')
+            return response
+        except Exception as e:
+            print(str(e))
+            print(traceback.format_exc())
+            return flask.jsonify({"error": "An error occurred while generating the export", "details": str(e)}), 500
 
     @v3_api.post('/edit-organization')
     def edit_organization():
@@ -994,6 +1197,21 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         user_data = get_user(user.uid, db)
         redirect_uri = data.get('redirect_uri', None)
         return spotify.get_token_from_code(sql_session, user.uid, user_data.get('organization'), code, redirect_uri, state)
+
+    @v3_api.get('/artists/label-counts')
+    def get_label_counts():
+        try:
+            data = request.args.to_dict()
+            filterModel = json.loads(data.get('filterModel', None)) if data.get('filterModel', None) else None
+            if filterModel is not None:
+                data['filterModel'] = filterModel
+            artists_controller = get_artists_controller()
+            counts = artists_controller.get_label_type_counts(user.uid, data, app, sql_session)
+            return flask.jsonify(counts)
+        except Exception as e:
+            print(str(e))
+            print(traceback.format_exc())
+            return flask.jsonify({"error": "An error occurred while getting label counts", "details": str(e)}), 500
 
     @v3_api.after_request
     def after_request(response):

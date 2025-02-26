@@ -363,6 +363,39 @@ class ArtistController():
                     query = query.order_by(column)
         return query
 
+    def get_label_type_counts(self, uid, data, app, sql_session):
+        """Get counts of artists by label type (indie/major/unsigned) based on filter model."""
+        try:
+            db = firestore.client(app)
+            user_data = get_user(uid, db)
+            
+            # Build base query with filters
+            base_query = self.build_query(uid, user_data, copy.deepcopy(dict(data)), db, sql_session, id_lookup=None, count=True)
+            
+            # Create queries for each distributor type
+            indie_query = base_query.filter(Evaluation.distributor_type == 1)
+            major_query = base_query.filter(Evaluation.distributor_type == 2)
+            diy_query = base_query.filter(Evaluation.distributor_type == 0)
+            unknown_query = base_query.filter(or_(Evaluation.distributor_type == 3, Evaluation.id == None))
+            
+            return {
+                "indie": indie_query.count(),
+                "major": major_query.count(),
+                "diy": diy_query.count(),
+                "unknown": unknown_query.count()
+            }
+            
+        except Exception as e:
+            print(e)
+            print(traceback.format_exc())
+            return {
+                "indie": 0,
+                "major": 0,
+                "diy": 0,
+                "unknown": 0,
+                "error": str(e)
+            }
+
 def artist_joined_query():
     query = select(Artist).options(
         contains_eager(Artist.statistics),
