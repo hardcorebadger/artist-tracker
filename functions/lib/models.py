@@ -411,12 +411,19 @@ class Lookalike(Base):
     organization_id = Column(String(28), nullable=False)
     target_artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
     status = Column(Integer, nullable=False, default=0)
+    auto_add = Column(Boolean, nullable=False, default=False)
     created_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
     updated_at = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now())
     target_artist: Mapped["Artist"] = relationship()
     def as_dict(self):
         resp = {c.name: getattr(self, c.name) for c in self.__table__.columns}
-        resp['target_artist'] = self.target_artist
+        resp['target_artist'] = {
+            "id": self.target_artist_id,
+            "spotify_id": self.target_artist.spotify_id,
+            "name": self.target_artist.name,
+            "avatar": self.target_artist.avatar,
+            "onboarded": self.target_artist.onboarded
+        }
         return resp
 
 class Playlist(Base):

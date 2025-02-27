@@ -22,7 +22,7 @@ from lib.utils import get_function_url
 from lib.config import *
 from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsClient, ErrorResponse, get_user, \
     CloudSQLClient, LinkSource, OrganizationArtist, StatisticType, \
-    ArtistTag, Playlist, Subscription, pop_default, Attribution, Import, ImportArtist, Statistic, ArtistLink
+    ArtistTag, Playlist, Subscription, pop_default, Attribution, Import, ImportArtist, Statistic, ArtistLink, Lookalike
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController, LookalikeController
 import flask
 from datetime import datetime, timedelta
@@ -82,6 +82,94 @@ def addartisttask(req: tasks_fn.CallableRequest) -> str:
     sql_session = sql.get_session()
     message, code = tracking_controller.add_artist(sql_session, spotify_id, uid, user_data['organization'], playlist_id, tags, import_id)
     sql_session.close()
+    return message
+
+@tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, max_backoff_seconds=60), memory=MemoryOption.MB_512)
+def lookaliketask(req: tasks_fn.CallableRequest) -> str:
+    db = firestore.client(app)
+    lookalike_id = req.data.get('lookalike_id')
+    sql_session = sql.get_session()
+    lookalike_controller = LookalikeController(get_spotify_client(), songstats, get_youtube_client(), sql_session, db)
+
+    import_obj = sql_session.query(Import).options(joinedload(Import.lookalike)).filter(Import.lookalike_id == lookalike_id).first()
+    lookalike = import_obj.lookalike
+    
+    if (lookalike.status > 0):
+        return "Already processed"
+    
+    # Set status to 1 to indicate task has started
+    lookalike.status = 1
+    sql_session.add(lookalike)
+    sql_session.commit()
+
+    try:
+        result = lookalike_controller.mine_lookalikes(lookalike.target_artist_id)
+        
+        # Extract all spotify IDs for bulk lookup
+        spotify_ids = [item.spotify_id for item in result['queue'] if hasattr(item, 'spotify_id')]
+        
+        # Find existing artists to get their IDs
+        existing_artists = {}
+        if spotify_ids:
+            artists = sql_session.query(Artist).filter(Artist.spotify_id.in_(spotify_ids)).all()
+            for artist in artists:
+                existing_artists[artist.spotify_id] = artist.id
+        
+        # Prepare data for bulk insert
+        import_artist_mappings = []
+        for queueable in result['queue']:
+            mapping = {
+                'import_id': import_obj.id,
+                'spotify_id': queueable['spotify_id'],
+                'name': queueable['name'],
+                'track_spotify_id': queueable['track_id'] if "track_id" in queueable else None,
+                'track_data': { "name": queueable['track_name'] if "track_name" in queueable else None},
+                'status': 0
+            }
+            
+            # If the artist already exists in the database, set the artist_id
+            if queueable['spotify_id'] in existing_artists:
+                mapping['artist_id'] = existing_artists[queueable['spotify_id']]
+            
+            import_artist_mappings.append(mapping)
+        
+        # Perform chunked bulk insert operations
+        chunk_size = 1000  # Adjust based on your database's capabilities
+        total_inserted = 0
+        
+        for i in range(0, len(import_artist_mappings), chunk_size):
+            chunk = import_artist_mappings[i:i + chunk_size]
+            if chunk:
+                sql_session.bulk_insert_mappings(ImportArtist, chunk)
+                total_inserted += len(chunk)
+        sql_session.commit()
+        
+        # If auto_add is enabled, queue artist add tasks
+        if lookalike.auto_add:
+            queue_artist_add_tasks(
+                spotify_ids=spotify_ids,
+                user_id=import_obj.user_id,
+                import_id=import_obj.id,
+                organization_id=import_obj.organization_id
+            )
+        
+        # Update lookalike status to complete (3)
+        lookalike.status = 3
+        sql_session.add(lookalike)
+        sql_session.commit()
+        
+        message = f"Successfully processed {total_inserted} lookalike artists using chunked bulk inserts"
+    except Exception as e:
+        # Update lookalike status to failed (2)
+        print(f"Failed to process lookalike artists: {str(e)}")
+        print(traceback.format_exc())
+        lookalike.status = 2
+        sql_session.add(lookalike)
+        sql_session.commit()
+        message = f"Failed to process lookalike artists: {str(e)}"
+    finally: 
+        sql_session.close()
+    print(message)
     return message
 
 
@@ -270,7 +358,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         #     # playlist.first_user = user.user_id
         #     # playlist.last_user = user.user_id
 
-        return "",200
+        # return "",200
         # artists_controller = ArtistController(PROJECT_ID, LOCATION, sql)
         # return artists_controller.queues(sql_session, app, 'q9HMKTU1S7hUlpNdtBB5braS1VJ3')
         # return "artists"
@@ -660,7 +748,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     v3_api = flask.Flask(__name__)
     sql_session = sql.get_session()
     if user is None:
-        return 'Unauthorized', 401
+        return '{"status": 401}', 401
     playlist_controller = PlaylistController(sql_session)
 
     print(request.path)
@@ -1079,6 +1167,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         stmt = update(OrganizationArtist).where(and_(OrganizationArtist.organization_id == user_data.get('organization'), OrganizationArtist.artist_id.in_(artist_ids))).values(muted=value)
         sql_session.execute(stmt)
         sql_session.commit()
+
     def artist_archive(artist_ids, uid, value):
         if isinstance(artist_ids, str):
             artist_ids = [artist_ids]
@@ -1213,6 +1302,106 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             print(traceback.format_exc())
             return flask.jsonify({"error": "An error occurred while getting label counts", "details": str(e)}), 500
 
+    @v3_api.post('/lookalike/queue')
+    def queue_lookalike_task():
+        try:
+            data = flask.request.get_json()
+            lookalike_id = data.get('lookalike_id')
+            
+            if not lookalike_id:
+                return flask.jsonify({"error": "Missing lookalike_id parameter"}), 400
+                
+            # Validate lookalike exists and check status
+            lookalike = sql_session.query(Lookalike).filter(Lookalike.id == lookalike_id).first()
+            
+            if not lookalike:
+                return flask.jsonify({"error": f"Lookalike with ID {lookalike_id} not found"}), 404
+                
+            if lookalike.status > 0:
+                return flask.jsonify({"error": f"Lookalike with ID {lookalike_id} already processed (status: {lookalike.status})"}), 400
+                
+            # Queue the task
+            task_queue = functions.task_queue("lookaliketask")
+            target_uri = get_function_url("lookaliketask")
+            
+            body = {"data": {"lookalike_id": lookalike_id}}
+            task_options = functions.TaskOptions(
+                schedule_time=datetime.now(),
+                uri=target_uri
+            )
+            
+            task_queue.enqueue(body, task_options)
+            
+            return flask.jsonify({
+                "message": f"Successfully queued lookalike task for ID {lookalike_id}",
+                "lookalike_id": lookalike_id
+            }), 200
+            
+        except Exception as e:
+            print(str(e))
+            print(traceback.format_exc())
+            return flask.jsonify({"error": "An error occurred while queuing lookalike task", "details": str(e)}), 500
+            
+    @v3_api.post('/lookalike/add-artists')
+    def queue_lookalike_add_artists():
+        try:
+            data = flask.request.get_json()
+            lookalike_id = data.get('lookalike_id')
+            
+            if not lookalike_id:
+                return flask.jsonify({"error": "Missing lookalike_id parameter"}), 400
+                
+            # Find import with this lookalike ID
+            import_obj = sql_session.query(Import).options(
+                joinedload(Import.lookalike),
+                joinedload(Import.artists)
+            ).filter(Import.lookalike_id == lookalike_id).first()
+            
+            if not import_obj:
+                return flask.jsonify({"error": f"Import with lookalike ID {lookalike_id} not found"}), 404
+                
+            lookalike = import_obj.lookalike
+            
+            if not lookalike:
+                return flask.jsonify({"error": f"Lookalike with ID {lookalike_id} not found"}), 404
+                
+            # Validate status and auto_add
+            if lookalike.status != 3:
+                return flask.jsonify({
+                    "error": f"Lookalike must have status 3 (completed) to add artists. Current status: {lookalike.status}"
+                }), 400
+                
+            if lookalike.auto_add:
+                return flask.jsonify({
+                    "error": "Artists were already automatically added for this lookalike (auto_add=true)"
+                }), 400
+                
+            # Get all Spotify IDs from import artists
+            spotify_ids = [artist.spotify_id for artist in import_obj.artists if artist.spotify_id]
+            
+            if not spotify_ids:
+                return flask.jsonify({"error": "No valid artists found to add"}), 400
+                
+            # Queue artist add tasks
+            count = queue_artist_add_tasks(
+                spotify_ids=spotify_ids,
+                user_id=import_obj.user_id,
+                import_id=import_obj.id,
+                organization_id=import_obj.organization_id
+            )
+            
+            return flask.jsonify({
+                "message": f"Successfully queued {count} artists for addition",
+                "lookalike_id": lookalike_id,
+                "import_id": import_obj.id,
+                "artists_queued": count
+            }), 200
+            
+        except Exception as e:
+            print(str(e))
+            print(traceback.format_exc())
+            return flask.jsonify({"error": "An error occurred while queuing artist additions", "details": str(e)}), 500
+
     @v3_api.after_request
     def after_request(response):
         # Code to run after each request
@@ -1221,12 +1410,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
 
     with v3_api.request_context(request.environ):
         resp = v3_api.full_dispatch_request()
-        try:
-            sql_session.close()
-        except Exception as e:
-            print(str(e))
-            print(traceback.format_exc())
-            return {"error": "failed"}, 500
+        sql_session.close()
         return resp
 
 def get_type_definitions(sql_session):
@@ -1484,3 +1668,40 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
 #
 #     with v1_api.request_context(req.environ):
 #         return v1_api.full_dispatch_request()
+
+# Extract reusable function for queueing artist add tasks
+def queue_artist_add_tasks(spotify_ids, user_id, import_id, organization_id):
+    """
+    Queue tasks to add artists to an organization
+    
+    Args:
+        spotify_ids: List of Spotify IDs to add
+        user_id: User ID who is adding the artists
+        import_id: Import ID for attribution
+        organization_id: Organization ID to add artists to
+    
+    Returns:
+        Number of tasks queued
+    """
+    count = 0
+    for spotify_id in spotify_ids:
+        task_queue = functions.task_queue("addartisttask")
+        target_uri = get_function_url("addartisttask")
+        
+        body = {
+            "data": {
+                "spotify_id": spotify_id,
+                "uid": user_id,
+                "import_id": import_id,
+                "organization": organization_id
+            }
+        }
+        
+        task_options = functions.TaskOptions(
+            schedule_time=datetime.now() + timedelta(seconds=20),
+            uri=target_uri
+        )
+        task_queue.enqueue(body, task_options)
+        count += 1
+    
+    return count
