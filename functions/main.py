@@ -108,7 +108,7 @@ def lookaliketask(req: tasks_fn.CallableRequest) -> str:
         result = lookalike_controller.mine_lookalikes(lookalike.target_artist_id)
         
         # Extract all spotify IDs for bulk lookup
-        spotify_ids = [item.spotify_id for item in result['queue'] if "spotify_id" in item]
+        spotify_ids = [item['spotify_id'] for item in result['queue'] if "spotify_id" in item]
         
         # Find existing artists to get their IDs
         existing_artists = {}

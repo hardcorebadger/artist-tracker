@@ -30,14 +30,13 @@ class LookalikeController():
         
     # Find the artist on youtube
     yt_track = self.youtube.find_song(sql_ref.name, top_tracks[0]['name'])
-
     yt_artist = yt_track['snippet']['channelId']
-    print("yt_artist", yt_artist)
     # Get YT recommendations
     recommendations = self.youtube.get_watch_playlist(yt_track['id'])
 
     to_queue = []
     print("found", recommendations)
+    found_ids = []
     for rec in recommendations['tracks'][:50]:
       # skip the source artist
       if rec['artists'][0]['id'] == yt_artist:
@@ -50,17 +49,21 @@ class LookalikeController():
       rec_song_yt = self.youtube.get_video(rec['videoId'])
       description = rec_song_yt['items'][0]['snippet']['description']
       distro, pline, distro_type = self.evaluator.eval_youtube_rights(artist, description)
-      # print(f"{distro} - {distro_type} : {pline}")
-      print(title, artist, distro_type)
+      print(f"{distro} - {distro_type} : {pline}")
       # Skip them if they are signed
       if distro_type != "diy":
         continue
       else:
         # Find them in spotify - TODO expensive may want to queue?
         song = self.spotify.find_song(artist, title)
-        
-        # Add them to ingest queue
-        to_queue.append({"track_name": song['name'], "track_id": song['id'], "name": song['artists'][0]['name'], "spotify_id": song['artists'][0]['id']})
+
+        for artist in song['artists']:
+          artist_id = artist['id']
+          if artist_id in found_ids:
+            continue
+          found_ids.append(artist_id)
+          # Add them to ingest queue
+          to_queue.append({"track_name": song['name'], "track_id": song['id'], "name": artist['name'], "spotify_id": artist_id})
 
     print("to_queue", to_queue)
     return {'queue':to_queue}

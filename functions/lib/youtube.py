@@ -46,16 +46,18 @@ class YoutubeClient():
     return self.get_description_from_video(res[0]['videoId'])
   
   def find_song(self, artist, track):
-    print("finding song", artist, track)
+    print("finding song " + str(artist) + " " + str(track))
     res = self.ytmusic.search(f"{artist} - {track}", 'songs', ignore_spelling=True)
+    print('res', res)
     if len(res) == 0:
       return None
     
     res = self.get_video(res[0]['videoId'])
 
-    for video in res['items'][:3]:
+    for video in res['items'][:5]:
       title = video['snippet']['title']
       channel_title = video['snippet']['channelTitle']
+      print("comparing " + str(title) + " " + str(channel_title))
       if self.evaluator.is_probably_same_track(title, track, channel_title, artist):
         return video
     
