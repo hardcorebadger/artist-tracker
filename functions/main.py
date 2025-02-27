@@ -74,6 +74,7 @@ def addartisttask(req: tasks_fn.CallableRequest) -> str:
     twilio = get_twilio_client()
     tracking_controller = TrackingController(spotify, songstats, db, twilio)
     uid = req.data.get('uid')
+    #TODO fix org to be passed in
     spotify_id = req.data.get('spotify_id')
     playlist_id = req.data.get('playlist_id', None)
     import_id = req.data.get('import_id', None)
@@ -106,7 +107,7 @@ def lookaliketask(req: tasks_fn.CallableRequest) -> str:
         result = lookalike_controller.mine_lookalikes(lookalike.target_artist_id)
         
         # Extract all spotify IDs for bulk lookup
-        spotify_ids = [item.spotify_id for item in result['queue'] if hasattr(item, 'spotify_id')]
+        spotify_ids = [item.spotify_id for item in result['queue'] if "spotify_id" in item]
         
         # Find existing artists to get their IDs
         existing_artists = {}
@@ -120,6 +121,7 @@ def lookaliketask(req: tasks_fn.CallableRequest) -> str:
         for queueable in result['queue']:
             mapping = {
                 'import_id': import_obj.id,
+                'artist_id': None,
                 'spotify_id': queueable['spotify_id'],
                 'name': queueable['name'],
                 'track_spotify_id': queueable['track_id'] if "track_id" in queueable else None,

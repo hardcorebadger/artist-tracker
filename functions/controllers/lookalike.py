@@ -37,7 +37,7 @@ class LookalikeController():
 
     to_queue = []
     print("found", recommendations)
-    for rec in recommendations['tracks'][:20]:
+    for rec in recommendations['tracks'][:50]:
       # skip the source artist
       if rec['artists'][0]['id'] == yt_artist:
         continue
