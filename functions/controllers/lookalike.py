@@ -30,6 +30,7 @@ class LookalikeController():
         
     # Find the artist on youtube
     yt_track = self.youtube.find_song(sql_ref.name, top_tracks[0]['name'])
+
     yt_artist = yt_track['snippet']['channelId']
     print("yt_artist", yt_artist)
     # Get YT recommendations

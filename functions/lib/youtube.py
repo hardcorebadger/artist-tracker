@@ -46,6 +46,7 @@ class YoutubeClient():
     return self.get_description_from_video(res[0]['videoId'])
   
   def find_song(self, artist, track):
+    print("finding song", artist, track)
     res = self.ytmusic.search(f"{artist} - {track}", 'songs', ignore_spelling=True)
     if len(res) == 0:
       return None

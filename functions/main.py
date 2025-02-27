@@ -74,14 +74,15 @@ def addartisttask(req: tasks_fn.CallableRequest) -> str:
     twilio = get_twilio_client()
     tracking_controller = TrackingController(spotify, songstats, db, twilio)
     uid = req.data.get('uid')
-    #TODO fix org to be passed in
     spotify_id = req.data.get('spotify_id')
     playlist_id = req.data.get('playlist_id', None)
     import_id = req.data.get('import_id', None)
-    tags = req.data.get('tags', None)
     user_data = get_user(uid, db)
+
+    organization_id = req.data.get('organization', user_data['organization_id'] if 'organization_id' in user_data else None)
+    tags = req.data.get('tags', None)
     sql_session = sql.get_session()
-    message, code = tracking_controller.add_artist(sql_session, spotify_id, uid, user_data['organization'], playlist_id, tags, import_id)
+    message, code = tracking_controller.add_artist(sql_session, spotify_id, uid, organization_id, playlist_id, tags, import_id)
     sql_session.close()
     return message
 
@@ -1557,7 +1558,7 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                     for a in aids:
                         task_queue = functions.task_queue("addartisttask")
                         target_uri = get_function_url("addartisttask")
-                        body = {"data": {"spotify_id": a, "uid": uid, "import_id": import_obj.id,  "playlist_id": sql_playlist.id, "tags": tags}}
+                        body = {"data": {"spotify_id": a, "uid": uid, "organization": user_data.get("organization_id"), "import_id": import_obj.id,  "playlist_id": sql_playlist.id, "tags": tags}}
                         task_options = functions.TaskOptions(schedule_time=datetime.now() + timedelta(seconds=20), uri=target_uri)
                         task_queue.enqueue(body, task_options)
                     return {'message': 'success', 'status': 200, 'added_count': len(aids), "import_id": import_obj.id}
