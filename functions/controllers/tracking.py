@@ -549,7 +549,7 @@ class TrackingController():
   def find_needs_ob_ingest(self, sql_session, limit: int):
     sql_ids = (select(Artist.spotify_id)
                .filter(Artist.onboarded == False)
-               .filter(Artist.onboard_failure != 300)
+               .filter(or_(Artist.onboard_failure == None, Artist.onboard_failure != 300))
                .filter(or_(Artist.onboard_wait_until == None, Artist.onboard_wait_until < func.now()))
                .filter(Artist.active == True)).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()
@@ -561,7 +561,7 @@ class TrackingController():
     sql_ids = (select(Artist.id)
              .filter(Artist.evaluation_id != None)
              .filter(~Artist.statistics.any())
-             .filter(Artist.onboard_failure != 300)
+              .filter(or_(Artist.onboard_failure == None, Artist.onboard_failure != 300))
              .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
              .filter(and_(Artist.active == True, Artist.id.in_(sub_query)))).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()

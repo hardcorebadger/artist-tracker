@@ -15,6 +15,10 @@ from lib import Artist
 
 def onboarding_cron(sql_session, task_controller : TaskController, tracking_controller: TrackingController, batch_size : int):
    artist_ids = tracking_controller.find_needs_ob_ingest(sql_session, batch_size)
+   if len(artist_ids) == 0:
+       print("No artists need onboarding ingest")
+   else:
+       print("queueing onboards:", artist_ids)
    for aritst_id in artist_ids:
         body = {"spotify_id": aritst_id}
         task_controller.enqueue_task('StatsQueue', 2, '/ingest-artist', body)
@@ -52,6 +56,9 @@ def stats_cron(sql_session, task_controller : TaskController, tracking_controlle
         artist_id_strs.append(str(artist_id))
         body = {"id": str(artist_id)}
         task_controller.enqueue_task('StatsQueue', 2, '/update-artist', body)
+    if len(artist_id_strs) == 0:
+        print("No artists need stats refresh")
+        return
     bulk_update(sql_session, artist_id_strs, 'stats_queued_at = NOW()')
 
 

@@ -283,15 +283,17 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        data = flask.request.get_json()
-        users = db.collection("users").get()
-        for user in users:
-            print(user.id + " " + user.get('first_name'))
-            user_dict = user.to_dict()
-            user_org = user_dict.get('organization')
-            if user_org is not None:
-                if user_dict.get('organization_id') != user_org:
-                    user.reference.update({'organization_id': user_org})
+        res = lookalike_controller.mine_lookalikes('16a7d3eb-16c6-4e64-a4ec-5ed6bde80315')
+        print(res)
+        # data = flask.request.get_json()
+        # users = db.collection("users").get()
+        # for user in users:
+        #     print(user.id + " " + user.get('first_name'))
+        #     user_dict = user.to_dict()
+        #     user_org = user_dict.get('organization')
+        #     if user_org is not None:
+        #         if user_dict.get('organization_id') != user_org:
+        #             user.reference.update({'organization_id': user_org})
             # else:
                 # user.reference.update({'organizations':[]})
         # for org in user_orgs.keys():
@@ -638,13 +640,15 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
 
         # does 300 evals per hours, doesn't care where they are in OB, TODO prios by oldest first so new artists go first
         eval_cron(sql_session, task_controller, eval_controller, 10, bulk_update)
-        # only looks at artists who are ingested, updates 750 stats per hour
-        stats_cron(sql_session, task_controller, tracking_controller, 25, bulk_update)
 
         # deals with messiness of waiting for songstats to ingest, pulls info and stats for the artist for first time, 1.5k per hr
         onboarding_cron(sql_session, task_controller, tracking_controller, 50)
+        # only looks at artists who are ingested, updates 750 stats per hour
+        stats_cron(sql_session, task_controller, tracking_controller, 25, bulk_update)
+
     except Exception as e:
         print(str(e))
+        print(traceback.format_exc())
         sql_session.close()
 
     sql_session.close()
