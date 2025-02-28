@@ -17,7 +17,8 @@ class LookalikeController():
     if sql_ref is None:
       return {"query":[]}
 
-    yt_link = list(filter(lambda x: x.link_source_id == 4, sql_ref.links)).pop()
+    yt_link = list(filter(lambda x: x.link_source_id == 4, sql_ref.links))
+    yt_link = yt_link[0] if len(yt_link) > 0 else None
     yt_artist = None
     if yt_link is not None:
       try:
