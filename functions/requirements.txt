@@ -10,3 +10,4 @@ sqlalchemy
 pg8000
 twilio
 stripe
+openpyxl

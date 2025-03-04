@@ -6,7 +6,7 @@ from firebase_admin import initialize_app, firestore, functions, auth, credentia
 from firebase_admin.auth import UserRecord, UserNotFoundError, ExpiredIdTokenError, InvalidIdTokenError
 from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
 from firebase_functions.options import RetryConfig, MemoryOption
-from flask import jsonify
+from flask import jsonify, Response
 from google.cloud.firestore_v1 import FieldFilter, Or
 from openai import organization
 from sqlalchemy import select, or_, update, text, and_
@@ -149,6 +149,7 @@ def lookaliketask(req: tasks_fn.CallableRequest) -> str:
         
         # If auto_add is enabled, queue artist add tasks
         if lookalike.auto_add:
+            print(spotify_ids, import_obj.user_id, import_obj.id, import_obj.organization_id)
             queue_artist_add_tasks(
                 spotify_ids=spotify_ids,
                 user_id=import_obj.user_id,
@@ -283,7 +284,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        res = lookalike_controller.mine_lookalikes('16a7d3eb-16c6-4e64-a4ec-5ed6bde80315')
+        res = lookalike_controller.mine_lookalikes('7c6676d0-3f51-4507-8a77-2b407c3aa49f')
         print(res)
         # data = flask.request.get_json()
         # users = db.collection("users").get()
@@ -755,7 +756,10 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     v3_api = flask.Flask(__name__)
     sql_session = sql.get_session()
     if user is None:
-        return '{"status": 401}', 401
+        response = Response('{"status": 401, "message": "Unauthorized"}', status=401, mimetype='application/json')
+        return response
+    else:
+        print("user", user.uid)
     playlist_controller = PlaylistController(sql_session)
 
     print(request.path)
@@ -793,6 +797,10 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             req = flask.request.get_json()
             artist_ids = req.get('ids', None)
             filter_model = req.get('filterModel', None)
+            # string array of column names for inclusion and ordering in sheet
+            column_order = req.get('columnOrder', None)
+            # Format can be 'csv' or 'excel'
+            export_format = req.get('format', 'csv').lower()
             
             db = firestore.client(app)
             user_data = get_user(user.uid, db)
@@ -833,163 +841,21 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             if not artists or len(artists) == 0:
                 return flask.jsonify({"error": "No artists found with the provided IDs"}), 404
 
-            # Get all statistic types and link sources for column headers
-            stat_types_list = load_stat_types(sql_session)
-            link_sources_list = load_link_sources(sql_session)
+            # Use the ArtistController's export_artists method
+            artists_controller = get_artists_controller()
+            content, mime_type, filename = artists_controller.export_artists(
+                sql_session, 
+                user_data, 
+                artists, 
+                column_order, 
+                export_format
+            )
             
-            # Create CSV header row
-            headers = [
-                "artist_id", "name", "spotify_id", "avatar", "created_at", "updated_at", "onboarded",
-                "distributor", "distributor_type", "label", "status", "back_catalog", 
-                "evaluation_updated_at", "evaluation_created_at"
-            ]
-            
-            # Add link source headers
-            for link_source in link_sources_list:
-                headers.append(f"link_{link_source.get('key')}")
-            
-            # Add statistic headers
-            for stat_type in stat_types_list:
-                source = stat_type.get('source')
-                key = stat_type.get('key')
-                headers.append(f"{source}_{key}-latest")
-                headers.append(f"{source}_{key}-previous")
-                headers.append(f"{source}_{key}-week_over_week")
-                headers.append(f"{source}_{key}-month_over_month")
-                headers.append(f"{source}_{key}-min")
-                headers.append(f"{source}_{key}-max")
-                headers.append(f"{source}_{key}-avg")
-            
-            # Add tags and added_by headers
-            headers.append("tags")
-            headers.append("added_by")
-            headers.append("added_on")
-            
-            # Create CSV rows
-            rows = []
-            rows.append(",".join(headers))
-            
-            # Map for distributor type and status values
-            distributor_type_map = {
-                0: "DIY",
-                1: "Indie",
-                2: "Major",
-                None: "Unknown"
-            }
-            
-            status_map = {
-                0: "Unsigned",
-                1: "Signed",
-                None: "Unknown"
-            }
-            
-            back_catalog_map = {
-                0: "Clean",
-                1: "Dirty",
-                None: "Unknown"
-            }
-            
-            # Load user data for added_by field
-            users_data = {}
-            users = load_users(user_data.get('organization'))
-            for user_info in users:
-                users_data[user_info.get('id')] = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
-            
-            # Helper function to escape CSV fields
-            def escape_csv_field(field):
-                if field is None:
-                    return ""
-                field_str = str(field)
-                if "," in field_str or '"' in field_str or "\n" in field_str:
-                    return f'"{field_str.replace('"', '""')}"'
-                return field_str
-            
-            for artist in artists:
-                row = []
-                
-                # Basic artist fields
-                row.append(escape_csv_field(artist.id))
-                row.append(escape_csv_field(artist.name))
-                row.append(escape_csv_field(artist.spotify_id))
-                row.append(escape_csv_field(artist.avatar))
-                row.append(escape_csv_field(artist.created_at.isoformat() if artist.created_at else ""))
-                row.append(escape_csv_field(artist.updated_at.isoformat() if artist.updated_at else ""))
-                row.append(escape_csv_field(artist.onboarded))
-                
-                # Evaluation fields
-                if artist.evaluation:
-                    row.append(escape_csv_field(artist.evaluation.distributor))
-                    row.append(escape_csv_field(distributor_type_map.get(artist.evaluation.distributor_type, "Unknown")))
-                    row.append(escape_csv_field(artist.evaluation.label))
-                    row.append(escape_csv_field(status_map.get(artist.evaluation.status, "Unknown")))
-                    row.append(escape_csv_field(back_catalog_map.get(artist.evaluation.back_catalog, "Unknown")))
-                    row.append(escape_csv_field(artist.evaluation.updated_at.isoformat() if artist.evaluation.updated_at else ""))
-                    row.append(escape_csv_field(artist.evaluation.created_at.isoformat() if artist.evaluation.created_at else ""))
-                else:
-                    row.extend(["", "Unknown", "", "Unknown", "Unknown", "", ""])
-                
-                # Link fields
-                link_dict = {}
-                for link in artist.links:
-                    if hasattr(link, 'source') and hasattr(link.source, 'key'):
-                        link_dict[link.source.key] = link.url
-                
-                for link_source in link_sources_list:
-                    key = link_source.get('key')
-                    row.append(escape_csv_field(link_dict.get(key, "")))
-                
-                # Statistic fields
-                stat_dict = {}
-                for stat in artist.statistics:
-                    if hasattr(stat, 'type') and hasattr(stat.type, 'source') and hasattr(stat.type, 'key'):
-                        key = f"{stat.type.source}_{stat.type.key}"
-                        stat_dict[key] = {
-                            "latest": stat.latest,
-                            "previous": stat.previous,
-                            "week_over_week": stat.week_over_week,
-                            "month_over_month": stat.month_over_month,
-                            "min": stat.min,
-                            "max": stat.max,
-                            "avg": stat.avg
-                        }
-                
-                for stat_type in stat_types_list:
-                    key = f"{stat_type.get('source')}_{stat_type.get('key')}"
-                    if key in stat_dict:
-                        row.append(escape_csv_field(stat_dict[key]["latest"]))
-                        row.append(escape_csv_field(stat_dict[key]["previous"]))
-                        row.append(escape_csv_field(stat_dict[key]["week_over_week"]))
-                        row.append(escape_csv_field(stat_dict[key]["month_over_month"]))
-                        row.append(escape_csv_field(stat_dict[key]["min"]))
-                        row.append(escape_csv_field(stat_dict[key]["max"]))
-                        row.append(escape_csv_field(stat_dict[key]["avg"]))
-                    else:
-                        row.extend(["", "", "", "", "", "", ""])
-                
-                # Tags field
-                tags = [tag.tag for tag in artist.tags if tag.organization_id == user_data.get('organization')]
-                row.append(escape_csv_field(",".join(tags) if tags else ""))
-                
-                # Added by and added on fields
-                org_artist = next((org for org in artist.organizations if org.organization_id == user_data.get('organization')), None)
-                if org_artist:
-                    added_by_names = []
-                    if hasattr(org_artist, 'added_by') and org_artist.added_by in users_data:
-                        added_by_names.append(users_data[org_artist.added_by])
-                    row.append(escape_csv_field(",".join(added_by_names) if added_by_names else ""))
-                    row.append(escape_csv_field(org_artist.created_at.isoformat() if org_artist.created_at else ""))
-                else:
-                    row.extend(["", ""])
-                
-                rows.append(",".join(row))
-            
-            # Create CSV content
-            csv_content = "\n".join(rows)
-            
-            # Create response with CSV content
-            response = flask.Response(csv_content, mimetype='text/csv')
-            response.headers.set('Content-Disposition', 'attachment', filename='artist_export.csv')
+            # Create response with the content
+            response = flask.Response(content, mimetype=mime_type)
+            response.headers.set('Content-Disposition', 'attachment', filename=filename)
             return response
+            
         except Exception as e:
             print(str(e))
             print(traceback.format_exc())
@@ -1691,24 +1557,76 @@ def queue_artist_add_tasks(spotify_ids, user_id, import_id, organization_id):
         Number of tasks queued
     """
     count = 0
-    for spotify_id in spotify_ids:
-        task_queue = functions.task_queue("addartisttask")
-        target_uri = get_function_url("addartisttask")
-        
-        body = {
-            "data": {
+    failed = 0
+    
+    # Debug info
+    print(f"Attempting to queue {len(spotify_ids)} tasks")
+    print(f"User ID: {user_id}")
+    print(f"Import ID: {import_id}")
+    print(f"Organization ID: {organization_id}")
+    
+    # Helper function to check if a value is blank
+    def is_blank(value):
+        if value is None:
+            return True
+        if isinstance(value, str) and not value.strip():
+            return True
+        return False
+    
+    for i, spotify_id in enumerate(spotify_ids):
+        # Skip blank Spotify IDs
+        if is_blank(spotify_id):
+            print(f"Skipping blank Spotify ID at index {i}")
+            continue
+            
+        # Skip if user_id is blank
+        if is_blank(user_id):
+            print("User ID is blank, skipping all tasks")
+            break
+            
+        try:
+            task_queue = functions.task_queue("addartisttask")
+            target_uri = get_function_url("addartisttask")
+            
+            # Create a minimal, flat data structure with only string values
+            data = {
                 "spotify_id": spotify_id,
                 "uid": user_id,
-                "import_id": import_id,
-                "organization": organization_id
             }
-        }
-        
-        task_options = functions.TaskOptions(
-            schedule_time=datetime.now() + timedelta(seconds=20),
-            uri=target_uri
-        )
-        task_queue.enqueue(body, task_options)
-        count += 1
+            
+            # Only add import_id if it's not blank
+            if not is_blank(import_id):
+                data["import_id"] = str(import_id)
+            
+            # Only add organization if it's not blank
+            if not is_blank(organization_id):
+                data["organization"] = organization_id
+            
+            # Simplified payload structure
+            task_payload = {"data": data}
+            
+            # Add a small delay between tasks to prevent rate limiting
+            schedule_time = datetime.now() + timedelta(seconds=20 + (i * 2))
+            
+            task_options = functions.TaskOptions(
+                schedule_time=schedule_time,
+                uri=target_uri
+            )
+            
+            # Debug the exact payload
+            debug_payload = task_payload.copy()
+            print(f"Task payload for {spotify_id}: {debug_payload}")
+            
+            # Enqueue the task
+            task_queue.enqueue(task_payload, task_options)
+            print(f"Successfully queued task for {spotify_id}")
+            count += 1
+            
+        except Exception as e:
+            error_message = str(e)
+            print(f"Failed to enqueue task for Spotify ID {spotify_id}: {error_message}")
+            failed += 1
+            continue
     
+    print(f"Successfully queued {count} tasks, failed {failed} tasks")
     return count

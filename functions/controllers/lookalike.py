@@ -23,6 +23,16 @@ class LookalikeController():
     if yt_link is not None:
       try:
         yt_artist = self.youtube.get_artist(yt_link.path)
+
+        if "results" not in yt_artist['songs']:
+          if yt_artist['related'] is not None and "results" in yt_artist['related'] and len(yt_artist['related']['results']) > 0:
+            yt_artist = self.youtube.get_artist(yt_artist['related']['results'][0]['browseId'])
+            if "results" not in yt_artist['songs']:
+              yt_artist = None
+          else:
+            yt_artist = None
+
+
       except Exception as e:
         yt_artist = None
     if yt_artist is None:
@@ -51,7 +61,7 @@ class LookalikeController():
 
     to_queue = []
     found_ids = []
-    for rec in recommendations['tracks'][:50]:
+    for rec in recommendations['tracks'][:25]:
       # skip the source artist
       if rec['artists'][0]['id'] == yt_artist:
         continue
