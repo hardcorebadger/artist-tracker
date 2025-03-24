@@ -284,15 +284,16 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-
-        data = flask.request.get_json()
-        if 'spotify_id' not in data and 'id' not in data:
-            raise ErrorResponse("Invalid payload. Must include 'spotify_id' or 'id'", 500)
-
-        spotify_id = data['spotify_id'] if 'spotify_id' in data else None
-        artist_id = data['id'] if 'id' in data else None
-        print('spotify_id/artist_id', str(spotify_id), str(artist_id))
-        return tracking_controller.update_artist(sql_session, spotify_id, artist_id, datetime.now() - timedelta(days=1))
+        artist_ids = tracking_controller.find_needs_stats_refresh(sql_session, 50)
+        print(artist_ids)
+        # data = flask.request.get_json()
+        # if 'spotify_id' not in data and 'id' not in data:
+        #     raise ErrorResponse("Invalid payload. Must include 'spotify_id' or 'id'", 500)
+        #
+        # spotify_id = data['spotify_id'] if 'spotify_id' in data else None
+        # artist_id = data['id'] if 'id' in data else None
+        # print('spotify_id/artist_id', str(spotify_id), str(artist_id))
+        # return tracking_controller.update_artist(sql_session, spotify_id, artist_id, datetime.now() - timedelta(days=1))
         # res = lookalike_controller.mine_lookalikes('7c6676d0-3f51-4507-8a77-2b407c3aa49f')
         # print(res)
         # data = flask.request.get_json()
@@ -635,7 +636,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
 
 @scheduler_fn.on_schedule(schedule=f"*/2 * * * *", memory=512)
-def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
+def fn_v2_ingest_job(event: scheduler_fn.ScheduledEvent) -> None:
     db = firestore.client(app)
     youtube = get_youtube_client()
     spotify = get_spotify_client()
@@ -653,6 +654,24 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
 
         # deals with messiness of waiting for songstats to ingest, pulls info and stats for the artist for first time, 1.5k per hr
         onboarding_cron(sql_session, task_controller, tracking_controller, 50)
+
+    except Exception as e:
+        print(str(e))
+        print(traceback.format_exc())
+        sql_session.close()
+
+    sql_session.close()
+@scheduler_fn.on_schedule(schedule=f"*/2 * * * *", memory=512)
+def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
+    db = firestore.client(app)
+    spotify = get_spotify_client()
+    twilio = get_twilio_client()
+    tracking_controller = TrackingController(spotify, songstats, db, twilio)
+    task_controller = get_task_controller()
+    sql_session = sql.get_session()
+
+    try:
+
         # only looks at artists who are ingested, updates 750 stats per hour
         stats_cron(sql_session, task_controller, tracking_controller, 25, bulk_update)
 

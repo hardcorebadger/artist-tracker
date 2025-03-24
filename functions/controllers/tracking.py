@@ -573,7 +573,7 @@ class TrackingController():
 
     sql_ids_two = (select(Artist.id)
                .filter(Artist.evaluation.has())
-               .filter(Artist.onboard_failure != 300)
+               .filter(or_(Artist.onboard_failure == None, Artist.onboard_failure != 300))
                .filter(Artist.statistics.any(Statistic.updated_at <  func.now() - timedelta(days=1)))
                .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
                .filter(and_(Artist.active == True, Artist.id.in_(sub_query)))).limit(limit - len(sql_ids))

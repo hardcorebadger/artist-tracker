@@ -21,7 +21,7 @@ def onboarding_cron(sql_session, task_controller : TaskController, tracking_cont
        print("queueing onboards:", artist_ids)
    for aritst_id in artist_ids:
         body = {"spotify_id": aritst_id}
-        task_controller.enqueue_task('StatsQueue', 2, '/ingest-artist', body)
+        task_controller.enqueue_task('IngestQueue', 2, '/ingest-artist', body)
 
 def spotify_cron(sql_session, task_controller : TaskController, eval_controller: EvalController, bulk_update):
     artist_ids = eval_controller.find_needs_shopify_for_eval(sql_session, 50)
@@ -41,6 +41,11 @@ def eval_cron(sql_session, task_controller : TaskController, eval_controller: Ev
 
     artist_ids = eval_controller.find_needs_eval_refresh(sql_session, batch_size)
     artist_id_strs = []
+    if len(artist_ids) == 0:
+        print("No artists need eval refresh")
+        return
+    else:
+        print("queueing eval:", artist_ids)
     for artist_id in artist_ids:
         artist_id_strs.append(str(artist_id))
         body = {"id": str(artist_id)}
@@ -52,13 +57,16 @@ def eval_cron(sql_session, task_controller : TaskController, eval_controller: Ev
 def stats_cron(sql_session, task_controller : TaskController, tracking_controller: TrackingController, batch_size : int, bulk_update):
     artist_ids = tracking_controller.find_needs_stats_refresh(sql_session, batch_size)
     artist_id_strs = []
+    if len(artist_ids) == 0:
+        print("No artists need stats refresh")
+        return
+    else:
+        print("queueing stats:", artist_ids)
     for artist_id in artist_ids:
         artist_id_strs.append(str(artist_id))
         body = {"id": str(artist_id)}
         task_controller.enqueue_task('StatsQueue', 2, '/update-artist', body)
-    if len(artist_id_strs) == 0:
-        print("No artists need stats refresh")
-        return
+
     bulk_update(sql_session, artist_id_strs, 'stats_queued_at = NOW()')
 
 
