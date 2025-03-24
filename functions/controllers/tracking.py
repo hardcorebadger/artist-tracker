@@ -457,6 +457,7 @@ class TrackingController():
 
 
     except Exception as e:
+        print(traceback.format_exc())
         print(str(e))
         return 'error', 500
     print("[INGEST] stats updated")

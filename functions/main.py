@@ -284,8 +284,17 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        res = lookalike_controller.mine_lookalikes('7c6676d0-3f51-4507-8a77-2b407c3aa49f')
-        print(res)
+
+        data = flask.request.get_json()
+        if 'spotify_id' not in data and 'id' not in data:
+            raise ErrorResponse("Invalid payload. Must include 'spotify_id' or 'id'", 500)
+
+        spotify_id = data['spotify_id'] if 'spotify_id' in data else None
+        artist_id = data['id'] if 'id' in data else None
+        print('spotify_id/artist_id', str(spotify_id), str(artist_id))
+        return tracking_controller.update_artist(sql_session, spotify_id, artist_id, datetime.now() - timedelta(days=1))
+        # res = lookalike_controller.mine_lookalikes('7c6676d0-3f51-4507-8a77-2b407c3aa49f')
+        # print(res)
         # data = flask.request.get_json()
         # users = db.collection("users").get()
         # for user in users:
@@ -1362,10 +1371,65 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
 
         spotify_id = spotify.url_to_id(spotify_url)
         if spotify_id == 'invalid':
+            # Try playlist
             spotify_id = spotify.url_to_id(spotify_url, 'playlist')
             if spotify_id == 'invalid':
-                return {'message': 'Invalid URL, try copy pasting an artist or playlist URL from Spotify directly.',
-                        'status': 400, 'added_count': 0}
+                # Try track
+                spotify_id = spotify.url_to_id(spotify_url, 'track')
+                if spotify_id == 'invalid':
+                    return {'message': 'Invalid URL, try copy pasting an artist, track or playlist URL from Spotify directly.',
+                            'status': 400, 'added_count': 0}
+                else:
+                    # Handle track URL
+                    user_data = get_user(uid, db)
+                    try:
+                        # Get artists from track using songstats
+                        artists = songstats.get_artists_from_track(spotify_id)
+                        
+                        if not artists:
+                            if preview:
+                                return {
+                                    "found": False,
+                                    "type": "track",
+                                    "spotify_id": spotify_id,
+                                    "url": spotify_url.split('?')[0],
+                                    "error": "No artists found for this track"
+                                }
+                            return {'message': 'No artists found for this track', 'status': 404, 'added_count': 0}
+                        
+                        if preview:
+                            # For preview, return information about the track and artists
+                            return {
+                                "found": True,
+                                "type": "track",
+                                "url": spotify_url.split('?')[0],
+                                "artists": artists,
+                                "artist_count": len(artists)
+                            }
+                        
+                        # Process each artist found in the track
+                        added_count = 0
+                        for artist in artists:
+                            artist_spotify_id = artist['id']
+                            msg, status = tracking_controller.add_ingest_update_artist(sql_session, artist_spotify_id, uid, user_data['organization'], tags)
+                            if status == 200:
+                                added_count += 1
+                        
+                        return {'message': 'success', 'status': 200, 'added_count': added_count, 'source': 'track'}
+                    except Exception as e:
+                        print(f"Error processing track: {str(e)}")
+                        print(traceback.format_exc())
+                        if preview:
+                            return {
+                                "found": False,
+                                "type": "track",
+                                "spotify_id": spotify_id,
+                                "url": spotify_url.split('?')[0],
+                                "error": str(e)
+                            }
+                        return {
+                            'message': 'Failed to process track', 'status': 500, 'error': traceback.format_exc()
+                        }
             else:
                 user_data = get_user(uid, db)
                 try:

@@ -19,6 +19,7 @@ class SongstatsClient():
     params=data)
     # print(res.json())
     if res.status_code > 299:
+      print(res.status_code)
       if res.status_code == 429:
         print("Songstats Rate Limiting")
 
@@ -35,7 +36,75 @@ class SongstatsClient():
     return self.get('/artists/info', {
       "spotify_artist_id": spotify_id
     })
-  
+
+  def get_artists_from_track(self, spotify_id : str):
+    """
+    Get artist information from a track using the Songstats API
+    
+    Args:
+        spotify_id (str): Spotify track ID
+        
+    Returns:
+        list: Dictionary of artist information with keys:
+          - id: Spotify ID
+          - name: Artist name
+          - avatar: Artist profile image URL
+    """
+    try:
+      # Call the Songstats API to get track info
+      track_info = self.get('/tracks/info', {
+        "spotify_track_id": spotify_id
+      })
+      
+      # Extract songstats artist IDs from the response
+      songstats_artist_ids = []
+      artists_data = {}
+      
+      if track_info and 'artists' in track_info:
+        for artist in track_info['artists']:
+          if 'id' in artist:
+            songstats_artist_id = artist['id']
+            songstats_artist_ids.append(songstats_artist_id)
+            # Store initial name and avatar from track info
+            artists_data[songstats_artist_id] = {
+              'name': artist.get('name', ''),
+              'avatar': artist.get('avatar', '')
+            }
+      
+      # Get Spotify IDs for the artists
+      result = []
+      
+      for songstats_artist_id in songstats_artist_ids:
+        try:
+          # This could be optimized with a batch endpoint if it becomes available
+          artist_info = self.get_artist_info_songstats(songstats_artist_id)
+          if artist_info and 'spotify_id' in artist_info:
+            spotify_id = artist_info.get('spotify_id')
+            if spotify_id:
+              # Create simplified artist object
+              artist_data = {
+                'id': spotify_id,
+                'name': artists_data[songstats_artist_id]['name'],
+                'avatar': artists_data[songstats_artist_id]['avatar']
+              }
+              
+              # Use better data from artist_info if available
+              if 'name' in artist_info and artist_info['name']:
+                artist_data['name'] = artist_info['name']
+              if 'avatar' in artist_info and artist_info['avatar']:
+                artist_data['avatar'] = artist_info['avatar']
+                
+              result.append(artist_data)
+        except Exception as e:
+          print(f"Error getting info for artist {songstats_artist_id}: {str(e)}")
+          # Continue with other artists even if one fails
+      
+      return result
+    except Exception as e:
+      print(f"Error getting artists from track: {str(e)}")
+      print(traceback.format_exc())
+      return []
+
   def _get_days_for_weeks(self, weeks, day_end=3):
     most_recent_day = (datetime.now() - timedelta(days=1)).date()
     # Calculate the most recent Thursday
