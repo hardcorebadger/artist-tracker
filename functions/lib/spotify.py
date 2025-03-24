@@ -220,6 +220,44 @@ class SpotifyClient():
     else:
         return 'invalid'
 
+  def get_artists_from_track(self, track_id):
+    """
+    Get artist information from a track using the Spotify API
+    
+    Args:
+        track_id (str): Spotify track ID
+        
+    Returns:
+        list: List of dictionaries containing artist information with keys:
+          - id: Spotify ID
+          - name: Artist name
+          - avatar: Artist profile image URL from their profile
+    """
+    try:
+      # Get the track information
+      track = self.get_cached(track_id, 'track', None, alt_token=False)
+      result = []
+      if track and 'artists' in track:
+        # Get artist IDs to fetch in bulk
+        artist_ids = [artist['id'] for artist in track['artists']]
+        
+        # Get full artist details
+        artists = self.get_artists(artist_ids)
+        
+        # Format the response
+        for artist in artists:
+          artist_data = {
+            'id': artist['id'],
+            'name': artist['name'],
+            'avatar': artist['images'][0]['url'] if artist.get('images') and len(artist['images']) > 0 else None
+          }
+          result.append(artist_data)
+          
+      return result, track['name'], track['album']['images'][0]['url'] if  track.get('album') and track['album'].get('images') and len(track['album']['images']) > 0 else None
+    except Exception as e:
+      print(f"Error getting artists from track: {str(e)}")
+      return None
+
   def get_token_from_code(self, sql_session, uid, org_id, code, redirect_uri, state):
     client_id = self.alt_client_id
     existing = sql_session.scalars(select(SpotifyToken).where(and_(SpotifyToken.state == state, SpotifyToken.client_id == client_id))).first()

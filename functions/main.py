@@ -1384,7 +1384,7 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                     user_data = get_user(uid, db)
                     try:
                         # Get artists from track using songstats
-                        artists = songstats.get_artists_from_track(spotify_id)
+                        artists, track_name, track_avatar = spotify.get_artists_from_track(spotify_id)
                         
                         if not artists:
                             if preview:
@@ -1402,6 +1402,8 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
                             return {
                                 "found": True,
                                 "type": "track",
+                                "name": track_name,
+                                "avatar": track_avatar,
                                 "url": spotify_url.split('?')[0],
                                 "artists": artists,
                                 "artist_count": len(artists)
