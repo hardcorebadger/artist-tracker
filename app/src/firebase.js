@@ -25,8 +25,8 @@ export const auth = fbauth.getAuth(app);
 if (is_dev) {
   console.log("Localhost detected. Using emulators.")
   connectFunctionsEmulator(functions, '127.0.0.1', 5001)
-  connectFirestoreEmulator(db, '127.0.0.1', 8181)
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099')
+  // connectFirestoreEmulator(db, '127.0.0.1', 8181)
+  // connectAuthEmulator(auth, 'http://127.0.0.1:9099')
 }
 // Initialize Firebase Authentication and get a reference to the service
 
