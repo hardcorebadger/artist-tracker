@@ -424,5 +424,46 @@ class SongstatsClient():
 
     return {'stats': weekly_rollups, 'as_of': weekly_dates}
   
+  def __merge_stats_to_df_abs_daily(self, stats):
+    dfs = []
+    for stat in stats:
+        source = stat['source']
+        if 'data' not in stat:
+            continue
+        if 'history' not in stat['data']:
+            continue
+        data = stat['data']['history']
+        if len(data) == 0:
+            continue
+        
+        df = pd.DataFrame(data)
+        df['date'] = pd.to_datetime(df['date'])
+        df = df.rename(columns=lambda x: f"{source}__{x}" if x != 'date' else x)
+        df.set_index('date', inplace=True)
+        
+        dfs.append(df)
+        
+    if len(dfs) == 0:
+      return None, False
+    # Merge all DataFrames on the date index
+    result_df = pd.concat(dfs, axis=1)
+    # forward fill missing data and fill any remaining NaNs with 0
+    daily = result_df.ffill().bfill().fillna(0).astype(int)
+    return daily, True
+
+  def get_stat_days_abs(self, spotify_id : str, days : int):
+    # Calculate start and end dates for daily data
+    end = datetime.now().date()
+    start = end - timedelta(days=days)
+    res = self.get_historic_stats(spotify_id, start, end)
+    df, status = self.__merge_stats_to_df_abs_daily(res['stats'])
+    if status == False:
+      return {'stats': {}, 'as_of': []}
+    # stats list
+    json_dict = df.to_dict(orient='list')
+    # dates list
+    dates = [ts.strftime('%Y-%m-%d') for ts in df.index.to_list()]
+    return {'stats': json_dict, 'as_of': dates}
+  
   
  
