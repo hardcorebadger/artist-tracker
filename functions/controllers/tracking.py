@@ -374,9 +374,9 @@ class TrackingController():
       if sql_ref is None:
           raise ErrorResponse('Artist not found: ' + str(artist_id) , 404, 'Tracking')
       spotify_id = sql_ref.spotify_id
+    print("Updating artist: " + str(spotify_id))
     ref = self.db.collection("artists_v2").document(spotify_id)
     doc = ref.get()
-    print("[INGEST] has update doc")
 
     # check the artist exists
     if not doc.exists:
@@ -394,8 +394,9 @@ class TrackingController():
     # if data['ob_status'] != 'ingested' and not is_ob:
     #   raise ErrorResponse('Artist not ingested', 401, 'Tracking')
     try:
-      stats = self.songstats.get_stat_weeks_abs(spotify_id, 8)
-      print(spotify_id, str(stats))
+    #   stats = self.songstats.get_stat_weeks_abs(spotify_id, 8)
+      stats = self.songstats.get_stat_days_abs(spotify_id, 8 * 7)
+    #   print(spotify_id, str(stats))
     except ErrorResponse as e:
       # Artist somehow got removed from songstats, but them back in OB
       if e.status_code == 404:
@@ -403,7 +404,7 @@ class TrackingController():
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(minutes=10)
           })
-          self.set_onboard_wait(sql_session, sql_ref, datetime.now() + timedelta(minutes=10))
+          self.set_onboard_wait(sql_session, sql_ref, 404, datetime.now() + timedelta(minutes=10))
 
           return 'Waiting for data', 201
       elif e.status_code == 429:
@@ -411,14 +412,12 @@ class TrackingController():
             "ob_status": "waiting_ingest",
             "ob_wait_till": datetime.now() + timedelta(days=30)
           })
-          self.set_onboard_wait(sql_session, sql_ref, datetime.now() + timedelta(minutes=10))
+          self.set_onboard_wait(sql_session, sql_ref, 429, datetime.now() + timedelta(days=30))
           return 'Waiting for data', 201
       else:
-          self.set_onboard_wait(sql_session, sql_ref, None)
+          self.set_onboard_wait(sql_session, sql_ref, e.status_code, None)
       raise e
     
-
-    print("[INGEST] has stats")
 
     try:
         #  update the hot tracking stats on the artist
@@ -460,7 +459,8 @@ class TrackingController():
         print(traceback.format_exc())
         print(str(e))
         return 'error', 500
-    print("[INGEST] stats updated")
+    
+    print("Artist updated: " + str(spotify_id))
 
     # TODO Add the deep stats subcollection
     return 'success', 200
@@ -495,23 +495,28 @@ class TrackingController():
       if statistic_type.format == 'int':
           valueSet = list(map(int, values))
           latest: int = valueSet[len(valueSet) - 1]
-          previous: int = valueSet[len(valueSet) - 2]
+          previous_day: int = valueSet[len(valueSet) - 2]
+          previous_week: int = valueSet[len(valueSet) - 8]
+          previous_month: int = valueSet[len(valueSet) - 29]
       else:
           valueSet = list(map(float, values))
           latest: float = valueSet[len(valueSet) - 1]
-          previous: float = valueSet[len(valueSet) - 2]
-
-      wow = 0 if previous <= 0 else (latest - previous) / previous
-      mom = 0 if valueSet[3] <= 0 else (valueSet[7] - valueSet[3]) / valueSet[3]
+          previous_day: float = valueSet[len(valueSet) - 2]
+          previous_week: float = valueSet[len(valueSet) - 8]
+          previous_month: float = valueSet[len(valueSet) - 29]
+      dod = 0 if previous_day <= 0 else (latest - previous_day) / previous_day
+      wow = 0 if previous_week <= 0 else (latest - previous_week) / previous_week
+      mom = 0 if previous_month <= 0 else (latest - previous_month) / previous_month
       found_stat = None
       for stat in artist.statistics:
           if stat.statistic_type_id == statistic_type.id:
               stat.latest = latest
-              stat.previous = previous
+              stat.previous = previous_week
               stat.max = max(valueSet)
               stat.min = min(valueSet)
               stat.avg = sum(valueSet) / len(valueSet)
               stat.data = valueSet
+              stat.day_over_day = dod
               stat.week_over_week = wow
               stat.month_over_month = mom
               stat.last_date = date
@@ -523,11 +528,12 @@ class TrackingController():
           found_stat = Statistic(
               type=statistic_type,
               latest=latest,
-              previous=previous,
+              previous=previous_week,
               max=max(valueSet),
               min=min(valueSet),
               avg=sum(valueSet) / len(valueSet),
               data=valueSet,
+              day_over_day=dod,
               week_over_week=wow,
               month_over_month=mom,
               last_date=date,
@@ -738,25 +744,30 @@ class TrackingController():
                       if newStatType.format == 'int':
                           valueSet = list(map(int, value))
                           latest: int = valueSet[len(valueSet) - 1]
-                          previous: int = valueSet[len(valueSet) - 2]
+                          previous_day: int = valueSet[len(valueSet) - 2]
+                          previous_week: int = valueSet[len(valueSet) - 8]
+                          previous_month: int = valueSet[len(valueSet) - 29]
                       else:
                           valueSet = list(map(float, value))
                           latest: float = valueSet[len(valueSet) - 1]
-                          previous: float = valueSet[len(valueSet) - 2]
+                          previous_day: float = valueSet[len(valueSet) - 2]
+                          previous_week: float = valueSet[len(valueSet) - 8]
+                          previous_month: float = valueSet[len(valueSet) - 29]
 
-                      wow = 0 if previous <= 0 else (latest - previous) / previous
+                      dod = 0 if previous_day <= 0 else (latest - previous_day) / previous_day
+                      wow = 0 if previous_week <= 0 else (latest - previous_week) / previous_week
 
-                      mom = None
-                      if len(valueSet) == 8:
-                          mom = 0 if valueSet[3] <= 0 else (valueSet[7] - valueSet[3]) / valueSet[3]
+                      
+                      mom = 0 if previous_month <= 0 else (latest - previous_month) / previous_month
                       stats.append(Statistic(
                           type=newStatType,
                           latest=latest,
-                          previous=previous,
+                          previous=previous_week,
                           max=max(valueSet),
                           min=min(valueSet),
                           avg=sum(valueSet) / len(valueSet),
                           data=valueSet,
+                          day_over_day=dod,
                           week_over_week=wow,
                           month_over_month=mom,
                           last_date=stat_dates[len(stat_dates) - 1],
@@ -823,3 +834,6 @@ class TrackingController():
                   continue
               filtered_links.append(link)
       return links
+  
+  def debug(self, spotify_id):
+      return self.songstats.get_stat_days_abs(spotify_id, 8 * 7)

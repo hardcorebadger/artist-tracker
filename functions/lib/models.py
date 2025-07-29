@@ -224,6 +224,7 @@ class Statistic(Base):
 
     latest = Column(Float, nullable=False)
     previous = Column(Float, nullable=False)
+    day_over_day = Column(Float, nullable=True)
     week_over_week = Column(Float, nullable=False)
     month_over_month = Column(Float, nullable=True)
     min = Column(Float, nullable=False)
@@ -246,6 +247,7 @@ class Statistic(Base):
         return {
             'latest': self.latest,
             'previous': self.previous,
+            'day_over_day': self.day_over_day,
             'week_over_week': self.week_over_week,
             'month_over_month': self.month_over_month,
             'min': self.min,
@@ -261,7 +263,7 @@ class Statistic(Base):
         # return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
     def __repr__(self):
-        return f"<Statistic({self.artist_id=}-{self.statistic_type_id}, {self.latest}, {self.previous=}, {self.week_over_week=}, {self.month_over_month}, {self.min}, {self.max}, {self.avg}, {self.data})>"
+        return f"<Statistic({self.artist_id=}-{self.statistic_type_id}, {self.latest}, {self.previous=}, {self.day_over_day=}, {self.week_over_week=}, {self.month_over_month=}, {self.min}, {self.max}, {self.avg}, {self.data})>"
 
 class StatisticType(Base):
     __tablename__ = 'statistic_types'
@@ -462,3 +464,18 @@ class SpotifyToken(Base):
 
     def __repr__(self):
         return f"<SpotifyToken({self.id=}, {self.client_id=}, {self.organization_id=}, {self.user_id=}, {self.created_at=}, {self.expires_at=})>"
+
+class ArtistAlert(Base):
+    __tablename__ = 'artist_alerts'
+    id: Mapped[int] = mapped_column(Integer, autoincrement=True, primary_key=True)
+    artist_id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('artists.id'), nullable=False)
+    organization_id = Column(String(28), nullable=False)
+    alert_id = Column(String(128), nullable=False)
+    send_id = Column(String(128), nullable=False)
+    sent_on = Column(TIMESTAMP, nullable=False, default=datetime.datetime.now)
+
+    def as_dict(self):
+        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+
+    def __repr__(self):
+        return f"<ArtistAlert({self.id=}, {self.artist_id=}, {self.organization_id=}, {self.alert_id=}, {self.send_id=}, {self.sent_on=})>"

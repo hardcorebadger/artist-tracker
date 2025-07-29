@@ -61,7 +61,7 @@ def stats_cron(sql_session, task_controller : TaskController, tracking_controlle
         print("No artists need stats refresh")
         return
     else:
-        print("queueing stats:", artist_ids)
+        print(f"queueing stats for {len(artist_ids)} artists")
     for artist_id in artist_ids:
         artist_id_strs.append(str(artist_id))
         body = {"id": str(artist_id)}

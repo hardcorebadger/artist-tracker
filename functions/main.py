@@ -28,6 +28,7 @@ import flask
 from datetime import datetime, timedelta
 import traceback
 from firebase_functions.params import IntParam, StringParam
+from controllers.alerts import AlertController
 
 # MIN_INSTANCES = IntParam("HELLO_WORLD_MIN_INSTANCES")
 
@@ -265,6 +266,8 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     eval_controller = EvalController(spotify, youtube, db, tracking_controller)
     lookalike_controller = LookalikeController(spotify, songstats, youtube, sql_session, db)
+    artist_controller = ArtistController(PROJECT_ID, LOCATION)
+    alert_controller = AlertController(db, artist_controller, sql_session)
     # artist_controller = ArtistController(PROJECT_ID, LOCATION, sql)
 
     v2_api = flask.Flask(__name__)
@@ -284,113 +287,10 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
 
     @v2_api.post("/debug")
     def debug():
-        artist_ids = tracking_controller.find_needs_stats_refresh(sql_session, 50)
-        print(artist_ids)
-        # data = flask.request.get_json()
-        # if 'spotify_id' not in data and 'id' not in data:
-        #     raise ErrorResponse("Invalid payload. Must include 'spotify_id' or 'id'", 500)
-        #
-        # spotify_id = data['spotify_id'] if 'spotify_id' in data else None
-        # artist_id = data['id'] if 'id' in data else None
-        # print('spotify_id/artist_id', str(spotify_id), str(artist_id))
-        # return tracking_controller.update_artist(sql_session, spotify_id, artist_id, datetime.now() - timedelta(days=1))
-        # res = lookalike_controller.mine_lookalikes('7c6676d0-3f51-4507-8a77-2b407c3aa49f')
-        # print(res)
-        # data = flask.request.get_json()
-        # users = db.collection("users").get()
-        # for user in users:
-        #     print(user.id + " " + user.get('first_name'))
-        #     user_dict = user.to_dict()
-        #     user_org = user_dict.get('organization')
-        #     if user_org is not None:
-        #         if user_dict.get('organization_id') != user_org:
-        #             user.reference.update({'organization_id': user_org})
-            # else:
-                # user.reference.update({'organizations':[]})
-        # for org in user_orgs.keys():
-        #     print(org + " " + str(len(user_orgs[org])))
-        #     for user in user_orgs[org]:
-        #         print("   " + user.get('first_name'))
-        return "Yay"
-        # return get_artists_controller().get_artists('q9HMKTU1S7hUlpNdtBB5braS1VJ3', {"filterModel": {"items": [], "muted": 'hide'}}, app, sql_session, True)
-
-        # for org in organizations:
-        #     if org.id == '0dhwhAKcEVTX4kQILMZD':
-        #         continue
-        #     attributions = sql_session.execute(text('SELECT DISTINCT(attribution.user_id) FROM attribution WHERE attribution.organization_id = \'' + org.id+'\''))
-        #     real_users = load_users(org.id)
-        #     final_ids = []
-        #     for user in real_users:
-        #         if user.get('id') not in final_ids:
-        #             final_ids.append(user.get('id'))
-        #     for attribution in attributions:
-        #         if attribution.user_id not in final_ids:
-        #             final_ids.append(attribution.user_id)
-        #     print(org.id, org.get('name'), final_ids)
-        #     newUsers = {}
-        #     for id in final_ids:
-        #         newUsers[id] = {
-        #             "active": True,
-        #             "admin": False
-        #         }
-        #     org.reference.update({
-        #         "users": newUsers
-        #     })
-        return "", 200
-        # playlists = sql_session.query(Playlist).options(joinedload(Playlist.imports)).all()
-        # generate imports from attrib
-        # for playlist in playlists:
-        #     if len(playlist.imports) == 0:
-        #         attrs = sql_session.query(Attribution).options(joinedload(Attribution.artist)).filter(Attribution.playlist_id == playlist.id).all()
-        #         import_artists = []
-        #         for attr in attrs:
-        #             import_artists.append(ImportArtist(
-        #                 spotify_id=attr.artist.spotify_id,
-        #                 artist_id=attr.artist.id,
-        #                 status=2,
-        #                 created_at=attr.created_at,
-        #                 updated_at=attr.created_at,
-        #
-        #             ))
-        #         playlist.imports.append(
-        #             Import(
-        #                 organization_id=playlist.organization_id,
-        #                 playlist_id=playlist.id,
-        #                 status="complete",
-        #                 user_id=playlist.first_user,
-        #                 completed_at=playlist.updated_at,
-        #                 created_at=playlist.created_at,
-        #                 updated_at=playlist.updated_at,
-        #                 artists=import_artists,
-        #             )
-        #         )
-        #         sql_session.add(playlist)
-        #         sql_session.commit()
-        #         print("Done with playlist: "+  str(playlist.id))
-        #     # user = sql_session.query(Attribution).order_by(Attribution.id.desc()).filter(Attribution.playlist_id == playlist.id).first()
-        #     # if user is None:
-        #     #     print ("??? " + str(playlist.id) + " has no attribution")
-        #     #     continue
-        #     # playlist.first_user = user.user_id
-        #     # playlist.last_user = user.user_id
-
-        # return "",200
-        # artists_controller = ArtistController(PROJECT_ID, LOCATION, sql)
-        # return artists_controller.queues(sql_session, app, 'q9HMKTU1S7hUlpNdtBB5braS1VJ3')
-        # return "artists"
-        # return json.dumps(body).encode()
-        # return spotify.get_playlist('3WxQaPZsG56Tl6Wrllkqas')
-        # return lookalike_controller.mine_lookalikes('94b2e9a9-b2e7-4750-8be0-9c3432991a4f')
-        #https://open.spotify.com/artist/7rRz5zPounzREHN0cIrYhS?si=f7dcf5b7322346bb
-        #https://open.spotify.com/artist/0PxzGnCYBpSuaI49OR94cA?si=68189be134ec4688
-        #https://open.spotify.com/playlist/3WxQaPZsG56Tl6Wrllkqas?si=85dee54659ef43ef
-        # return twilio.receive_message(db, '+19493385918', 'https://open.spotify.com/artist/1UKNeJ3wk2fCZEi0Bzb30O?si=86bfc38017b04740', process_spotify_link, sql_session)
-
-
-        # spotify = get_spotify_client()
-        # return tracking_controller.find_needs_stats_refresh(sql_session, 10)
-        # return eval_controller.evaluate_copyrights('7uelPzv7TB20x3wtDt95E9', sql_session, None)
-        # return spotify.get_artist('55ZKRn4w3oNhBMV7sgG1PP')
+        data = flask.request.get_json()
+        db.collection("alert_messages").add(data)
+        return "success"
+     
 
     @v2_api.post("/twilio")
     def twilio_endpoint():
@@ -610,6 +510,25 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         print('spotify_id/artist_id',str(spotify_id),str(artist_id))
         return tracking_controller.update_artist(sql_session, spotify_id, artist_id, datetime.now() - timedelta(days=1))
 
+    @v2_api.post("/run-alerts")
+    def run_all_alerts():
+        try:
+            alert_controller.run_alerts()
+            return {"status": "success", "message": "All alerts processed."}, 200
+        except Exception as e:
+            return {"status": "error", "message": str(e)}, 500
+
+    @v2_api.post("/run-alert")
+    def run_specific_alert():
+        try:
+            data = flask.request.get_json()
+            alert_id = data.get('alert_id')
+            if not alert_id:
+                raise ErrorResponse("Invalid payload. Must include 'alert_id'", 500)
+            alert_controller.run_alert(alert_id)
+            return {"status": "success", "message": f"Alert {alert_id} processed."}, 200
+        except Exception as e:
+            return {"status": "error", "message": str(e)}, 500
     # @v2_api.errorhandler(500)
     # def internal_server_error(error):
     #     return flask.Response(json.dumps({'error': error.description}), error.status_code, error.mimetype)
@@ -619,11 +538,15 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
         sql_session.close()
 
         return response
-
+    
     with v2_api.request_context(req.environ):
         resp = v2_api.full_dispatch_request()
         sql_session.close()
         return resp
+
+
+   
+        
 #################################
 # Cron Job Definitions
 #################################
@@ -680,6 +603,15 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
         print(traceback.format_exc())
         sql_session.close()
 
+    sql_session.close()
+
+@scheduler_fn.on_schedule(schedule="0 * * * *", memory=512)
+def fn_v2_alerts_cron(event: scheduler_fn.ScheduledEvent) -> None:
+    db = firestore.client(app)
+    sql_session = sql.get_session()
+    artist_controller = ArtistController(PROJECT_ID, LOCATION)
+    alert_controller = AlertController(db, artist_controller, sql_session)
+    alert_controller.run_alerts()
     sql_session.close()
 
 #################################

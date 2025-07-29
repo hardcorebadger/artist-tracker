@@ -103,6 +103,7 @@ class ArtistController():
                 "error": None
             }
         except Exception as e:
+            # print(traceback.format_exc())
             print (e)
             if id_lookup is not None:
                 return {
@@ -125,6 +126,7 @@ class ArtistController():
         muted = 'hide'
         if filter_model is not None:
             muted = filter_model.get('muted')
+        
         if not count and not ids_only:
             query = (select(Artist).options(
                 joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True).defer(StatisticType.created_at).defer(StatisticType.updated_at),
@@ -203,7 +205,7 @@ class ArtistController():
                         value = float(value)
                     else:
                         value = int(value)
-                if statistic_func in ['week_over_week', 'month_over_month']:
+                if statistic_func in ['week_over_week', 'month_over_month', 'day_over_day']:
                     value /= 100
                 query = self.build_condition(query, getattr(dynamic, statistic_func), operator, value)
             elif field == 'tags':
@@ -837,7 +839,8 @@ class ArtistController():
                     return ""
                 field_str = str(field)
                 if "," in field_str or '"' in field_str or "\n" in field_str:
-                    return f'"{field_str.replace('"', '""')}"'
+                    fff = field_str.replace('"', '""')
+                    return f'"{fff}"'
                 return field_str
             
             # Create CSV rows
