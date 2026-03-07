@@ -2,6 +2,7 @@ import json
 import time
 from time import sleep
 
+from firebase_admin import firestore
 from google.cloud.firestore_v1 import FieldFilter
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
@@ -60,6 +61,12 @@ class TwilioController():
       return True, None
     else:
       return False, verification_check.status
+
+  def remove_number(self, uid, db):
+    print(f"remove_number called for uid={uid}")
+    _, user_ref = self.load_user_ref(uid, db)
+    user_ref.update({'sms': firestore.DELETE_FIELD})
+    print(f"sms field deleted for uid={uid}")
 
   def receive_message(self, db, from_number, message, link_proc, sql_session):
     print(str(from_number) + ": " + str(message))

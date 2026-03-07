@@ -112,6 +112,21 @@ class TrackingController():
         sql_session.add(sql_ref)
         sql_session.commit()
 
+  def add_genre_tags(self, sql_session, sql_ref: Artist, genres: list, tag_type_id: int):
+      if not genres:
+          return
+      for genre in genres:
+          exists = any(t.tag == genre and t.tag_type_id == tag_type_id for t in sql_ref.tags)
+          if exists:
+              continue
+          sql_ref.tags.append(ArtistTag(
+              tag_type_id=tag_type_id,
+              tag=genre,
+              organization_id=None,
+          ))
+      sql_session.add(sql_ref)
+      sql_session.commit()
+
   def add_artist(self, sql_session, spotify_id, user_id, org_id, sql_playlist_id = None, tags = None, import_id = None):
     try:
         if tags is None:
@@ -261,6 +276,7 @@ class TrackingController():
             return 'Artist failed to import, please try again', 500
         artist_ref = artist_with_meta(sql_session, spotify_id)
         self.add_tags(sql_session, artist_ref, org_id, tags)
+        self.add_genre_tags(sql_session, artist_ref, artist.get('genres', []), tag_type_id=3)
         if import_id is not None:
             sql_session.execute(text('UPDATE import_artists SET status=2, artist_id=:artist_id, updated_at=NOW() WHERE import_id=:import_id AND spotify_id=:spotify_id'), {'artist_id': str(artist_ref.id), 'import_id': import_id, 'spotify_id': str(spotify_id)})
             sql_session.execute(text('UPDATE imports SET status=:status, completed_at=NOW(), updated_at=NOW() WHERE id=:import_id AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL'), {'status': 'complete', 'import_id': import_id})
@@ -340,6 +356,8 @@ class TrackingController():
       "avatar": info['artist_info']['avatar'],
       "links": info['artist_info']['links'],
     })
+    # save SongStats genres
+    self.add_genre_tags(sql_session, sql_ref, info['artist_info'].get('genres', []), tag_type_id=4)
     # get the stats now that we know the artist is in SS
     self.update_artist(sql_session, spotify_id, is_ob=True)
 

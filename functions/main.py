@@ -60,6 +60,16 @@ def get_tag_types():
             "id": 2,
             "name": "Genre",
             "key": "genre"
+        },
+        3: {
+            "id": 3,
+            "name": "Spotify Genre",
+            "key": "spotify_genre"
+        },
+        4: {
+            "id": 4,
+            "name": "SongStats Genre",
+            "key": "songstats_genre"
         }
     })
 
@@ -710,6 +720,15 @@ def user_from_request(request: https_fn.Request) -> None|UserRecord:
 def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     user = user_from_request(request)
     v3_api = flask.Flask(__name__)
+
+    @v3_api.errorhandler(Exception)
+    def invalid_api_usage(e: Exception):
+        print(str(e))
+        print(traceback.format_exc())
+        if isinstance(e, ErrorResponse):
+            return e.respond()
+        return flask.jsonify({"error": str(e)}), 500
+
     if user is None:
         response = Response('{"status": 401, "message": "Unauthorized"}', status=401, mimetype='application/json')
         return response
@@ -1084,9 +1103,13 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     def sms_setup():
         db = firestore.client(app)
         uid = user.uid
-        spotify = get_spotify_client()
         data = flask.request.get_json()
         twilio = get_twilio_client()
+        if data.get('remove', False):
+            print(f"Removing phone number for user {uid}")
+            twilio.remove_number(uid, db)
+            print(f"Phone number removed for user {uid}")
+            return {"success": True}
         code = data.get('code', None)
         if code is not None:
             success, status = twilio.verify_code(uid, db, data.get('number'), code)

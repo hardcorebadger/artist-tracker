@@ -3,6 +3,7 @@ from sqlalchemy import select, func, or_, and_
 from sqlalchemy.orm import joinedload
 
 from lib import SpotifyClient, YoutubeClient, ErrorResponse, Artist, Evaluation, CopyrightEvaluator, OrganizationArtist
+from controllers.artists import artist_with_meta
 from datetime import datetime, timedelta
 import re
 from fuzzywuzzy import fuzz
@@ -248,6 +249,16 @@ class EvalController():
     )
     sql_session.add_all([sql_ref])
     sql_session.commit()
+
+    # refresh SongStats genres
+    try:
+        ss_info = self.tracking_controller.songstats.get_artist_info(spotify_id)
+        ss_genres = ss_info.get('artist_info', {}).get('genres', [])
+        sql_ref_with_tags = artist_with_meta(sql_session, spotify_id)
+        self.tracking_controller.add_genre_tags(sql_session, sql_ref_with_tags, ss_genres, tag_type_id=4)
+    except Exception as e:
+        print(f"Genre refresh failed for {spotify_id}: {e}")
+
     # TODO save the full eval state to a subcollection
     return 'success', 200
 
