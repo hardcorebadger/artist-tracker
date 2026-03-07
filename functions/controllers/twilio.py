@@ -70,10 +70,12 @@ class TwilioController():
 
   def set_sms_org(self, uid, db, org_id):
     print(f"set_sms_org called for uid={uid}, org_id={org_id}")
-    user, user_ref = self.load_user_ref(uid, db)
-    user_data = user.to_dict()
-    user_orgs = user_data.get('organizations', [])
-    if org_id not in user_orgs:
+    _, user_ref = self.load_user_ref(uid, db)
+    org_doc = db.collection("organizations").document(org_id).get()
+    if not org_doc.exists:
+      raise ErrorResponse("Organization not found.", 400)
+    org_users = org_doc.to_dict().get('users', {})
+    if uid not in org_users or not org_users[uid].get('active', False):
       raise ErrorResponse("You are not a member of this organization.", 400)
     user_ref.update({'sms.org_id': org_id})
     print(f"sms.org_id set to {org_id} for uid={uid}")
@@ -112,7 +114,10 @@ class TwilioController():
 
     if pending_import is not None:
       if lowered == 'y' or lowered == 'yes':
-        link_proc(sql_session, user.id, pending_import.get('url'), None, False)
+        result = link_proc(sql_session, user.id, pending_import.get('url'), None, False)
+        import_id = result.get('import_id') if isinstance(result, dict) else None
+        if import_id:
+          self.send_message(user_data, "Import started! Track progress: https://indiestack.app/i/" + str(import_id))
       user.update({'pending_import': None})
 
     org_id, org_error = self.resolve_sms_org(user_data)
@@ -181,14 +186,14 @@ class TwilioController():
         elif data is not None:
           if data.get('type') == 'artist':
             if data.get('existing') is not None:
-              sent = self.send_template(user_data, "HXabba02580e40f6bbf0e0c1ddac752a36", dict({"1": data.get("name"), "2": "https://indiestack.app/app/artists/" + str(data.get('existing'))}))
+              sent = self.send_template(user_data, "HXabba02580e40f6bbf0e0c1ddac752a36", dict({"1": data.get("name"), "2": "https://indiestack.app/a/" + str(data.get('existing'))}))
               artist_data = artist_with_meta(sql_session=sql_session, spotify_id=None, artist_id=data.get('existing'))
               if artist_data is not None and len(artist_data.statistics) > 0:
                 sleep(0.25)
                 self.send_artist_stats(user_data, artist_data)
               # sent = self.send_template(user_data, "HXabba02580e40f6bbf0e0c1ddac752a36", dict({"1": data.get("name"), "2": "https://google.com"}))
             else:
-              sent = self.send_template(user_data, "HXf2f85e6870b94efefd58e668c95008ce", dict({"1": data.get("name"), "2": "https://indiestack.app/app/artists/" + str(data.get("new"))}))
+              sent = self.send_template(user_data, "HXf2f85e6870b94efefd58e668c95008ce", dict({"1": data.get("name"), "2": "https://indiestack.app/a/" + str(data.get("new"))}))
           else:
             if data.get('existing') is not None:
               user.update({
