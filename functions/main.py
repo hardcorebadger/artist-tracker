@@ -1105,6 +1105,9 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         uid = user.uid
         data = flask.request.get_json()
         twilio = get_twilio_client()
+        if data.get('set_org') is not None:
+            twilio.set_sms_org(uid, db, data.get('set_org'))
+            return {"success": True}
         if data.get('remove', False):
             print(f"Removing phone number for user {uid}")
             twilio.remove_number(uid, db)

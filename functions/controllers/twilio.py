@@ -68,6 +68,16 @@ class TwilioController():
     user_ref.update({'sms': firestore.DELETE_FIELD})
     print(f"sms field deleted for uid={uid}")
 
+  def set_sms_org(self, uid, db, org_id):
+    print(f"set_sms_org called for uid={uid}, org_id={org_id}")
+    user, user_ref = self.load_user_ref(uid, db)
+    user_data = user.to_dict()
+    user_orgs = user_data.get('organizations', [])
+    if org_id not in user_orgs:
+      raise ErrorResponse("You are not a member of this organization.", 400)
+    user_ref.update({'sms.org_id': org_id})
+    print(f"sms.org_id set to {org_id} for uid={uid}")
+
   def receive_message(self, db, from_number, message, link_proc, sql_session):
     print(str(from_number) + ": " + str(message))
     user = db.collection("users").where(filter=FieldFilter("sms.number", "==", from_number)).where(filter=FieldFilter("sms.verified", "==", True)).limit(1)
@@ -79,6 +89,21 @@ class TwilioController():
     else:
       return self.process_message(user[0], from_number, message, link_proc, sql_session)
 
+  def resolve_sms_org(self, user_data):
+    """Resolve which org to use for SMS. Returns (org_id, error_message)."""
+    sms_org_id = user_data.get('sms', {}).get('org_id', None)
+    if sms_org_id:
+      return sms_org_id, None
+    user_orgs = user_data.get('organizations', [])
+    if len(user_orgs) > 1:
+      current_org = user_data.get('organization', '')
+      return None, (
+        "I noticed you have more than one organization, but haven't set which one is assigned to SMS. "
+        "Please set your SMS organization on your settings page: "
+        f"https://indiestack.app/org/{current_org}/settings/general"
+      )
+    return user_data.get('organization'), None
+
   def process_message(self, user, from_number: str, message: str, link_proc, sql_session):
     lowered = message.lower().strip()
     sent = False
@@ -89,6 +114,12 @@ class TwilioController():
       if lowered == 'y' or lowered == 'yes':
         link_proc(sql_session, user.id, pending_import.get('url'), None, False)
       user.update({'pending_import': None})
+
+    org_id, org_error = self.resolve_sms_org(user_data)
+    if org_error:
+      self.send_message(user_data, org_error)
+      return {"processed": False, "sent": True}
+
     data = None
     print("Received twilio text", message, lowered)
     try:
@@ -112,7 +143,7 @@ class TwilioController():
           artist_query = (select(Artist)
                           .options( joinedload(Artist.organizations, innerjoin=True))
                           .where(Artist.spotify_id == spotify_id)
-                          .where(Artist.organizations.any(OrganizationArtist.organization_id == user_data.get('organization'))))
+                          .where(Artist.organizations.any(OrganizationArtist.organization_id == org_id)))
           artist_existing = sql_session.scalars(artist_query).unique().first()
           if artist_existing is None:
             try:
@@ -136,7 +167,7 @@ class TwilioController():
             org = None
             if artist_existing is not None:
               org = list(
-                filter(lambda x: x.organization_id == user_data.get('organization'), artist_existing.organizations)).pop()
+                filter(lambda x: x.organization_id == org_id, artist_existing.organizations)).pop()
             data = {
               "found": True,
               "type": "artist",
