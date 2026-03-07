@@ -8,10 +8,8 @@ from firebase_functions import https_fn, scheduler_fn, tasks_fn, options
 from firebase_functions.options import RetryConfig, MemoryOption
 from flask import jsonify, Response
 from google.cloud.firestore_v1 import FieldFilter, Or
-from openai import organization
 from sqlalchemy import select, or_, update, text, and_
 from sqlalchemy.orm import joinedload, close_all_sessions
-from sqlalchemy.util.preloaded import sql_dml
 
 from controllers.artists import ArtistController
 from controllers.playlists import PlaylistController
@@ -242,9 +240,10 @@ def reimport_artists_eval(page = 0, page_size = 50):
 
 
 def bulk_update(sql_session, ids: list, set: str):
-    list_str = ', '.join("'" + str(item) + "'" for item in ids)
-    sql_query = text('UPDATE artists SET '+set+' WHERE artists.id IN (' + list_str + ')')
-    sql_session.execute(sql_query)
+    placeholders = ', '.join(f':id_{i}' for i in range(len(ids)))
+    sql_query = text(f'UPDATE artists SET {set} WHERE artists.id IN ({placeholders})')
+    params = {f'id_{i}': str(id_val) for i, id_val in enumerate(ids)}
+    sql_session.execute(sql_query, params)
     sql_session.commit()
 
 def get_stripe():
@@ -541,7 +540,6 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     
     with v2_api.request_context(req.environ):
         resp = v2_api.full_dispatch_request()
-        sql_session.close()
         return resp
 
 
@@ -581,9 +579,8 @@ def fn_v2_ingest_job(event: scheduler_fn.ScheduledEvent) -> None:
     except Exception as e:
         print(str(e))
         print(traceback.format_exc())
+    finally:
         sql_session.close()
-
-    sql_session.close()
 @scheduler_fn.on_schedule(schedule=f"*/2 * * * *", memory=512)
 def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     db = firestore.client(app)
@@ -601,9 +598,8 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     except Exception as e:
         print(str(e))
         print(traceback.format_exc())
+    finally:
         sql_session.close()
-
-    sql_session.close()
 
 @scheduler_fn.on_schedule(schedule="0 * * * *", memory=512)
 def fn_v2_alerts_cron(event: scheduler_fn.ScheduledEvent) -> None:
@@ -714,12 +710,12 @@ def user_from_request(request: https_fn.Request) -> None|UserRecord:
 def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
     user = user_from_request(request)
     v3_api = flask.Flask(__name__)
-    sql_session = sql.get_session()
     if user is None:
         response = Response('{"status": 401, "message": "Unauthorized"}', status=401, mimetype='application/json')
         return response
     else:
         print("user", user.uid)
+    sql_session = sql.get_session()
     playlist_controller = PlaylistController(sql_session)
 
     print(request.path)
@@ -747,7 +743,7 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
                     sql_session.add(existing)
                     sql_session.commit()
                 except Exception as e:
-                    print(str(e))
+                    print(traceback.format_exc())
         is_admin = user_data.get('admin') if 'admin' in user_data else False
         return {'checkout': stripe.generate_checkout(user_data.get('organization'), is_admin, sql_session)}, 200
 
@@ -841,13 +837,14 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         ids = data.get('ids', None)
         organizations = dict()
         subs = sql_session.scalars(select(Subscription).where(Subscription.organization_id.in_(ids)).where(Subscription.status.in_(['active', 'paused'])).order_by(Subscription.created_at.desc())).all()
-        list_str = ', '.join("'" + str(item) + "'" for item in ids)
-
-        sql_query = text('SELECT organization_artists.organization_id, artists.active, COUNT(*) FROM organization_artists LEFT JOIN artists ON artists.id = organization_artists.artist_id WHERE organization_id IN ('+list_str+') GROUP BY organization_artists.organization_id, artists.active')
-        resp = sql_session.execute(sql_query).all()
-        users = list(map(lambda x: x.to_dict(), db.collection('users').where(filter=FieldFilter(
-        "organization", "in", ids
-        )).get()))
+        placeholders = ', '.join(f':id_{i}' for i in range(len(ids)))
+        params = {f'id_{i}': str(id_val) for i, id_val in enumerate(ids)}
+        sql_query = text(f'SELECT organization_artists.organization_id, artists.active, COUNT(*) FROM organization_artists LEFT JOIN artists ON artists.id = organization_artists.artist_id WHERE organization_id IN ({placeholders}) GROUP BY organization_artists.organization_id, artists.active')
+        resp = sql_session.execute(sql_query, params).all()
+        users = []
+        for i in range(0, len(ids), 30):
+            chunk = ids[i:i+30]
+            users.extend([x.to_dict() for x in db.collection('users').where(filter=FieldFilter("organization", "in", chunk)).get()])
 
         for sub in subs:
             if sub.organization_id not in organizations:
@@ -905,7 +902,15 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
         admin = user_data['admin'] if 'admin' in user_data else False
         if admin == False:
             return 'Unauthorized', 401
-        return list(map(lambda org: {"id": org.id, "name": org.get('name')}, db.collection('organizations').get()))
+        orgs = []
+        query = db.collection('organizations').order_by('__name__').limit(100)
+        while True:
+            docs = list(query.stream())
+            orgs.extend([{"id": doc.id, "name": doc.get('name')} for doc in docs])
+            if len(docs) < 100:
+                break
+            query = db.collection('organizations').order_by('__name__').start_after(docs[-1]).limit(100)
+        return orgs
 
     @v3_api.post('/set-organization')
     def set_organization_request():

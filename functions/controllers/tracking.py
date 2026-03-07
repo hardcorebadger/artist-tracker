@@ -193,10 +193,8 @@ class TrackingController():
           self.add_tags(sql_session, sqlRef, org_id, tags)
 
           if import_id is not None:
-              sql_query = text('UPDATE import_artists SET status=2, artist_id=\''+str(sqlRef.id)+'\', updated_at=NOW() WHERE import_id='+str(import_id)+' AND spotify_id=\''+str(spotify_id)+'\'')
-              sql_session.execute(sql_query)
-              sql_query = text('UPDATE imports SET status=\'complete\', completed_at=NOW(), updated_at=NOW() WHERE id='+str(import_id)+' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0)')
-              sql_session.execute(sql_query)
+              sql_session.execute(text('UPDATE import_artists SET status=2, artist_id=:artist_id, updated_at=NOW() WHERE import_id=:import_id AND spotify_id=:spotify_id'), {'artist_id': str(sqlRef.id), 'import_id': import_id, 'spotify_id': str(spotify_id)})
+              sql_session.execute(text('UPDATE imports SET status=:status, completed_at=NOW(), updated_at=NOW() WHERE id=:import_id AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0)'), {'status': 'complete', 'import_id': import_id})
               sql_session.commit()
 
 
@@ -264,19 +262,15 @@ class TrackingController():
         artist_ref = artist_with_meta(sql_session, spotify_id)
         self.add_tags(sql_session, artist_ref, org_id, tags)
         if import_id is not None:
-            sql_query = text('UPDATE import_artists SET status=2, artist_id=\'' + str(artist_ref.id) + '\', updated_at=NOW() WHERE import_id=' + str(import_id) + ' AND spotify_id=\'' + str(spotify_id) + '\'')
-            sql_session.execute(sql_query)
-            sql_query = text('UPDATE imports SET status=\'complete\', completed_at=NOW(), updated_at=NOW() WHERE id=' + str(import_id) + ' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL')
-            sql_session.execute(sql_query)
+            sql_session.execute(text('UPDATE import_artists SET status=2, artist_id=:artist_id, updated_at=NOW() WHERE import_id=:import_id AND spotify_id=:spotify_id'), {'artist_id': str(artist_ref.id), 'import_id': import_id, 'spotify_id': str(spotify_id)})
+            sql_session.execute(text('UPDATE imports SET status=:status, completed_at=NOW(), updated_at=NOW() WHERE id=:import_id AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL'), {'status': 'complete', 'import_id': import_id})
             sql_session.commit()
     except Exception as e:
         print(e)
         print(traceback.format_exc())
         if import_id is not None:
-            sql_query = text('UPDATE import_artists SET status=1 WHERE import_id=' + str(import_id) + ' AND spotify_id=\'' + str(spotify_id) + '\'')
-            sql_session.execute(sql_query)
-            sql_query = text('UPDATE imports SET status=\'complete\', completed_at=NOW(), updated_at=NOW() WHERE id=' + str(import_id) + ' AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL')
-            sql_session.execute(sql_query)
+            sql_session.execute(text('UPDATE import_artists SET status=1 WHERE import_id=:import_id AND spotify_id=:spotify_id'), {'import_id': import_id, 'spotify_id': str(spotify_id)})
+            sql_session.execute(text('UPDATE imports SET status=:status, completed_at=NOW(), updated_at=NOW() WHERE id=:import_id AND id NOT IN (SELECT import_id FROM import_artists WHERE status=0) AND completed_at IS NULL'), {'status': 'complete', 'import_id': import_id})
             sql_session.commit()
     return 'success', 200
   
@@ -680,14 +674,15 @@ class TrackingController():
       imported = 0
       skipped = 0
       fails = {}
+      existing_map = {a.spotify_id: a for a in existing}
       start = time.time()
       for artist in old_artists:
           spotify_id = artist.get('spotify_id')
           add_batch = list()
-          existingMatches = list(filter(lambda x: x.spotify_id == spotify_id, existing))
-          if len(existingMatches) > 0:
+          existingMatch = existing_map.get(spotify_id)
+          if existingMatch is not None:
               skipped += 1
-              print("Skipping existing artist: " + spotify_id + ' ' + str(existingMatches[0].id))
+              print("Skipping existing artist: " + spotify_id + ' ' + str(existingMatch.id))
               continue
           else:
               print("Adding artist: " + spotify_id)
@@ -737,9 +732,11 @@ class TrackingController():
                           sql_session.add(newStatType)
                           sql_session.commit()
                           print("ADDING TYPE: " + statName)
-                          stat_types = list(sql_session.scalars(select(StatisticType)).all())
+                          stat_types.append(newStatType)
 
                       if len(value) == 0:
+                          continue
+                      if len(value) < 29:
                           continue
                       if newStatType.format == 'int':
                           valueSet = list(map(int, value))

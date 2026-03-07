@@ -1,3 +1,4 @@
+import traceback
 from google.cloud.firestore_v1 import Client
 from lib import SongstatsClient, ErrorResponse, SpotifyClient, YoutubeClient, CloudSQLClient, CopyrightEvaluator, Artist
 from .artists import artist_with_meta
@@ -34,6 +35,7 @@ class LookalikeController():
 
 
       except Exception as e:
+        print(f"YouTube artist lookup failed: {traceback.format_exc()}")
         yt_artist = None
     if yt_artist is None:
       print("no yt artist found, fetching manually")

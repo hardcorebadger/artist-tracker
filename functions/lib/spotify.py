@@ -289,7 +289,7 @@ class SpotifyClient():
         if existing is not None:
           return existing.as_dict()
         else:
-          print(str(e))
+          print(traceback.format_exc())
           return {'error': 'could not insert token'}
       return token_record.as_dict()
     else:
@@ -322,7 +322,9 @@ class SpotifyClient():
 
     return objects
 
-  def get_cached(self, ids: list|str, object_type: str, expires_delta: timedelta|None  = timedelta(hours=1), alt_token = False, data: dict|str = {}):
+  def get_cached(self, ids: list|str, object_type: str, expires_delta: timedelta|None  = timedelta(hours=1), alt_token = False, data: dict|str = None):
+    if data is None:
+      data = {}
     path = object_type+"s"
     if object_type in ['top-tracks', 'albums-artist']:
       if isinstance(ids, list):
