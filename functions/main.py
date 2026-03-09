@@ -74,14 +74,15 @@ def get_tag_types():
     })
 
 sql = CloudSQLClient(PROJECT_ID, LOCATION, SQL_INSTANCE, SQL_USER, SQL_PASSWORD, SQL_DB)
-songstats = SongstatsClient(SONGSTATS_API_KEY)
+def get_songstats_client(db=None):
+    return SongstatsClient(SONGSTATS_API_KEY, db)
 
 @tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, max_backoff_seconds=60), memory=MemoryOption.MB_512)
 def addartisttask(req: tasks_fn.CallableRequest) -> str:
     db = firestore.client(app)
     spotify = get_spotify_client()
     twilio = get_twilio_client()
-    tracking_controller = TrackingController(spotify, songstats, db, twilio)
+    tracking_controller = TrackingController(spotify, get_songstats_client(db), db, twilio)
     uid = req.data.get('uid')
     spotify_id = req.data.get('spotify_id')
     playlist_id = req.data.get('playlist_id', None)
@@ -100,7 +101,7 @@ def lookaliketask(req: tasks_fn.CallableRequest) -> str:
     db = firestore.client(app)
     lookalike_id = req.data.get('lookalike_id')
     sql_session = sql.get_session()
-    lookalike_controller = LookalikeController(get_spotify_client(), songstats, get_youtube_client(), sql_session, db)
+    lookalike_controller = LookalikeController(get_spotify_client(), get_songstats_client(db), get_youtube_client(), sql_session, db)
 
     import_obj = sql_session.query(Import).options(joinedload(Import.lookalike)).filter(Import.lookalike_id == lookalike_id).first()
     lookalike = import_obj.lookalike
@@ -200,7 +201,7 @@ def reimport_artists_eval(page = 0, page_size = 50):
     db = firestore.client(app)
     spotify = get_spotify_client()
 
-    tracking_controller = TrackingController(spotify, songstats, db)
+    tracking_controller = TrackingController(spotify, get_songstats_client(db), db)
     offset = page * page_size
     old_artists = db.collection("artists_v2").limit(page_size).offset(offset).get()
     spotifys = list(map(lambda x: x.get('spotify_id'), old_artists))
@@ -271,6 +272,7 @@ def fn_v2_api(req: https_fn.Request) -> https_fn.Response:
     spotify = get_spotify_client()
     twilio = get_twilio_client()
     youtube = get_youtube_client()
+    songstats = get_songstats_client(db)
     tracking_controller = TrackingController(spotify, songstats, db, twilio)
 
     eval_controller = EvalController(spotify, youtube, db, tracking_controller)
@@ -572,7 +574,7 @@ def fn_v2_ingest_job(event: scheduler_fn.ScheduledEvent) -> None:
     youtube = get_youtube_client()
     spotify = get_spotify_client()
     twilio = get_twilio_client()
-    tracking_controller = TrackingController(spotify, songstats, db, twilio)
+    tracking_controller = TrackingController(spotify, get_songstats_client(db), db, twilio)
     eval_controller = EvalController(spotify, youtube, db, tracking_controller)
     task_controller = get_task_controller()
     sql_session = sql.get_session()
@@ -596,7 +598,7 @@ def fn_v2_update_job(event: scheduler_fn.ScheduledEvent) -> None:
     db = firestore.client(app)
     spotify = get_spotify_client()
     twilio = get_twilio_client()
-    tracking_controller = TrackingController(spotify, songstats, db, twilio)
+    tracking_controller = TrackingController(spotify, get_songstats_client(db), db, twilio)
     task_controller = get_task_controller()
     sql_session = sql.get_session()
 
@@ -625,7 +627,7 @@ def fn_v2_alerts_cron(event: scheduler_fn.ScheduledEvent) -> None:
 #################################
 def add_artist(sql_session, uid, spotify_url = None, identifier = False, tags = None, preview = False):
     db = firestore.client(app)
-    songstats = SongstatsClient(SONGSTATS_API_KEY)
+    songstats = get_songstats_client(db)
     spotify = get_spotify_client()
     tracking_controller = TrackingController(spotify, songstats, db)
     print(uid, identifier, spotify_url, str(tags), preview)
@@ -1347,7 +1349,7 @@ def process_spotify_link(sql_session, uid, spotify_url, tags = None, preview = F
     task_controller = get_task_controller()
     try:
         db = firestore.client(app)
-        songstats = SongstatsClient(SONGSTATS_API_KEY)
+        songstats = get_songstats_client(db)
 
         tracking_controller = TrackingController(spotify, songstats, db, None)
 

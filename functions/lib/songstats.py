@@ -4,11 +4,13 @@ import requests
 import json
 import pandas as pd
 from datetime import datetime, timedelta
+from google.cloud.firestore_v1 import SERVER_TIMESTAMP
 from .errors import ErrorResponse
 
 class SongstatsClient():
-  def __init__(self, key):
+  def __init__(self, key, db=None):
     self.key = key
+    self.db = db
     self.root_uri = f"https://api.songstats.com/enterprise/v1"
 
   def get(self, path, data=None):
@@ -27,15 +29,75 @@ class SongstatsClient():
       raise ErrorResponse(res.json(), res.status_code, "Songstats")
     return res.json()
 
+  def get_cached_artist_info(self, lookup_id: str, lookup_type: str, expires_delta: timedelta = timedelta(days=3)):
+    """
+    Cached wrapper for /artists/info. Stores full response in Firestore songstats_cache.
+    lookup_type: "spotify" or "songstats" — determines which field to query/store by.
+    """
+    # Build the API params for a direct call
+    if lookup_type == "spotify":
+      api_params = {"spotify_artist_id": lookup_id}
+      query_field = "spotify_id"
+    else:
+      api_params = {"songstats_artist_id": lookup_id}
+      query_field = "songstats_id"
+
+    # No db = no cache, just hit API directly
+    if self.db is None:
+      return self.get('/artists/info', api_params)
+
+    # Check cache
+    try:
+      cached_docs = self.db.collection("songstats_cache").where(
+        query_field, "==", lookup_id
+      ).limit(1).get()
+
+      for doc in cached_docs:
+        doc_data = doc.to_dict()
+        created_at = doc_data.get('created_at')
+        if created_at and created_at.replace(tzinfo=None) > datetime.now() - expires_delta:
+          print(f"[songstats_cache] HIT for {query_field}={lookup_id}")
+          return doc_data['data']
+        else:
+          # Stale — fetch fresh, update in place
+          print(f"[songstats_cache] STALE for {query_field}={lookup_id}")
+          result = self.get('/artists/info', api_params)
+          spotify_id = result.get('spotify_id') or result.get('artist_info', {}).get('spotify_id') or (lookup_id if lookup_type == "spotify" else None)
+          songstats_id = result.get('id') or result.get('artist_info', {}).get('id') or (lookup_id if lookup_type == "songstats" else None)
+          doc.reference.set({
+            "spotify_id": spotify_id,
+            "songstats_id": songstats_id,
+            "data": result,
+            "created_at": SERVER_TIMESTAMP,
+          })
+          return result
+    except Exception as e:
+      # If cache read fails, log and fall through to API
+      if isinstance(e, ErrorResponse):
+        raise
+      print(f"[songstats_cache] cache read error: {e}")
+
+    # Cache miss — fetch from API
+    print(f"[songstats_cache] MISS for {query_field}={lookup_id}")
+    result = self.get('/artists/info', api_params)
+    spotify_id = result.get('spotify_id') or result.get('artist_info', {}).get('spotify_id') or (lookup_id if lookup_type == "spotify" else None)
+    songstats_id = result.get('id') or result.get('artist_info', {}).get('id') or (lookup_id if lookup_type == "songstats" else None)
+    try:
+      self.db.collection("songstats_cache").add({
+        "spotify_id": spotify_id,
+        "songstats_id": songstats_id,
+        "data": result,
+        "created_at": SERVER_TIMESTAMP,
+      })
+    except Exception as e:
+      print(f"[songstats_cache] cache write error: {e}")
+    return result
+
   def get_artist_info_songstats(self, songstats_id : str):
-    return self.get('/artists/info', {
-      "songstats_artist_id": songstats_id
-    })
+    return self.get_cached_artist_info(songstats_id, "songstats")
 
   def get_artist_info(self, spotify_id : str):
-    return self.get('/artists/info', {
-      "spotify_artist_id": spotify_id
-    })
+    return self.get_cached_artist_info(spotify_id, "spotify")
 
   def get_artists_from_track(self, spotify_id : str):
     """
