@@ -217,6 +217,9 @@ class TrackingController():
 
         # check if the ID is valid (this will raise a 400 if the artist is invalid)
         artist = self.spotify.get_artist(spotify_id)
+        image = None
+        if len(artist.get('images', list())) > 0:
+            image = artist.get('images')[0]['url']
         # create an artist
         new_schema = {
             "id": spotify_id,
@@ -226,7 +229,7 @@ class TrackingController():
             "genres": artist['genres'],
             "ob_status": "needs_ingest",
             "ob_wait_till": None,
-            "avatar": None,
+            "avatar": image,
             "stats_as_of": datetime(2000, 1, 1, 1, 1, 1, 1),
             "stat_dates": [],
             "eval_as_of": datetime(2000, 1, 1, 1, 1, 1, 1),
@@ -582,7 +585,8 @@ class TrackingController():
              .filter(~Artist.statistics.any())
               .filter(or_(Artist.onboard_failure == None, Artist.onboard_failure != 300))
              .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
-             .filter(and_(Artist.active == True, Artist.id.in_(sub_query)))).limit(limit)
+             .filter(and_(Artist.active == True, Artist.id.in_(sub_query)))
+             .order_by(Artist.created_at.asc())).limit(limit)
     sql_ids = sql_session.scalars(sql_ids).unique()
 
     sql_ids = list(sql_ids)
@@ -594,7 +598,8 @@ class TrackingController():
                .filter(or_(Artist.onboard_failure == None, Artist.onboard_failure != 300))
                .filter(Artist.statistics.any(Statistic.updated_at <  func.now() - timedelta(days=1)))
                .filter(or_(Artist.stats_queued_at == None, Artist.stats_queued_at < func.now() - timedelta(hours=16)))
-               .filter(and_(Artist.active == True, Artist.id.in_(sub_query)))).limit(limit - len(sql_ids))
+               .filter(and_(Artist.active == True, Artist.id.in_(sub_query)))
+               .order_by(Artist.stats_queued_at.asc().nullsfirst())).limit(limit - len(sql_ids))
     sql_ids_two = sql_session.scalars(sql_ids_two).unique()
     for id in sql_ids_two:
         if id not in sql_ids:
@@ -605,9 +610,9 @@ class TrackingController():
 
       filtered_sources = list(filter(lambda s: s.key == link.get('source'), sources))
 
-      if len(sources) == 0:
-          print("No valid source: " + link.get('source') + ' ' + link.get('url'))
-          exit(1)
+      if len(filtered_sources) == 0:
+          print(f"No valid source: '{link.get('source')}' for url '{link.get('url')}' — skipping link. Known sources: {[s.key for s in sources]}")
+          return None
 
       url: str = link.get('url')
       source: LinkSource = filtered_sources[0]
@@ -840,7 +845,7 @@ class TrackingController():
       links = list()
       dict_artist = artist.to_dict()
       if 'links' in dict_artist:
-          links = list(map(lambda x: self.convert_artist_link(x, link_sources, sql_id), dict_artist.get('links', [])))
+          links = list(filter(None, map(lambda x: self.convert_artist_link(x, link_sources, sql_id), dict_artist.get('links', []))))
 
           filtered_links = list()
           for link in links:
