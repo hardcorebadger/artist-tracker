@@ -209,22 +209,32 @@ class ArtistController():
                     value /= 100
                 query = self.build_condition(query, getattr(dynamic, statistic_func), operator, value)
             elif field == 'tags':
-                tag_type = 1
-                if field == 'tag_genre':
-                    tag_type = 2
-
                 if operator == 'is':
                     if value is None:
-                        query = query.filter(~(Artist.tags.any(and_(ArtistTag.tag_type_id == tag_type, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None)))))
+                        query = query.filter(~(Artist.tags.any(and_(ArtistTag.tag_type_id == 1, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None)))))
                     else:
-                        query = query.filter(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == tag_type, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))))
+                        query = query.filter(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == 1, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))))
                 elif operator == 'not':
                     if value is None:
-                        query = query.filter(Artist.tags.any(and_(ArtistTag.tag_type_id == tag_type, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))))
+                        query = query.filter(Artist.tags.any(and_(ArtistTag.tag_type_id == 1, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))))
                     else:
-                        query = query.filter(~(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == tag_type, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None)))))
+                        query = query.filter(~(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == 1, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None)))))
                 elif operator == 'isAnyOf' and value is not None and len(value) > 0:
-                    query = query.filter(Artist.tags.any(and_(ArtistTag.tag.in_(value), ArtistTag.tag_type_id == tag_type, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))))
+                    query = query.filter(Artist.tags.any(and_(ArtistTag.tag.in_(value), ArtistTag.tag_type_id == 1, or_(ArtistTag.organization_id == user_data.get('organization'), ArtistTag.organization_id == None))))
+
+            elif field == 'genres':
+                if operator == 'is':
+                    if value is None:
+                        query = query.filter(~(Artist.tags.any(ArtistTag.tag_type_id == 4)))
+                    else:
+                        query = query.filter(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == 4)))
+                elif operator == 'not':
+                    if value is None:
+                        query = query.filter(Artist.tags.any(ArtistTag.tag_type_id == 4))
+                    else:
+                        query = query.filter(~(Artist.tags.any(and_(ArtistTag.tag == value, ArtistTag.tag_type_id == 4))))
+                elif operator == 'isAnyOf' and value is not None and len(value) > 0:
+                    query = query.filter(Artist.tags.any(and_(ArtistTag.tag.in_(value), ArtistTag.tag_type_id == 4)))
 
             elif field.startswith('evaluation.'):
                 eval_key = field.split('.')
