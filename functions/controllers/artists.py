@@ -425,9 +425,11 @@ class ArtistController():
             Tuple of (file content, mimetype, filename)
         """
         try:
-            # Get all statistic types and link sources for column headers
-            stat_types_list = self._load_stat_types(sql_session)
-            link_sources_list = self._load_link_sources(sql_session)
+            # Only load stat types and link sources if those columns are needed
+            has_stat_columns = not column_order or any(c.startswith("statistic.") for c in column_order)
+            has_link_columns = not column_order or any(c.startswith("link_") for c in column_order)
+            stat_types_list = self._load_stat_types(sql_session) if has_stat_columns else []
+            link_sources_list = self._load_link_sources(sql_session) if has_link_columns else []
             
             # Create a set of all possible headers
             all_headers = {
@@ -558,11 +560,12 @@ class ArtistController():
                 None: "Unknown"
             }
             
-            # Load user data for added_by field
+            # Load user data for added_by field (skip Firestore query if not needed)
             users_data = {}
-            users = self._load_users(user_data.get('organization'))
-            for user_info in users:
-                users_data[user_info.get('id')] = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
+            if "added_by" in headers:
+                users = self._load_users(user_data.get('organization'))
+                for user_info in users:
+                    users_data[user_info.get('id')] = f"{user_info.get('first_name', '')} {user_info.get('last_name', '')}".strip()
             
             # Prepare data rows (field values for each artist)
             data_rows = []

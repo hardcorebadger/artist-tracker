@@ -9,7 +9,7 @@ from firebase_functions.options import RetryConfig, MemoryOption
 from flask import jsonify, Response
 from google.cloud.firestore_v1 import FieldFilter, Or
 from sqlalchemy import select, or_, update, text, and_
-from sqlalchemy.orm import joinedload, close_all_sessions
+from sqlalchemy.orm import joinedload, selectinload, close_all_sessions
 
 from controllers.artists import ArtistController
 from controllers.playlists import PlaylistController
@@ -781,38 +781,43 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             
             db = firestore.client(app)
             user_data = get_user(user.uid, db)
-            
+
+            # Build load options based on which columns are actually needed
+            needs_stats = not column_order or any(c.startswith("statistic.") for c in column_order)
+            needs_links = not column_order or any(c.startswith("link_") for c in column_order)
+            needs_eval = not column_order or any(c.startswith("evaluation.") for c in column_order)
+            needs_tags = not column_order or "tags" in column_order
+            needs_users = not column_order or "users" in column_order
+
+            load_options = [selectinload(Artist.organizations)]
+            if needs_stats:
+                load_options.append(selectinload(Artist.statistics).joinedload(Statistic.type, innerjoin=True))
+            if needs_links:
+                load_options.append(selectinload(Artist.links).joinedload(ArtistLink.source, innerjoin=True))
+            if needs_eval:
+                load_options.append(selectinload(Artist.evaluation))
+            if needs_tags:
+                load_options.append(selectinload(Artist.tags))
+            if needs_users:
+                load_options.append(selectinload(Artist.users))
+
             # Get artists based on IDs or filter model
             if filter_model is None and artist_ids is not None:
                 if isinstance(artist_ids, str):
                     artist_ids = [artist_ids]
                 # Query for specific artist IDs
-                query = (select(Artist).options(
-                    joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True),
-                    joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True),
-                    joinedload(Artist.evaluation, innerjoin=False),
-                    joinedload(Artist.organizations, innerjoin=False),
-                    joinedload(Artist.tags, innerjoin=False),
-                    joinedload(Artist.users, innerjoin=False)
-                ).where(Artist.id.in_(artist_ids)))
+                query = select(Artist).options(*load_options).where(Artist.id.in_(artist_ids))
                 artists = sql_session.scalars(query).unique().all()
             else:
                 # Use the filter model to get artist IDs
                 artists_controller = get_artists_controller()
                 artist_ids = artists_controller.get_artists(user.uid, {"filterModel": filter_model}, app, sql_session, True)
-                
+
                 if not artist_ids or len(artist_ids) == 0:
                     return flask.jsonify({"error": "No artists found matching the filter criteria"}), 404
-                
+
                 # Query for artists with these IDs
-                query = (select(Artist).options(
-                    joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True),
-                    joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True),
-                    joinedload(Artist.evaluation, innerjoin=False),
-                    joinedload(Artist.organizations, innerjoin=False),
-                    joinedload(Artist.tags, innerjoin=False),
-                    joinedload(Artist.users, innerjoin=False)
-                ).where(Artist.id.in_(artist_ids)))
+                query = select(Artist).options(*load_options).where(Artist.id.in_(artist_ids))
                 artists = sql_session.scalars(query).unique().all()
             
             if not artists or len(artists) == 0:
