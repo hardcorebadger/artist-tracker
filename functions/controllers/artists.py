@@ -10,7 +10,7 @@ from datetime import datetime
 from firebase_admin import firestore
 from google.cloud.firestore_v1 import FieldFilter
 from sqlalchemy import select, and_, not_, or_, text, func
-from sqlalchemy.orm import joinedload, contains_eager, aliased, subqueryload
+from sqlalchemy.orm import joinedload, contains_eager, aliased, subqueryload, selectinload
 
 from lib import Artist, get_user, LinkSource, ArtistLink, ArtistTag, OrganizationArtist, Evaluation, StatisticType, Statistic, \
     UserArtist, Attribution, pop_default
@@ -129,12 +129,12 @@ class ArtistController():
         
         if not count and not ids_only:
             query = (select(Artist).options(
-                joinedload(Artist.statistics).joinedload(Statistic.type, innerjoin=True).defer(StatisticType.created_at).defer(StatisticType.updated_at),
-                joinedload(Artist.links, innerjoin=False).joinedload(ArtistLink.source, innerjoin=True).defer(LinkSource.logo),
+                selectinload(Artist.statistics).joinedload(Statistic.type, innerjoin=True).defer(StatisticType.created_at).defer(StatisticType.updated_at),
+                selectinload(Artist.links).joinedload(ArtistLink.source, innerjoin=True).defer(LinkSource.logo),
                 contains_eager(Artist.organizations),
                 contains_eager(Artist.evaluation),
-                joinedload(Artist.users, innerjoin=False),
-                joinedload(Artist.tags, innerjoin=False),
+                selectinload(Artist.users),
+                selectinload(Artist.tags),
             ))
 
         if id_lookup is not None and not ids_only:
