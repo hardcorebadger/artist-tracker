@@ -612,10 +612,15 @@ class ArtistController():
                     if hasattr(link, 'source') and hasattr(link.source, 'key') and link.source.key in needed_link_keys:
                         fields[f"link_{link.source.key}"] = link.url
                 
-                # Fill in missing link fields with empty strings
+                # Fill in missing link fields with empty strings.
+                # For Spotify, fall back to constructing the URL from spotify_id so exports
+                # match what the UI shows (see ColumnConfig.tsx linkColumnFactory).
                 for header in headers:
-                    if header.startswith("link_") and header not in fields:
-                        fields[header] = ""
+                    if header.startswith("link_") and not fields.get(header):
+                        if header == "link_spotify" and artist.spotify_id:
+                            fields[header] = f"https://open.spotify.com/artist/{artist.spotify_id}"
+                        else:
+                            fields[header] = ""
                 
                 # Get the needed statistic types based on headers
                 needed_stat_keys = set()
