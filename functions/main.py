@@ -187,6 +187,23 @@ def lookaliketask(req: tasks_fn.CallableRequest) -> str:
     return message
 
 
+@tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=3, max_backoff_seconds=60), memory=MemoryOption.MB_512)
+def generateplaylisttask(req: tasks_fn.CallableRequest) -> str:
+    # Playlist-generation background job (new). Enqueued by indiestack via the Firebase
+    # Admin task queue. Reads/writes the generation_* tables and the operator's Spotify.
+    db = firestore.client(app)
+    job_id = req.data.get('job_id')
+    sql_session = sql.get_session()
+    try:
+        from controllers.generation import GenerationController
+        controller = GenerationController(get_spotify_client(), sql_session, db)
+        message = controller.process_job(job_id)
+        print(message)
+        return message
+    finally:
+        sql_session.close()
+
+
 @tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=5, min_backoff_seconds=60), memory=MemoryOption.MB_512)
 def reimportsql(req: tasks_fn.CallableRequest) -> str:
 

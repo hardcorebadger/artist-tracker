@@ -26,6 +26,16 @@ SPOTIFY_ALT_CLIENT_SECRET = StringParam("SPOTIFY_ALT_CLIENT_SECRET").value
 SPOTIFY_USER_FACING_CLIENT_ID = StringParam("SPOTIFY_USER_FACING_CLIENT_ID").value
 SPOTIFY_USER_FACING_CLIENT_SECRET = StringParam("SPOTIFY_USER_FACING_CLIENT_SECRET").value
 
+# Playlist generation feature — dedicated Spotify app + discovery, used only by the
+# generateplaylisttask background job. SPOTIFY_TOKEN_ENC_KEY must match indiestack's value.
+SPOTIFY_PLAYLIST_CLIENT_ID = StringParam("SPOTIFY_PLAYLIST_CLIENT_ID").value
+SPOTIFY_PLAYLIST_CLIENT_SECRET = StringParam("SPOTIFY_PLAYLIST_CLIENT_SECRET").value
+SPOTIFY_TOKEN_ENC_KEY = StringParam("SPOTIFY_TOKEN_ENC_KEY").value
+LASTFM_API_KEY = StringParam("LASTFM_API_KEY").value
+# Optional AI fallback — the indiestack AI-SDK route called on Last.fm shortfall.
+AI_FALLBACK_URL = StringParam("AI_FALLBACK_URL").value
+INTERNAL_API_SECRET = StringParam("INTERNAL_API_SECRET").value
+
 
 TWILIO_VERIFY_SERVICE = StringParam("TWILIO_VERIFY_SERVICE").value
 TWILIO_TOKEN = StringParam("TWILIO_TOKEN").value
