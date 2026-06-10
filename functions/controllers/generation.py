@@ -25,6 +25,7 @@ from lib.models_generation import GenerationJob, GeneratedPlaylist, DiscoveredTr
 from lib.spotify_playlist_writer import (
     SpotifyPlaylistWriter, get_operator_connection, ensure_operator_token,
 )
+from lib.spotify_operator import OperatorSpotifyClient
 
 # Per-seed discovery budget — ship a shorter playlist rather than exceed the task deadline.
 DISCOVERY_DEADLINE_S = 30
@@ -32,7 +33,9 @@ DISCOVERY_DEADLINE_S = 30
 
 class GenerationController:
     def __init__(self, spotify, sql_session, db):
-        self.spotify = spotify          # read/search SpotifyClient (app credentials)
+        # `spotify` (app-credential client) is intentionally ignored: generation must read with the
+        # operator's OAuth token only. process_job builds an OperatorSpotifyClient once the token loads.
+        self.spotify = spotify
         self.sql = sql_session
         self.db = db
 
@@ -54,6 +57,11 @@ class GenerationController:
             if not connection:
                 raise Exception('No Spotify connection for this operator')
             access_token = ensure_operator_token(self.sql, connection)
+            # All generation reads use the operator's OAuth token (never the shared app pairs).
+            self.spotify = OperatorSpotifyClient(
+                self.db, access_token,
+                token_provider=lambda: ensure_operator_token(self.sql, connection),
+            )
             writer = SpotifyPlaylistWriter(access_token)
             operator_spotify_id = writer.get_current_user().get('id')
             job.operator_spotify_id = operator_spotify_id

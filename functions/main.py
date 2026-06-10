@@ -24,6 +24,7 @@ from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsC
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController, LookalikeController
 from lib.models_generation import GenerationJob
 from lib.spotify_playlist_writer import get_operator_connection, ensure_operator_token, SpotifyPlaylistWriter
+from lib.spotify_operator import OperatorSpotifyClient
 import flask
 from datetime import datetime, timedelta
 import traceback
@@ -1357,7 +1358,11 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             token = ensure_operator_token(sql_session, connection)
             track_ids = SpotifyPlaylistWriter(token).get_playlist_track_ids(playlist_id)
 
-            spotify = get_spotify_client()
+            # Hydrate track objects with the OPERATOR's token too — never the shared app pairs.
+            spotify = OperatorSpotifyClient(
+                db, token,
+                token_provider=lambda: ensure_operator_token(sql_session, connection),
+            )
             by_id = {}
             for i in range(0, len(track_ids), 50):
                 for obj in spotify.get_cached(track_ids[i:i + 50], 'track', None):
