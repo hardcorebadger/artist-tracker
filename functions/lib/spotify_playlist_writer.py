@@ -88,6 +88,21 @@ class SpotifyPlaylistWriter:
     def get_current_user(self):
         return self._request('GET', '/me')
 
+    def get_playlist_track_ids(self, playlist_id):
+        """List a playlist's track ids using the operator token (reads their private playlists)."""
+        ids, seen = [], set()
+        url = f'/playlists/{playlist_id}/tracks?limit=100&fields=items(track(id)),next'
+        while url:
+            resp = self._request('GET', url)
+            for item in resp.get('items') or []:
+                t = item.get('track')
+                if t and t.get('id') and t['id'] not in seen:
+                    seen.add(t['id'])
+                    ids.append(t['id'])
+            nxt = resp.get('next')
+            url = nxt.replace(SPOTIFY_API_BASE, '') if nxt else None
+        return ids
+
     def create_playlist(self, user_id, name, description, public=False):
         return self._request('POST', f'/users/{user_id}/playlists', {
             'name': name, 'description': description, 'public': public,

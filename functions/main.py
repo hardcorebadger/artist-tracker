@@ -23,6 +23,7 @@ from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsC
     ArtistTag, Playlist, Subscription, pop_default, Attribution, Import, ImportArtist, Statistic, ArtistLink, Lookalike
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController, LookalikeController
 from lib.models_generation import GenerationJob
+from lib.spotify_playlist_writer import get_operator_connection, ensure_operator_token, SpotifyPlaylistWriter
 import flask
 from datetime import datetime, timedelta
 import traceback
@@ -1335,6 +1336,52 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             print(str(e))
             print(traceback.format_exc())
             return flask.jsonify({"error": "An error occurred while queuing generation task", "details": str(e)}), 500
+
+    @v3_api.post('/generation/playlist-tracks')
+    def generation_playlist_tracks():
+        try:
+            data = flask.request.get_json()
+            playlist_id = data.get('playlist_id')
+            if not playlist_id:
+                return flask.jsonify({"error": "Missing playlist_id parameter"}), 400
+
+            db = firestore.client(app)
+            user_data = get_user(user.uid, db)
+
+            # Load the playlist's track ids with the SUBMITTING user's dedicated Spotify token
+            # (reads their private playlists). Track objects themselves are public, so fetch +
+            # cache them via the existing get_cached('track', ...) — same storage as the importer.
+            connection = get_operator_connection(sql_session, user.uid, user_data.get('organization'))
+            if not connection:
+                return flask.jsonify({"connected": False, "tracks": []}), 200
+            token = ensure_operator_token(sql_session, connection)
+            track_ids = SpotifyPlaylistWriter(token).get_playlist_track_ids(playlist_id)
+
+            spotify = get_spotify_client()
+            by_id = {}
+            for i in range(0, len(track_ids), 50):
+                for obj in spotify.get_cached(track_ids[i:i + 50], 'track', None):
+                    if obj and obj.get('id'):
+                        by_id[obj['id']] = obj
+
+            tracks = []
+            for tid in track_ids:  # preserve playlist order
+                t = by_id.get(tid)
+                if not t:
+                    continue
+                tracks.append({
+                    "id": t['id'],
+                    "name": t.get('name') or '',
+                    "artist": (t.get('artists') or [{}])[0].get('name') or '',
+                    "image": ((t.get('album') or {}).get('images') or [{}])[0].get('url'),
+                })
+
+            return flask.jsonify({"connected": True, "tracks": tracks}), 200
+
+        except Exception as e:
+            print(str(e))
+            print(traceback.format_exc())
+            return flask.jsonify({"error": "An error occurred while loading playlist tracks", "details": str(e)}), 500
 
     @v3_api.after_request
     def after_request(response):
