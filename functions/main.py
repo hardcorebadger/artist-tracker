@@ -189,7 +189,7 @@ def lookaliketask(req: tasks_fn.CallableRequest) -> str:
     return message
 
 
-@tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=3, max_backoff_seconds=60), memory=MemoryOption.MB_512)
+@tasks_fn.on_task_dispatched(retry_config=RetryConfig(max_attempts=3, max_backoff_seconds=60), memory=MemoryOption.MB_512, timeout_sec=540)
 def generateplaylisttask(req: tasks_fn.CallableRequest) -> str:
     # Playlist-generation background job (new). Enqueued by indiestack via the Firebase
     # Admin task queue. Reads/writes the generation_* tables and the operator's Spotify.

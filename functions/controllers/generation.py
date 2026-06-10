@@ -81,6 +81,7 @@ class GenerationController:
                     print(traceback.format_exc())
                     self._record_seed_error(job, seed['artist_name'], str(e))
 
+            self._recompute_counts(job)
             self.sql.refresh(job)
             job.status = 'cancelled' if job.cancellation_requested else 'completed'
             job.phase = 'done'
@@ -362,6 +363,16 @@ class GenerationController:
     # -- per-seed processing ---------------------------------------------------
 
     def _process_seed(self, job, writer, operator_spotify_id, seed, index, tracks_per, name_template, make_public):
+        # Idempotent resume: if a retried task already built this seed's playlist for THIS job,
+        # skip it — prevents duplicate Spotify writes and inflated counters.
+        done = self.sql.query(GeneratedPlaylist).filter(
+            GeneratedPlaylist.generation_job_id == job.id,
+            GeneratedPlaylist.seed_artist_spotify_id == seed['artist_spotify_id'],
+            GeneratedPlaylist.status == 3,
+        ).first()
+        if done:
+            return
+
         playlist_name = name_template.replace('{artist}', seed['artist_name'])
         job.phase = 'discovering'
         job.message = f'Playlist {index + 1}/{job.total_playlists}: {playlist_name}'
@@ -442,17 +453,35 @@ class GenerationController:
             ))
         self.sql.commit()
 
-        # Atomic progress bump.
-        self.sql.execute(text(
-            'UPDATE generation_jobs SET completed_playlists = completed_playlists + 1, '
-            'tracks_discovered = tracks_discovered + :tc, unique_artists_found = unique_artists_found + :ua, '
-            'updated_at = NOW() WHERE id = :id'
-        ), {'tc': len(picked), 'ua': len(used), 'id': job.id})
-        self.sql.commit()
+        # Clear any stale error from a prior failed attempt at this seed, then derive the
+        # progress counters from the actual rows (idempotent — retries can't inflate them).
+        self._clear_seed_error(job, seed['artist_name'])
+        self._recompute_counts(job)
 
     def _record_seed_error(self, job, artist_name, message):
         errors = list(job.errors or [])
         errors.append({'seed_artist': artist_name, 'error': message, 'timestamp': datetime.now().isoformat()})
         job.errors = errors
         self.sql.add(job)
+        self.sql.commit()
+
+    def _clear_seed_error(self, job, artist_name):
+        if not job.errors:
+            return
+        remaining = [e for e in job.errors if e.get('seed_artist') != artist_name]
+        if len(remaining) != len(job.errors):
+            job.errors = remaining
+            self.sql.add(job)
+            self.sql.commit()
+
+    def _recompute_counts(self, job):
+        # Counters derived from the generated rows so a retried/duplicated run can't inflate them.
+        self.sql.execute(text(
+            'UPDATE generation_jobs g SET '
+            'completed_playlists = (SELECT COUNT(*) FROM generated_playlists WHERE generation_job_id = g.id), '
+            'tracks_discovered = (SELECT COALESCE(SUM(total_tracks), 0) FROM generated_playlists WHERE generation_job_id = g.id), '
+            'unique_artists_found = (SELECT COUNT(DISTINCT dt.spotify_artist_id) FROM discovered_tracks dt '
+            'JOIN generated_playlists gp ON dt.generated_playlist_id = gp.id WHERE gp.generation_job_id = g.id), '
+            'updated_at = NOW() WHERE g.id = :id'
+        ), {'id': job.id})
         self.sql.commit()
