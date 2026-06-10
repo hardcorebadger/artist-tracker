@@ -22,6 +22,7 @@ from lib import Artist, SpotifyClient, AirtableClient, YoutubeClient, SongstatsC
     CloudSQLClient, LinkSource, OrganizationArtist, StatisticType, \
     ArtistTag, Playlist, Subscription, pop_default, Attribution, Import, ImportArtist, Statistic, ArtistLink, Lookalike
 from controllers import AirtableV1Controller, TaskController, TrackingController, EvalController, LookalikeController
+from lib.models_generation import GenerationJob
 import flask
 from datetime import datetime, timedelta
 import traceback
@@ -1289,6 +1290,48 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             print(str(e))
             print(traceback.format_exc())
             return flask.jsonify({"error": "An error occurred while queuing artist additions", "details": str(e)}), 500
+
+    @v3_api.post('/generation/queue')
+    def queue_generation_task():
+        try:
+            data = flask.request.get_json()
+            job_id = data.get('job_id')
+
+            if not job_id:
+                return flask.jsonify({"error": "Missing job_id parameter"}), 400
+
+            # Scope to the caller's org so one org can't trigger another's job.
+            job = sql_session.query(GenerationJob).filter(
+                GenerationJob.id == job_id,
+                GenerationJob.organization_id == user_data.get('organization'),
+            ).first()
+
+            if not job:
+                return flask.jsonify({"error": f"Generation job {job_id} not found"}), 404
+
+            if job.status != 'queued':
+                return flask.jsonify({"error": f"Generation job {job_id} already processed (status: {job.status})"}), 400
+
+            task_queue = functions.task_queue("generateplaylisttask")
+            target_uri = get_function_url("generateplaylisttask")
+
+            body = {"data": {"job_id": job_id}}
+            task_options = functions.TaskOptions(
+                schedule_time=datetime.now(),
+                uri=target_uri
+            )
+
+            task_queue.enqueue(body, task_options)
+
+            return flask.jsonify({
+                "message": f"Successfully queued generation job {job_id}",
+                "job_id": job_id
+            }), 200
+
+        except Exception as e:
+            print(str(e))
+            print(traceback.format_exc())
+            return flask.jsonify({"error": "An error occurred while queuing generation task", "details": str(e)}), 500
 
     @v3_api.after_request
     def after_request(response):

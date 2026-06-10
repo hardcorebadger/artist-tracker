@@ -101,11 +101,14 @@ class GenerationController:
     # -- seeds -----------------------------------------------------------------
 
     def _resolve_seeds(self, job):
-        # If the operator selected specific tracks, seed from those; otherwise derive one
-        # seed per artist from the source playlist (each artist's top track as the seed).
+        # If the operator selected specific tracks, seed from those; a single source artist
+        # yields one seed (replaces the old lookalike entry); otherwise derive one seed per
+        # artist from the source playlist (each artist's top track as the seed).
         track_ids = job.selected_track_ids or []
         if track_ids:
             return self._seeds_from_tracks(track_ids)
+        if job.source_artist_id:
+            return self._seeds_from_artist(job.source_artist_id, job.source_artist_name)
         return self._seeds_from_playlist(job.source_playlist_id)
 
     def _seeds_from_tracks(self, track_ids):
@@ -163,6 +166,29 @@ class GenerationController:
                 'track_uri': t.get('uri') or f'spotify:track:{t.get("id")}',
             })
         return seeds
+
+    def _seeds_from_artist(self, artist_id, artist_name):
+        # Single-artist seed: the artist's top track seeds one discovery playlist of
+        # similar artists. Mirrors the per-artist branch of _seeds_from_playlist.
+        try:
+            top = spotify_limiter.execute(lambda: self.spotify.get_artist_top_tracks(artist_id))
+        except Exception as e:
+            print(f'top tracks for artist {artist_id} failed: {e}')
+            return []
+        tracks = (top or {}).get('tracks', [])
+        if not tracks:
+            return []
+        t = tracks[0]
+        name = artist_name
+        if not name:
+            name = (t.get('artists') or [{}])[0].get('name')
+        return [{
+            'artist_spotify_id': artist_id,
+            'artist_name': name,
+            'track_spotify_id': t.get('id'),
+            'track_name': t.get('name'),
+            'track_uri': t.get('uri') or f'spotify:track:{t.get("id")}',
+        }]
 
     # -- discovery -------------------------------------------------------------
 
