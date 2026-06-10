@@ -1300,6 +1300,9 @@ def fn_v3_api(request: https_fn.Request) -> https_fn.Response:
             if not job_id:
                 return flask.jsonify({"error": "Missing job_id parameter"}), 400
 
+            db = firestore.client(app)
+            user_data = get_user(user.uid, db)
+
             # Scope to the caller's org so one org can't trigger another's job.
             job = sql_session.query(GenerationJob).filter(
                 GenerationJob.id == job_id,
