@@ -128,12 +128,16 @@ class GenerationController:
             if not aid or aid in seen_artists:
                 continue
             seen_artists.add(aid)
+            album = track.get('album') or {}
+            images = album.get('images') or []
             seeds.append({
                 'artist_spotify_id': aid,
                 'artist_name': artist.get('name'),
                 'track_spotify_id': track.get('id'),
                 'track_name': track.get('name'),
                 'track_uri': track.get('uri') or f'spotify:track:{track.get("id")}',
+                'album_name': album.get('name'),
+                'album_image_url': images[0]['url'] if images else None,
             })
         return seeds
 
@@ -159,12 +163,16 @@ class GenerationController:
             if not tracks:
                 continue
             t = tracks[0]
+            album = t.get('album') or {}
+            images = album.get('images') or []
             seeds.append({
                 'artist_spotify_id': aid,
                 'artist_name': a.get('name'),
                 'track_spotify_id': t.get('id'),
                 'track_name': t.get('name'),
                 'track_uri': t.get('uri') or f'spotify:track:{t.get("id")}',
+                'album_name': album.get('name'),
+                'album_image_url': images[0]['url'] if images else None,
             })
         return seeds
 
@@ -183,12 +191,16 @@ class GenerationController:
         name = artist_name
         if not name:
             name = (t.get('artists') or [{}])[0].get('name')
+        album = t.get('album') or {}
+        images = album.get('images') or []
         return [{
             'artist_spotify_id': artist_id,
             'artist_name': name,
             'track_spotify_id': t.get('id'),
             'track_name': t.get('name'),
             'track_uri': t.get('uri') or f'spotify:track:{t.get("id")}',
+            'album_name': album.get('name'),
+            'album_image_url': images[0]['url'] if images else None,
         }]
 
     # -- discovery -------------------------------------------------------------
@@ -207,7 +219,8 @@ class GenerationController:
             'track_uri': seed['track_uri'],
             'spotify_url': f'https://open.spotify.com/track/{seed["track_spotify_id"]}',
             'similarity_score': None, 'source': 'seed',
-            'album_id': None, 'album_name': None, 'album_type': None, 'album_image_url': None,
+            'album_id': None, 'album_name': seed.get('album_name'), 'album_type': None,
+            'album_image_url': seed.get('album_image_url'),
             'album_total_tracks': None, 'release_date': None, 'duration_ms': None, 'isrc': None,
             'lastfm_track_listeners': None, 'lastfm_track_playcount': None, 'lastfm_track_tags': [],
         }]
